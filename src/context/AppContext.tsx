@@ -1,6 +1,6 @@
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
 
-interface Student {
+export interface Student {
   id: string;
   name: string;
   grade: string;
@@ -9,9 +9,12 @@ interface Student {
   guardianEmail?: string;
   address?: string;
   enrollmentDate: string;
+  gender?: 'Male' | 'Female';
+  dateOfBirth?: string;
+  status?: 'active' | 'inactive' | 'transferred';
 }
 
-interface Payment {
+export interface Payment {
   id: string;
   studentId: string;
   type: string;
@@ -20,9 +23,12 @@ interface Payment {
   status: 'paid' | 'pending' | 'overdue';
   paidDate?: string;
   createdDate: string;
+  term?: string;
+  receiptNumber?: string;
+  notes?: string;
 }
 
-interface Uniform {
+export interface Uniform {
   id: string;
   studentId: string;
   item: string;
@@ -31,7 +37,7 @@ interface Uniform {
   status: string;
 }
 
-interface Requirement {
+export interface Requirement {
   id: string;
   studentId: string;
   item: string;
@@ -40,178 +46,436 @@ interface Requirement {
   term: string;
 }
 
+export interface Teacher {
+  id: string;
+  name: string;
+  subject: string;
+  phone: string;
+  email?: string;
+  qualification: string;
+  joinDate: string;
+  role: 'Teacher' | 'Deputy Head' | 'Head Teacher' | 'Support Staff';
+  assignedClass?: string;
+  status: 'active' | 'inactive';
+}
+
+export interface Expense {
+  id: string;
+  description: string;
+  category: 'Utilities' | 'Salaries' | 'Supplies' | 'Maintenance' | 'Food' | 'Transport' | 'Other';
+  amount: number;
+  date: string;
+  paidBy: string;
+  term: string;
+  receiptNumber?: string;
+}
+
+export interface InventoryItem {
+  id: string;
+  name: string;
+  category: 'Furniture' | 'Electronics' | 'Stationery' | 'Sports' | 'Cleaning' | 'Kitchen' | 'Other';
+  quantity: number;
+  unit: string;
+  condition: 'Good' | 'Fair' | 'Poor' | 'Damaged';
+  location: string;
+  lastUpdated: string;
+  notes?: string;
+}
+
+export interface SchoolEvent {
+  id: string;
+  title: string;
+  description: string;
+  date: string;
+  endDate?: string;
+  type: 'Academic' | 'Sports' | 'Cultural' | 'Meeting' | 'Holiday' | 'Other';
+  targetAudience: 'All' | 'Students' | 'Teachers' | 'Parents';
+}
+
 interface AppContextType {
   students: Student[];
   payments: Payment[];
   uniforms: Uniform[];
   requirements: Requirement[];
+  teachers: Teacher[];
+  expenses: Expense[];
+  inventory: InventoryItem[];
+  events: SchoolEvent[];
+  currentTerm: string;
+  setCurrentTerm: (term: string) => void;
   addStudent: (student: Student) => void;
   updateStudent: (id: string, student: Partial<Student>) => void;
   deleteStudent: (id: string) => void;
   addPayment: (payment: Payment) => void;
   updatePayment: (id: string, payment: Partial<Payment>) => void;
+  deletePayment: (id: string) => void;
   addUniformPurchase: (uniform: Uniform) => void;
   addRequirement: (requirement: Requirement) => void;
   updateRequirement: (id: string, requirement: Partial<Requirement>) => void;
+  addTeacher: (teacher: Teacher) => void;
+  updateTeacher: (id: string, teacher: Partial<Teacher>) => void;
+  deleteTeacher: (id: string) => void;
+  addExpense: (expense: Expense) => void;
+  updateExpense: (id: string, expense: Partial<Expense>) => void;
+  deleteExpense: (id: string) => void;
+  addInventoryItem: (item: InventoryItem) => void;
+  updateInventoryItem: (id: string, item: Partial<InventoryItem>) => void;
+  deleteInventoryItem: (id: string) => void;
+  addEvent: (event: SchoolEvent) => void;
+  updateEvent: (id: string, event: Partial<SchoolEvent>) => void;
+  deleteEvent: (id: string) => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
+function loadFromStorage<T>(key: string, defaultValue: T): T {
+  try {
+    const saved = localStorage.getItem(key);
+    return saved ? JSON.parse(saved) : defaultValue;
+  } catch {
+    return defaultValue;
+  }
+}
+
+const INITIAL_STUDENTS: Student[] = [
+  {
+    id: 'student-1',
+    name: 'Sarah Mwanza',
+    grade: 'Grade 5',
+    gender: 'Female',
+    guardianName: 'Mary Mwanza',
+    guardianPhone: '0977123456',
+    guardianEmail: 'mary.mwanza@email.com',
+    address: '123 Kabulonga Road, Lusaka',
+    enrollmentDate: '2024-01-15T00:00:00.000Z',
+    status: 'active'
+  },
+  {
+    id: 'student-2',
+    name: 'John Banda',
+    grade: 'Grade 3',
+    gender: 'Male',
+    guardianName: 'Peter Banda',
+    guardianPhone: '0966987654',
+    guardianEmail: 'peter.banda@email.com',
+    address: '456 Roma Road, Lusaka',
+    enrollmentDate: '2024-01-10T00:00:00.000Z',
+    status: 'active'
+  },
+  {
+    id: 'student-3',
+    name: 'Grace Phiri',
+    grade: 'Reception',
+    gender: 'Female',
+    guardianName: 'Janet Phiri',
+    guardianPhone: '0955555555',
+    enrollmentDate: '2024-02-01T00:00:00.000Z',
+    status: 'active'
+  },
+  {
+    id: 'student-4',
+    name: 'Chanda Phiri',
+    grade: 'Grade 2',
+    gender: 'Male',
+    guardianName: 'Janet Phiri',
+    guardianPhone: '0955555555',
+    enrollmentDate: '2024-01-15T00:00:00.000Z',
+    status: 'active'
+  }
+];
+
+const INITIAL_PAYMENTS: Payment[] = [
+  {
+    id: 'payment-1',
+    studentId: 'student-1',
+    type: 'Tuition Fee',
+    amount: 3000,
+    dueDate: '2026-02-01T00:00:00.000Z',
+    status: 'paid',
+    paidDate: '2026-01-28T00:00:00.000Z',
+    createdDate: '2026-01-15T00:00:00.000Z',
+    term: 'Term 1 2026',
+    receiptNumber: 'RCP-001'
+  },
+  {
+    id: 'payment-2',
+    studentId: 'student-2',
+    type: 'Tuition Fee',
+    amount: 2700,
+    dueDate: '2026-02-01T00:00:00.000Z',
+    status: 'pending',
+    createdDate: '2026-01-10T00:00:00.000Z',
+    term: 'Term 1 2026'
+  },
+  {
+    id: 'payment-3',
+    studentId: 'student-1',
+    type: 'Lunch',
+    amount: 500,
+    dueDate: '2026-02-15T00:00:00.000Z',
+    status: 'paid',
+    paidDate: '2026-02-01T00:00:00.000Z',
+    createdDate: '2026-01-15T00:00:00.000Z',
+    term: 'Term 1 2026'
+  },
+  {
+    id: 'payment-4',
+    studentId: 'student-3',
+    type: 'Tuition Fee',
+    amount: 2700,
+    dueDate: '2026-02-01T00:00:00.000Z',
+    status: 'overdue',
+    createdDate: '2026-01-20T00:00:00.000Z',
+    term: 'Term 1 2026'
+  },
+  {
+    id: 'payment-5',
+    studentId: 'student-4',
+    type: 'Tuition Fee',
+    amount: 2700,
+    dueDate: '2026-02-01T00:00:00.000Z',
+    status: 'pending',
+    createdDate: '2026-01-15T00:00:00.000Z',
+    term: 'Term 1 2026'
+  }
+];
+
+const INITIAL_TEACHERS: Teacher[] = [
+  {
+    id: 'teacher-1',
+    name: 'Mrs. Tembo',
+    subject: 'English & Mathematics',
+    phone: '0977001122',
+    email: 'tembo@gha.edu.zm',
+    qualification: 'B.Ed Primary Education',
+    joinDate: '2020-01-05T00:00:00.000Z',
+    role: 'Head Teacher',
+    status: 'active'
+  },
+  {
+    id: 'teacher-2',
+    name: 'Mr. Mutale',
+    subject: 'Science & Social Studies',
+    phone: '0966334455',
+    qualification: 'Diploma in Education',
+    joinDate: '2021-09-01T00:00:00.000Z',
+    role: 'Teacher',
+    assignedClass: 'Grade 5',
+    status: 'active'
+  },
+  {
+    id: 'teacher-3',
+    name: 'Mrs. Lungu',
+    subject: 'Baby & Middle Class',
+    phone: '0955667788',
+    qualification: 'Early Childhood Education Certificate',
+    joinDate: '2022-01-10T00:00:00.000Z',
+    role: 'Teacher',
+    assignedClass: 'Baby Class',
+    status: 'active'
+  }
+];
+
+const INITIAL_EXPENSES: Expense[] = [
+  {
+    id: 'expense-1',
+    description: 'Electricity Bill - January',
+    category: 'Utilities',
+    amount: 850,
+    date: '2026-01-31T00:00:00.000Z',
+    paidBy: 'Admin',
+    term: 'Term 1 2026',
+    receiptNumber: 'EXP-001'
+  },
+  {
+    id: 'expense-2',
+    description: 'Cleaning Supplies',
+    category: 'Supplies',
+    amount: 320,
+    date: '2026-02-05T00:00:00.000Z',
+    paidBy: 'Admin',
+    term: 'Term 1 2026'
+  }
+];
+
+const INITIAL_INVENTORY: InventoryItem[] = [
+  {
+    id: 'inv-1',
+    name: 'Student Desks',
+    category: 'Furniture',
+    quantity: 45,
+    unit: 'pieces',
+    condition: 'Good',
+    location: 'Classrooms',
+    lastUpdated: '2026-01-01T00:00:00.000Z'
+  },
+  {
+    id: 'inv-2',
+    name: 'Whiteboard Markers',
+    category: 'Stationery',
+    quantity: 24,
+    unit: 'boxes',
+    condition: 'Good',
+    location: 'Store Room',
+    lastUpdated: '2026-02-01T00:00:00.000Z'
+  },
+  {
+    id: 'inv-3',
+    name: 'Laptop Computer',
+    category: 'Electronics',
+    quantity: 2,
+    unit: 'units',
+    condition: 'Good',
+    location: 'Head Teacher Office',
+    lastUpdated: '2025-09-01T00:00:00.000Z'
+  }
+];
+
+const INITIAL_EVENTS: SchoolEvent[] = [
+  {
+    id: 'event-1',
+    title: 'Term 1 Begins',
+    description: 'Start of Term 1 2026. All students to report by 7:30 AM.',
+    date: '2026-01-12T00:00:00.000Z',
+    type: 'Academic',
+    targetAudience: 'All'
+  },
+  {
+    id: 'event-2',
+    title: 'Sports Day',
+    description: 'Annual inter-class sports competition. Parents welcome.',
+    date: '2026-03-20T00:00:00.000Z',
+    type: 'Sports',
+    targetAudience: 'All'
+  },
+  {
+    id: 'event-3',
+    title: 'Parents Meeting',
+    description: 'End of Term 1 parents meeting and report card collection.',
+    date: '2026-04-03T00:00:00.000Z',
+    type: 'Meeting',
+    targetAudience: 'Parents'
+  },
+  {
+    id: 'event-4',
+    title: 'Aerobics Day',
+    description: 'Annual school aerobics and fitness event.',
+    date: '2026-02-28T00:00:00.000Z',
+    type: 'Sports',
+    targetAudience: 'All'
+  }
+];
+
+const INITIAL_UNIFORMS: Uniform[] = [
+  {
+    id: 'uniform-1',
+    studentId: 'student-1',
+    item: 'Girl Dress',
+    price: 250,
+    purchaseDate: '2026-01-20T00:00:00.000Z',
+    status: 'purchased'
+  },
+  {
+    id: 'uniform-2',
+    studentId: 'student-2',
+    item: 'Short Sleeved Shirt',
+    price: 180,
+    purchaseDate: '2026-01-22T00:00:00.000Z',
+    status: 'purchased'
+  }
+];
+
+const INITIAL_REQUIREMENTS: Requirement[] = [
+  {
+    id: 'req-1',
+    studentId: 'student-1',
+    item: 'Ream of Paper & Tissues',
+    status: 'provided',
+    dateProvided: '2026-01-25T00:00:00.000Z',
+    term: 'Term 1 2026'
+  },
+  {
+    id: 'req-2',
+    studentId: 'student-2',
+    item: 'Ream of Paper + 2 Handy Andy + 2 Handwash',
+    status: 'pending',
+    term: 'Term 1 2026'
+  }
+];
+
 export function AppProvider({ children }: { children: React.ReactNode }) {
-  const [students, setStudents] = useState<Student[]>([
-    {
-      id: 'student-1',
-      name: 'Sarah Mwanza',
-      grade: 'Grade 5',
-      guardianName: 'Mary Mwanza',
-      guardianPhone: '0977123456',
-      guardianEmail: 'mary.mwanza@email.com',
-      address: '123 Kabulonga Road, Lusaka',
-      enrollmentDate: '2024-01-15T00:00:00.000Z'
-    },
-    {
-      id: 'student-2',
-      name: 'John Banda',
-      grade: 'Grade 3',
-      guardianName: 'Peter Banda',
-      guardianPhone: '0966987654',
-      guardianEmail: 'peter.banda@email.com',
-      address: '456 Roma Road, Lusaka',
-      enrollmentDate: '2024-01-10T00:00:00.000Z'
-    },
-    {
-      id: 'student-3',
-      name: 'Grace Phiri',
-      grade: 'Reception',
-      guardianName: 'Janet Phiri',
-      guardianPhone: '0955555555',
-      enrollmentDate: '2024-02-01T00:00:00.000Z'
-    }
-  ]);
+  const [students, setStudents] = useState<Student[]>(() => loadFromStorage('gha_students', INITIAL_STUDENTS));
+  const [payments, setPayments] = useState<Payment[]>(() => loadFromStorage('gha_payments', INITIAL_PAYMENTS));
+  const [uniforms, setUniforms] = useState<Uniform[]>(() => loadFromStorage('gha_uniforms', INITIAL_UNIFORMS));
+  const [requirements, setRequirements] = useState<Requirement[]>(() => loadFromStorage('gha_requirements', INITIAL_REQUIREMENTS));
+  const [teachers, setTeachers] = useState<Teacher[]>(() => loadFromStorage('gha_teachers', INITIAL_TEACHERS));
+  const [expenses, setExpenses] = useState<Expense[]>(() => loadFromStorage('gha_expenses', INITIAL_EXPENSES));
+  const [inventory, setInventory] = useState<InventoryItem[]>(() => loadFromStorage('gha_inventory', INITIAL_INVENTORY));
+  const [events, setEvents] = useState<SchoolEvent[]>(() => loadFromStorage('gha_events', INITIAL_EVENTS));
+  const [currentTerm, setCurrentTerm] = useState<string>(() => loadFromStorage('gha_currentTerm', 'Term 1 2026'));
 
-  const [payments, setPayments] = useState<Payment[]>([
-    {
-      id: 'payment-1',
-      studentId: 'student-1',
-      type: 'Tuition Fee',
-      amount: 3000,
-      dueDate: '2024-02-01T00:00:00.000Z',
-      status: 'paid',
-      paidDate: '2024-01-28T00:00:00.000Z',
-      createdDate: '2024-01-15T00:00:00.000Z'
-    },
-    {
-      id: 'payment-2',
-      studentId: 'student-2',
-      type: 'Tuition Fee',
-      amount: 2700,
-      dueDate: '2024-02-01T00:00:00.000Z',
-      status: 'pending',
-      createdDate: '2024-01-10T00:00:00.000Z'
-    },
-    {
-      id: 'payment-3',
-      studentId: 'student-1',
-      type: 'Lunch',
-      amount: 500,
-      dueDate: '2024-02-15T00:00:00.000Z',
-      status: 'pending',
-      createdDate: '2024-01-15T00:00:00.000Z'
-    }
-  ]);
+  useEffect(() => { localStorage.setItem('gha_students', JSON.stringify(students)); }, [students]);
+  useEffect(() => { localStorage.setItem('gha_payments', JSON.stringify(payments)); }, [payments]);
+  useEffect(() => { localStorage.setItem('gha_uniforms', JSON.stringify(uniforms)); }, [uniforms]);
+  useEffect(() => { localStorage.setItem('gha_requirements', JSON.stringify(requirements)); }, [requirements]);
+  useEffect(() => { localStorage.setItem('gha_teachers', JSON.stringify(teachers)); }, [teachers]);
+  useEffect(() => { localStorage.setItem('gha_expenses', JSON.stringify(expenses)); }, [expenses]);
+  useEffect(() => { localStorage.setItem('gha_inventory', JSON.stringify(inventory)); }, [inventory]);
+  useEffect(() => { localStorage.setItem('gha_events', JSON.stringify(events)); }, [events]);
+  useEffect(() => { localStorage.setItem('gha_currentTerm', JSON.stringify(currentTerm)); }, [currentTerm]);
 
-  const [uniforms, setUniforms] = useState<Uniform[]>([
-    {
-      id: 'uniform-1',
-      studentId: 'student-1',
-      item: 'Girl Dress',
-      price: 250,
-      purchaseDate: '2024-01-20T00:00:00.000Z',
-      status: 'purchased'
-    },
-    {
-      id: 'uniform-2',
-      studentId: 'student-2',
-      item: 'Short Sleeved Shirt',
-      price: 180,
-      purchaseDate: '2024-01-22T00:00:00.000Z',
-      status: 'purchased'
-    }
-  ]);
-
-  const [requirements, setRequirements] = useState<Requirement[]>([
-    {
-      id: 'req-1',
-      studentId: 'student-1',
-      item: 'Ream of Paper & Tissues',
-      status: 'provided',
-      dateProvided: '2024-01-25T00:00:00.000Z',
-      term: 'Term 1'
-    },
-    {
-      id: 'req-2',
-      studentId: 'student-2',
-      item: 'Ream of Paper + 2 Handy Andy + 2 Handwash',
-      status: 'pending',
-      term: 'Term 1'
-    }
-  ]);
-
-  const addStudent = (student: Student) => {
-    setStudents(prev => [...prev, student]);
-  };
-
-  const updateStudent = (id: string, updatedStudent: Partial<Student>) => {
-    setStudents(prev => prev.map(student => 
-      student.id === id ? { ...student, ...updatedStudent } : student
-    ));
-  };
-
+  const addStudent = (student: Student) => setStudents(prev => [...prev, student]);
+  const updateStudent = (id: string, updated: Partial<Student>) =>
+    setStudents(prev => prev.map(s => s.id === id ? { ...s, ...updated } : s));
   const deleteStudent = (id: string) => {
-    setStudents(prev => prev.filter(student => student.id !== id));
-    setPayments(prev => prev.filter(payment => payment.studentId !== id));
-    setUniforms(prev => prev.filter(uniform => uniform.studentId !== id));
-    setRequirements(prev => prev.filter(req => req.studentId !== id));
+    setStudents(prev => prev.filter(s => s.id !== id));
+    setPayments(prev => prev.filter(p => p.studentId !== id));
+    setUniforms(prev => prev.filter(u => u.studentId !== id));
+    setRequirements(prev => prev.filter(r => r.studentId !== id));
   };
 
-  const addPayment = (payment: Payment) => {
-    setPayments(prev => [...prev, payment]);
-  };
+  const addPayment = (payment: Payment) => setPayments(prev => [...prev, payment]);
+  const updatePayment = (id: string, updated: Partial<Payment>) =>
+    setPayments(prev => prev.map(p => p.id === id ? { ...p, ...updated } : p));
+  const deletePayment = (id: string) => setPayments(prev => prev.filter(p => p.id !== id));
 
-  const updatePayment = (id: string, updatedPayment: Partial<Payment>) => {
-    setPayments(prev => prev.map(payment => 
-      payment.id === id ? { ...payment, ...updatedPayment } : payment
-    ));
-  };
+  const addUniformPurchase = (uniform: Uniform) => setUniforms(prev => [...prev, uniform]);
 
-  const addUniformPurchase = (uniform: Uniform) => {
-    setUniforms(prev => [...prev, uniform]);
-  };
+  const addRequirement = (requirement: Requirement) => setRequirements(prev => [...prev, requirement]);
+  const updateRequirement = (id: string, updated: Partial<Requirement>) =>
+    setRequirements(prev => prev.map(r => r.id === id ? { ...r, ...updated } : r));
 
-  const addRequirement = (requirement: Requirement) => {
-    setRequirements(prev => [...prev, requirement]);
-  };
+  const addTeacher = (teacher: Teacher) => setTeachers(prev => [...prev, teacher]);
+  const updateTeacher = (id: string, updated: Partial<Teacher>) =>
+    setTeachers(prev => prev.map(t => t.id === id ? { ...t, ...updated } : t));
+  const deleteTeacher = (id: string) => setTeachers(prev => prev.filter(t => t.id !== id));
 
-  const updateRequirement = (id: string, updatedRequirement: Partial<Requirement>) => {
-    setRequirements(prev => prev.map(req => 
-      req.id === id ? { ...req, ...updatedRequirement } : req
-    ));
-  };
+  const addExpense = (expense: Expense) => setExpenses(prev => [...prev, expense]);
+  const updateExpense = (id: string, updated: Partial<Expense>) =>
+    setExpenses(prev => prev.map(e => e.id === id ? { ...e, ...updated } : e));
+  const deleteExpense = (id: string) => setExpenses(prev => prev.filter(e => e.id !== id));
+
+  const addInventoryItem = (item: InventoryItem) => setInventory(prev => [...prev, item]);
+  const updateInventoryItem = (id: string, updated: Partial<InventoryItem>) =>
+    setInventory(prev => prev.map(i => i.id === id ? { ...i, ...updated } : i));
+  const deleteInventoryItem = (id: string) => setInventory(prev => prev.filter(i => i.id !== id));
+
+  const addEvent = (event: SchoolEvent) => setEvents(prev => [...prev, event]);
+  const updateEvent = (id: string, updated: Partial<SchoolEvent>) =>
+    setEvents(prev => prev.map(e => e.id === id ? { ...e, ...updated } : e));
+  const deleteEvent = (id: string) => setEvents(prev => prev.filter(e => e.id !== id));
 
   return (
     <AppContext.Provider value={{
-      students,
-      payments,
-      uniforms,
-      requirements,
-      addStudent,
-      updateStudent,
-      deleteStudent,
-      addPayment,
-      updatePayment,
+      students, payments, uniforms, requirements, teachers, expenses, inventory, events, currentTerm, setCurrentTerm,
+      addStudent, updateStudent, deleteStudent,
+      addPayment, updatePayment, deletePayment,
       addUniformPurchase,
-      addRequirement,
-      updateRequirement
+      addRequirement, updateRequirement,
+      addTeacher, updateTeacher, deleteTeacher,
+      addExpense, updateExpense, deleteExpense,
+      addInventoryItem, updateInventoryItem, deleteInventoryItem,
+      addEvent, updateEvent, deleteEvent
     }}>
       {children}
     </AppContext.Provider>

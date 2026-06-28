@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { ClipboardList, Check, X } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 
@@ -24,7 +24,7 @@ export function Requirements() {
       updateRequirement(existing.id, {
         ...existing,
         status: existing.status === 'provided' ? 'pending' : 'provided',
-        dateProvided: existing.status === 'pending' ? new Date().toISOString() : null
+        dateProvided: existing.status === 'pending' ? new Date().toISOString() : undefined
       });
     } else {
       addRequirement({
