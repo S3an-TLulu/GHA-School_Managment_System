@@ -1,12 +1,12 @@
-import React, { useState } from 'react';
-import { Plus, Search, CreditCard as Edit, Trash2 } from 'lucide-react';
-import { useAppContext } from '../context/AppContext';
+import { useState } from 'react';
+import { Plus, Search, Pencil, Trash2 } from 'lucide-react';
+import { useAppContext, Student } from '../context/AppContext';
 import { StudentModal } from './StudentModal';
 
 export function Students() {
   const { students, addStudent, updateStudent, deleteStudent } = useAppContext();
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingStudent, setEditingStudent] = useState(null);
+  const [editingStudent, setEditingStudent] = useState<Student | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
 
   const filteredStudents = students.filter(student =>
@@ -14,7 +14,7 @@ export function Students() {
     student.grade.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const handleEdit = (student: any) => {
+  const handleEdit = (student: Student) => {
     setEditingStudent(student);
     setIsModalOpen(true);
   };
@@ -113,7 +113,7 @@ export function Students() {
                         onClick={() => handleEdit(student)}
                         className="text-blue-600 hover:text-blue-900 p-2 hover:bg-blue-50 rounded"
                       >
-                        <Edit className="h-4 w-4" />
+                        <Pencil className="h-4 w-4" />
                       </button>
                       <button
                         onClick={() => handleDelete(student.id)}

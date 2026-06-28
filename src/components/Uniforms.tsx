@@ -1,5 +1,4 @@
-import React, { useState } from 'react';
-import { ShoppingBag, Plus } from 'lucide-react';
+import { useState } from 'react';
 import { useAppContext } from '../context/AppContext';
 
 export function Uniforms() {
@@ -22,7 +21,7 @@ export function Uniforms() {
     { name: '2 Pairs of Socks', price: 100, category: 'Both' }
   ];
 
-  const handlePurchase = (item: any) => {
+  const handlePurchase = (item: { name: string; price: number; category: string }) => {
     if (!selectedStudent) {
       alert('Please select a student first');
       return;

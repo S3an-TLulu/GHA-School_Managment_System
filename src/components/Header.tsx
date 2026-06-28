@@ -1,4 +1,3 @@
-import React from 'react';
 import { LogOut, School } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
