@@ -1,7 +1,6 @@
 import {
   LayoutDashboard,
   Users,
-  GraduationCap,
   CreditCard,
   ShoppingBag,
   ClipboardList,
@@ -10,7 +9,9 @@ import {
   TrendingDown,
   Package,
   Calendar,
-  FileText
+  FileText,
+  DollarSign,
+  Bell
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -43,11 +44,12 @@ const menuGroups = [
   {
     label: 'School',
     items: [
-      { id: 'classes', label: 'Classes & Fees', icon: GraduationCap },
+      { id: 'feestructure', label: 'Fee Structure', icon: DollarSign },
       { id: 'uniforms', label: 'Uniforms', icon: ShoppingBag },
       { id: 'requirements', label: 'Requirements', icon: ClipboardList },
       { id: 'inventory', label: 'Inventory', icon: Package },
       { id: 'events', label: 'Events & Calendar', icon: Calendar },
+      { id: 'announcements', label: 'Announcements', icon: Bell },
     ]
   },
   {

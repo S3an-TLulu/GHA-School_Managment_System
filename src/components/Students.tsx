@@ -1,17 +1,20 @@
 import { useState } from 'react';
-import { Plus, Search, Pencil, Trash2 } from 'lucide-react';
+import { Plus, Search, Pencil, Trash2, Eye } from 'lucide-react';
 import { useAppContext, Student } from '../context/AppContext';
 import { StudentModal } from './StudentModal';
+import { StudentProfile } from './StudentProfile';
 
 export function Students() {
   const { students, addStudent, updateStudent, deleteStudent } = useAppContext();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingStudent, setEditingStudent] = useState<Student | null>(null);
+  const [profileStudent, setProfileStudent] = useState<Student | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
 
   const filteredStudents = students.filter(student =>
     student.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    student.grade.toLowerCase().includes(searchTerm.toLowerCase())
+    student.grade.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (student.admissionNumber || '').toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const handleEdit = (student: Student) => {
@@ -52,7 +55,7 @@ export function Students() {
             <Search className="absolute left-3 top-3 h-5 w-5 text-gray-400" />
             <input
               type="text"
-              placeholder="Search students..."
+              placeholder="Search students by name, grade or admission number..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -83,7 +86,7 @@ export function Students() {
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {filteredStudents.map((student) => (
-                <tr key={student.id}>
+                <tr key={student.id} className="hover:bg-gray-50">
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center">
                       <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
@@ -93,7 +96,11 @@ export function Students() {
                       </div>
                       <div className="ml-4">
                         <div className="text-sm font-medium text-gray-900">{student.name}</div>
-                        <div className="text-sm text-gray-500">ID: {student.id.slice(0, 8)}</div>
+                        {student.admissionNumber ? (
+                          <div className="text-xs text-gray-500">{student.admissionNumber}</div>
+                        ) : (
+                          <div className="text-xs text-gray-400">ID: {student.id.slice(0, 8)}</div>
+                        )}
                       </div>
                     </div>
                   </td>
@@ -110,14 +117,23 @@ export function Students() {
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                     <div className="flex space-x-2">
                       <button
+                        onClick={() => setProfileStudent(student)}
+                        className="text-gray-600 hover:text-gray-900 p-2 hover:bg-gray-100 rounded"
+                        title="View Profile"
+                      >
+                        <Eye className="h-4 w-4" />
+                      </button>
+                      <button
                         onClick={() => handleEdit(student)}
                         className="text-blue-600 hover:text-blue-900 p-2 hover:bg-blue-50 rounded"
+                        title="Edit"
                       >
                         <Pencil className="h-4 w-4" />
                       </button>
                       <button
                         onClick={() => handleDelete(student.id)}
                         className="text-red-600 hover:text-red-900 p-2 hover:bg-red-50 rounded"
+                        title="Delete"
                       >
                         <Trash2 className="h-4 w-4" />
                       </button>
@@ -125,6 +141,11 @@ export function Students() {
                   </td>
                 </tr>
               ))}
+              {filteredStudents.length === 0 && (
+                <tr>
+                  <td colSpan={5} className="px-6 py-8 text-center text-gray-400">No students found.</td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
@@ -142,6 +163,13 @@ export function Students() {
             handleModalClose();
           }}
           onClose={handleModalClose}
+        />
+      )}
+
+      {profileStudent && (
+        <StudentProfile
+          student={profileStudent}
+          onClose={() => setProfileStudent(null)}
         />
       )}
     </div>
