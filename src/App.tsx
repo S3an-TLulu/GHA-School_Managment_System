@@ -14,6 +14,7 @@ import { Expenses } from './components/Expenses';
 import { Inventory } from './components/Inventory';
 import { Events } from './components/Events';
 import { FamilyStatements } from './components/FamilyStatements';
+import { OfficeCashier } from './components/OfficeCashier';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { Login } from './components/Login';
 import { AppProvider } from './context/AppContext';
@@ -35,6 +36,7 @@ function AppContent() {
       case 'feestructure': return <FeeStructure />;
       case 'announcements': return <Announcements />;
       case 'payments':     return <Payments />;
+      case 'cashier':      return <OfficeCashier />;
       case 'expenses':     return <Expenses />;
       case 'statements':   return <FamilyStatements />;
       case 'uniforms':     return <Uniforms />;

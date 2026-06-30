@@ -11,7 +11,8 @@ import {
   Calendar,
   FileText,
   DollarSign,
-  Bell
+  Bell,
+  MonitorCheck
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -36,6 +37,7 @@ const menuGroups = [
   {
     label: 'Finances',
     items: [
+      { id: 'cashier', label: 'Office Cashier', icon: MonitorCheck },
       { id: 'payments', label: 'Fees & Payments', icon: CreditCard },
       { id: 'expenses', label: 'Expenses', icon: TrendingDown },
       { id: 'statements', label: 'Family Statements', icon: FileText },
