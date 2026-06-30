@@ -1,8 +1,8 @@
-import { Users, GraduationCap, DollarSign, AlertCircle, TrendingUp, TrendingDown, Calendar, UserCheck } from 'lucide-react';
+import { Users, GraduationCap, DollarSign, AlertCircle, TrendingUp, TrendingDown, Calendar, UserCheck, Bell } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 
 export function Dashboard() {
-  const { students, payments, teachers, expenses, events, currentTerm } = useAppContext();
+  const { students, payments, teachers, expenses, events, announcements, currentTerm } = useAppContext();
 
   const activeStudents = students.filter(s => !s.status || s.status === 'active').length;
   const activeTeachers = teachers.filter(t => t.status === 'active').length;
@@ -30,12 +30,22 @@ export function Dashboard() {
     .sort((a, b) => new Date(b.enrollmentDate).getTime() - new Date(a.enrollmentDate).getTime())
     .slice(0, 5);
 
+  const recentAnnouncements = [...announcements]
+    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+    .slice(0, 3);
+
   const gradeCounts = students.reduce((acc, s) => {
     acc[s.grade] = (acc[s.grade] || 0) + 1;
     return acc;
   }, {} as Record<string, number>);
 
   const gradeOrder = ['Baby Class', 'Middle Class', 'Reception', 'Grade 1', 'Grade 2', 'Grade 3', 'Grade 4', 'Grade 5', 'Grade 6', 'Grade 7'];
+
+  const priorityDot: Record<string, string> = {
+    normal: 'bg-blue-400',
+    important: 'bg-yellow-400',
+    urgent: 'bg-red-500'
+  };
 
   return (
     <div className="space-y-6">
@@ -196,6 +206,35 @@ export function Dashboard() {
             {upcomingEvents.length === 0 && <p className="text-sm text-gray-400">No upcoming events.</p>}
           </div>
         </div>
+      </div>
+
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+        <div className="flex items-center space-x-2 mb-4">
+          <Bell className="h-5 w-5 text-blue-600" />
+          <h3 className="text-base font-semibold text-gray-900">Recent Announcements</h3>
+        </div>
+        {recentAnnouncements.length === 0 ? (
+          <p className="text-sm text-gray-400">No announcements yet.</p>
+        ) : (
+          <div className="space-y-3">
+            {recentAnnouncements.map(ann => (
+              <div key={ann.id} className="flex items-start space-x-3 p-3 bg-gray-50 rounded-lg">
+                <div className={`w-2 h-2 rounded-full mt-2 flex-shrink-0 ${priorityDot[ann.priority]}`} />
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center space-x-2">
+                    <p className="text-sm font-medium text-gray-900 truncate">{ann.title}</p>
+                    <span className="text-xs text-gray-400 flex-shrink-0">{ann.targetAudience}</span>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">{ann.message}</p>
+                  <p className="text-xs text-gray-400 mt-1">
+                    {new Date(ann.date).toLocaleDateString('en-ZM', { month: 'short', day: 'numeric', year: 'numeric' })}
+                    &nbsp;&bull;&nbsp;{ann.createdBy}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">

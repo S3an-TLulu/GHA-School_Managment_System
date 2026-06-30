@@ -1,7 +1,6 @@
 import {
   LayoutDashboard,
   Users,
-  GraduationCap,
   CreditCard,
   ShoppingBag,
   ClipboardList,
@@ -10,7 +9,17 @@ import {
   TrendingDown,
   Package,
   Calendar,
-  FileText
+  FileText,
+  DollarSign,
+  Bell,
+  MonitorCheck,
+  ClipboardCheck,
+  CalendarDays,
+  Palette,
+  Building2,
+  LayoutTemplate,
+  Clock,
+  Layers
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -35,7 +44,9 @@ const menuGroups = [
   {
     label: 'Finances',
     items: [
+      { id: 'cashier', label: 'Office Cashier', icon: MonitorCheck },
       { id: 'payments', label: 'Fees & Payments', icon: CreditCard },
+      { id: 'bulkfees', label: 'Bulk Fee Collection', icon: Layers },
       { id: 'expenses', label: 'Expenses', icon: TrendingDown },
       { id: 'statements', label: 'Family Statements', icon: FileText },
     ]
@@ -43,17 +54,29 @@ const menuGroups = [
   {
     label: 'School',
     items: [
-      { id: 'classes', label: 'Classes & Fees', icon: GraduationCap },
+      { id: 'attendance', label: 'Attendance', icon: ClipboardCheck },
+      { id: 'timetable', label: 'Class Timetable', icon: Clock },
+      { id: 'calendar', label: 'School Calendar', icon: CalendarDays },
+      { id: 'feestructure', label: 'Fee Structure', icon: DollarSign },
       { id: 'uniforms', label: 'Uniforms', icon: ShoppingBag },
       { id: 'requirements', label: 'Requirements', icon: ClipboardList },
       { id: 'inventory', label: 'Inventory', icon: Package },
-      { id: 'events', label: 'Events & Calendar', icon: Calendar },
+      { id: 'events', label: 'Events', icon: Calendar },
+      { id: 'announcements', label: 'Announcements', icon: Bell },
     ]
   },
   {
     label: 'Reports',
     items: [
-      { id: 'reports', label: 'Reports', icon: BarChart3 },
+      { id: 'reports',   label: 'Reports Centre',    icon: BarChart3 },
+      { id: 'templates', label: 'Document Templates', icon: LayoutTemplate },
+    ]
+  },
+  {
+    label: 'Personalise',
+    items: [
+      { id: 'branding', label: 'Branding Manager', icon: Building2 },
+      { id: 'theme',    label: 'Theme Manager',    icon: Palette },
     ]
   }
 ];

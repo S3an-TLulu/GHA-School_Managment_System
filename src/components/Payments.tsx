@@ -1,9 +1,109 @@
 import { useState } from 'react';
-import { Plus, Search, Check, X, Clock, Trash2 } from 'lucide-react';
-import { useAppContext } from '../context/AppContext';
+import { Plus, Search, Check, X, Clock, Trash2, Printer } from 'lucide-react';
+import { useAppContext, Payment, Student } from '../context/AppContext';
 import { PaymentModal } from './PaymentModal';
 
 const TERMS = ['Term 1 2026', 'Term 2 2026', 'Term 3 2026', 'Term 1 2025', 'Term 2 2025', 'Term 3 2025'];
+
+function printReceipt(payment: Payment, student: Student | undefined) {
+  const printContent = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <title>Receipt - ${payment.receiptNumber || payment.id}</title>
+      <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: Arial, sans-serif; background: #fff; color: #1f2937; padding: 40px; max-width: 480px; margin: 0 auto; }
+        .header { text-align: center; margin-bottom: 24px; }
+        .school-name { font-size: 20px; font-weight: bold; color: #1d4ed8; }
+        .school-sub { font-size: 11px; color: #6b7280; margin-top: 4px; }
+        .receipt-title { font-size: 16px; font-weight: bold; margin-top: 12px; letter-spacing: 0.1em; text-transform: uppercase; }
+        .paid-badge { display: inline-block; background: #d1fae5; color: #065f46; border: 2px solid #059669; border-radius: 6px; padding: 4px 16px; font-size: 13px; font-weight: bold; margin-top: 8px; }
+        .divider { border-top: 2px dashed #e5e7eb; margin: 16px 0; }
+        .row { display: flex; justify-content: space-between; padding: 6px 0; font-size: 13px; border-bottom: 1px solid #f3f4f6; }
+        .row .label { color: #6b7280; }
+        .row .value { font-weight: 600; color: #111827; }
+        .amount-box { text-align: center; margin: 24px 0; background: #f0fdf4; border: 2px solid #86efac; border-radius: 8px; padding: 16px; }
+        .amount-label { font-size: 11px; color: #6b7280; text-transform: uppercase; letter-spacing: 0.05em; }
+        .amount-value { font-size: 36px; font-weight: bold; color: #15803d; margin-top: 4px; }
+        .sig-section { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-top: 40px; }
+        .sig-line { border-top: 1px solid #374151; padding-top: 6px; font-size: 11px; color: #6b7280; text-align: center; }
+        .footer { text-align: center; margin-top: 24px; font-size: 10px; color: #9ca3af; }
+        .bank-box { background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 6px; padding: 12px; margin-top: 16px; font-size: 11px; color: #1e40af; }
+        .bank-title { font-weight: bold; margin-bottom: 4px; }
+        @media print { body { padding: 20px; } }
+      </style>
+    </head>
+    <body>
+      <div class="header">
+        <div class="school-name">Great Highway Academy</div>
+        <div class="school-sub">Lusaka, Zambia | Tel: +260-XXX-XXXXXX</div>
+        <div class="receipt-title">Official Payment Receipt</div>
+        ${payment.status === 'paid' ? '<div class="paid-badge">✓ PAID</div>' : ''}
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="row">
+        <span class="label">Receipt No.</span>
+        <span class="value">${payment.receiptNumber || `RCP-${payment.id.slice(-6).toUpperCase()}`}</span>
+      </div>
+      <div class="row">
+        <span class="label">Date Paid</span>
+        <span class="value">${payment.paidDate ? new Date(payment.paidDate).toLocaleDateString('en-ZM', { year: 'numeric', month: 'long', day: 'numeric' }) : '—'}</span>
+      </div>
+      <div class="row">
+        <span class="label">Student Name</span>
+        <span class="value">${student?.name || 'Unknown'}</span>
+      </div>
+      <div class="row">
+        <span class="label">Admission No.</span>
+        <span class="value">${student?.admissionNumber || '—'}</span>
+      </div>
+      <div class="row">
+        <span class="label">Grade</span>
+        <span class="value">${student?.grade || '—'}</span>
+      </div>
+      <div class="row">
+        <span class="label">Payment Type</span>
+        <span class="value">${payment.type}</span>
+      </div>
+      <div class="row">
+        <span class="label">Term</span>
+        <span class="value">${payment.term || '—'}</span>
+      </div>
+      ${payment.notes ? `<div class="row"><span class="label">Notes</span><span class="value">${payment.notes}</span></div>` : ''}
+
+      <div class="amount-box">
+        <div class="amount-label">Amount Received</div>
+        <div class="amount-value">K${payment.amount.toLocaleString()}</div>
+      </div>
+
+      <div class="bank-box">
+        <div class="bank-title">Banking Details</div>
+        Bank: First Alliance Bank &nbsp;|&nbsp; Branch: East Park<br>
+        Account Name: Great Highway Academy<br>
+        Account No: 0060700054001 &nbsp;|&nbsp; Currency: ZMW
+      </div>
+
+      <div class="sig-section">
+        <div><div class="sig-line">Received By</div></div>
+        <div><div class="sig-line">Date: ${new Date().toLocaleDateString()}</div></div>
+      </div>
+
+      <div class="footer">
+        This is an official receipt of Great Highway Academy &bull; Thank you for your payment
+      </div>
+    </body>
+    </html>
+  `;
+  const win = window.open('', '_blank');
+  if (win) {
+    win.document.write(printContent);
+    win.document.close();
+    win.print();
+  }
+}
 
 export function Payments() {
   const { payments, students, addPayment, updatePayment, deletePayment, currentTerm } = useAppContext();
@@ -145,6 +245,13 @@ export function Payments() {
                             Mark Paid
                           </button>
                         )}
+                        <button
+                          onClick={() => printReceipt(payment, student)}
+                          className="p-1.5 text-gray-500 hover:bg-gray-100 rounded"
+                          title="Print Receipt"
+                        >
+                          <Printer className="h-3.5 w-3.5" />
+                        </button>
                         <button onClick={() => handleDelete(payment.id)}
                           className="p-1.5 text-red-500 hover:bg-red-50 rounded">
                           <Trash2 className="h-3.5 w-3.5" />

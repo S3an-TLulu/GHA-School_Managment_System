@@ -12,6 +12,7 @@ export interface Student {
   gender?: 'Male' | 'Female';
   dateOfBirth?: string;
   status?: 'active' | 'inactive' | 'transferred';
+  admissionNumber?: string;
 }
 
 export interface Payment {
@@ -92,6 +93,71 @@ export interface SchoolEvent {
   targetAudience: 'All' | 'Students' | 'Teachers' | 'Parents';
 }
 
+export interface FeeStructureItem {
+  id: string;
+  className: string;
+  cashFee: number;
+  installmentFee: number;
+  description: string;
+}
+
+export interface OtherCharge {
+  id: string;
+  name: string;
+  amount: string;
+  per: string;
+}
+
+export interface Announcement {
+  id: string;
+  title: string;
+  message: string;
+  date: string;
+  priority: 'normal' | 'important' | 'urgent';
+  targetAudience: 'All' | 'Students' | 'Teachers' | 'Parents';
+  createdBy: string;
+}
+
+export interface SchoolBranding {
+  schoolName: string;
+  motto: string;
+  address: string;
+  phone: string;
+  email: string;
+  website: string;
+  bankName: string;
+  bankBranch: string;
+  bankAccountNumber: string;
+  principalName: string;
+  logoUrl: string;
+}
+
+export interface AppTheme {
+  colorScheme: 'blue' | 'green' | 'purple' | 'orange' | 'red';
+  darkMode: boolean;
+  sidebarStyle: 'default' | 'compact';
+}
+
+export interface TimetableCell {
+  subject: string;
+  teacherName: string;
+}
+
+export interface Timetable {
+  id: string;
+  classGrade: string;
+  slots: Record<string, TimetableCell>;
+}
+
+export interface AttendanceRecord {
+  id: string;
+  date: string;
+  classGrade: string;
+  studentId: string;
+  status: 'present' | 'absent' | 'late' | 'excused';
+  notes?: string;
+}
+
 interface AppContextType {
   students: Student[];
   payments: Payment[];
@@ -101,6 +167,9 @@ interface AppContextType {
   expenses: Expense[];
   inventory: InventoryItem[];
   events: SchoolEvent[];
+  feeStructure: FeeStructureItem[];
+  otherCharges: OtherCharge[];
+  announcements: Announcement[];
   currentTerm: string;
   setCurrentTerm: (term: string) => void;
   addStudent: (student: Student) => void;
@@ -124,6 +193,24 @@ interface AppContextType {
   addEvent: (event: SchoolEvent) => void;
   updateEvent: (id: string, event: Partial<SchoolEvent>) => void;
   deleteEvent: (id: string) => void;
+  addFeeStructureItem: (item: FeeStructureItem) => void;
+  updateFeeStructureItem: (id: string, item: Partial<FeeStructureItem>) => void;
+  deleteFeeStructureItem: (id: string) => void;
+  addOtherCharge: (charge: OtherCharge) => void;
+  updateOtherCharge: (id: string, charge: Partial<OtherCharge>) => void;
+  deleteOtherCharge: (id: string) => void;
+  addAnnouncement: (announcement: Announcement) => void;
+  updateAnnouncement: (id: string, announcement: Partial<Announcement>) => void;
+  deleteAnnouncement: (id: string) => void;
+  attendance: AttendanceRecord[];
+  saveAttendance: (records: AttendanceRecord[]) => void;
+  deleteAttendanceForDate: (date: string, classGrade: string) => void;
+  timetables: Timetable[];
+  saveTimetable: (timetable: Timetable) => void;
+  branding: SchoolBranding;
+  updateBranding: (b: Partial<SchoolBranding>) => void;
+  theme: AppTheme;
+  updateTheme: (t: Partial<AppTheme>) => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -148,7 +235,8 @@ const INITIAL_STUDENTS: Student[] = [
     guardianEmail: 'mary.mwanza@email.com',
     address: '123 Kabulonga Road, Lusaka',
     enrollmentDate: '2024-01-15T00:00:00.000Z',
-    status: 'active'
+    status: 'active',
+    admissionNumber: 'GHA-2024-001'
   },
   {
     id: 'student-2',
@@ -160,7 +248,8 @@ const INITIAL_STUDENTS: Student[] = [
     guardianEmail: 'peter.banda@email.com',
     address: '456 Roma Road, Lusaka',
     enrollmentDate: '2024-01-10T00:00:00.000Z',
-    status: 'active'
+    status: 'active',
+    admissionNumber: 'GHA-2024-002'
   },
   {
     id: 'student-3',
@@ -170,7 +259,8 @@ const INITIAL_STUDENTS: Student[] = [
     guardianName: 'Janet Phiri',
     guardianPhone: '0955555555',
     enrollmentDate: '2024-02-01T00:00:00.000Z',
-    status: 'active'
+    status: 'active',
+    admissionNumber: 'GHA-2024-003'
   },
   {
     id: 'student-4',
@@ -180,7 +270,8 @@ const INITIAL_STUDENTS: Student[] = [
     guardianName: 'Janet Phiri',
     guardianPhone: '0955555555',
     enrollmentDate: '2024-01-15T00:00:00.000Z',
-    status: 'active'
+    status: 'active',
+    admissionNumber: 'GHA-2024-004'
   }
 ];
 
@@ -403,7 +494,73 @@ const INITIAL_REQUIREMENTS: Requirement[] = [
   }
 ];
 
+const INITIAL_FEE_STRUCTURE: FeeStructureItem[] = [
+  { id: 'fee-1', className: 'Baby Class', cashFee: 3000, installmentFee: 3200, description: 'Early childhood development program' },
+  { id: 'fee-2', className: 'Middle Class', cashFee: 2700, installmentFee: 2900, description: 'Pre-primary preparation' },
+  { id: 'fee-3', className: 'Reception', cashFee: 2700, installmentFee: 2900, description: 'Foundation year for primary education' },
+  { id: 'fee-4', className: 'Grade 1', cashFee: 2700, installmentFee: 2900, description: 'Primary education level 1' },
+  { id: 'fee-5', className: 'Grade 2', cashFee: 2700, installmentFee: 2900, description: 'Primary education level 2' },
+  { id: 'fee-6', className: 'Grade 3', cashFee: 2700, installmentFee: 2900, description: 'Primary education level 3' },
+  { id: 'fee-7', className: 'Grade 4', cashFee: 2700, installmentFee: 2900, description: 'Primary education level 4' },
+  { id: 'fee-8', className: 'Grade 5', cashFee: 3000, installmentFee: 3200, description: 'Upper primary level 5' },
+  { id: 'fee-9', className: 'Grade 6', cashFee: 3000, installmentFee: 3200, description: 'Upper primary level 6' },
+  { id: 'fee-10', className: 'Grade 7', cashFee: 3000, installmentFee: 3200, description: 'Final primary year' }
+];
+
+const INITIAL_OTHER_CHARGES: OtherCharge[] = [
+  { id: 'charge-1', name: 'Enrollment Form', amount: '100', per: 'once-off' },
+  { id: 'charge-2', name: 'Lunch', amount: '500', per: 'per month' },
+  { id: 'charge-3', name: 'Transport', amount: '600-1000', per: 'per month' },
+  { id: 'charge-4', name: 'Water', amount: '40', per: 'per term' },
+  { id: 'charge-5', name: 'Assessment Tests', amount: '200', per: 'per term' }
+];
+
+const INITIAL_ANNOUNCEMENTS: Announcement[] = [
+  {
+    id: 'ann-1',
+    title: 'Term 1 2026 School Fees Due',
+    message: 'This is a reminder that Term 1 2026 school fees are due by 1st February 2026. Please ensure all outstanding balances are cleared. Cash payments receive a K200-K300 discount. Contact the school office for payment arrangements.',
+    date: '2026-01-15T00:00:00.000Z',
+    priority: 'important',
+    targetAudience: 'Parents',
+    createdBy: 'Mrs. Tembo'
+  },
+  {
+    id: 'ann-2',
+    title: 'Sports Day - 20th March 2026',
+    message: 'We are pleased to announce our Annual Sports Day on 20th March 2026. All students are encouraged to participate. Parents and guardians are welcome to attend. Students should come in their house colours. Please ensure children bring water and a packed lunch.',
+    date: '2026-02-10T00:00:00.000Z',
+    priority: 'normal',
+    targetAudience: 'All',
+    createdBy: 'Admin'
+  }
+];
+
+const DEFAULT_BRANDING: SchoolBranding = {
+  schoolName: 'Great Highway Academy',
+  motto: 'Excellence in Education',
+  address: 'Great East Road, Lusaka, Zambia',
+  phone: '+260 97X XXX XXX',
+  email: 'info@greathighwayacademy.edu.zm',
+  website: 'www.greathighwayacademy.edu.zm',
+  bankName: 'First Alliance Bank',
+  bankBranch: 'East Park Branch',
+  bankAccountNumber: '0060700054001',
+  principalName: 'Mrs. Tembo',
+  logoUrl: '',
+};
+
+const DEFAULT_THEME: AppTheme = {
+  colorScheme: 'blue',
+  darkMode: false,
+  sidebarStyle: 'default',
+};
+
 export function AppProvider({ children }: { children: React.ReactNode }) {
+  const [attendance, setAttendance] = useState<AttendanceRecord[]>(() => loadFromStorage('gha_attendance', []));
+  const [timetables, setTimetables] = useState<Timetable[]>(() => loadFromStorage('gha_timetables', []));
+  const [branding, setBranding] = useState<SchoolBranding>(() => loadFromStorage('gha_branding', DEFAULT_BRANDING));
+  const [theme, setTheme] = useState<AppTheme>(() => loadFromStorage('gha_theme', DEFAULT_THEME));
   const [students, setStudents] = useState<Student[]>(() => loadFromStorage('gha_students', INITIAL_STUDENTS));
   const [payments, setPayments] = useState<Payment[]>(() => loadFromStorage('gha_payments', INITIAL_PAYMENTS));
   const [uniforms, setUniforms] = useState<Uniform[]>(() => loadFromStorage('gha_uniforms', INITIAL_UNIFORMS));
@@ -412,8 +569,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [expenses, setExpenses] = useState<Expense[]>(() => loadFromStorage('gha_expenses', INITIAL_EXPENSES));
   const [inventory, setInventory] = useState<InventoryItem[]>(() => loadFromStorage('gha_inventory', INITIAL_INVENTORY));
   const [events, setEvents] = useState<SchoolEvent[]>(() => loadFromStorage('gha_events', INITIAL_EVENTS));
+  const [feeStructure, setFeeStructure] = useState<FeeStructureItem[]>(() => loadFromStorage('gha_feestructure', INITIAL_FEE_STRUCTURE));
+  const [otherCharges, setOtherCharges] = useState<OtherCharge[]>(() => loadFromStorage('gha_othercharges', INITIAL_OTHER_CHARGES));
+  const [announcements, setAnnouncements] = useState<Announcement[]>(() => loadFromStorage('gha_announcements', INITIAL_ANNOUNCEMENTS));
   const [currentTerm, setCurrentTerm] = useState<string>(() => loadFromStorage('gha_currentTerm', 'Term 1 2026'));
 
+  useEffect(() => { localStorage.setItem('gha_attendance', JSON.stringify(attendance)); }, [attendance]);
+  useEffect(() => { localStorage.setItem('gha_timetables', JSON.stringify(timetables)); }, [timetables]);
+  useEffect(() => { localStorage.setItem('gha_branding', JSON.stringify(branding)); }, [branding]);
+  useEffect(() => { localStorage.setItem('gha_theme', JSON.stringify(theme)); }, [theme]);
   useEffect(() => { localStorage.setItem('gha_students', JSON.stringify(students)); }, [students]);
   useEffect(() => { localStorage.setItem('gha_payments', JSON.stringify(payments)); }, [payments]);
   useEffect(() => { localStorage.setItem('gha_uniforms', JSON.stringify(uniforms)); }, [uniforms]);
@@ -422,6 +586,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => { localStorage.setItem('gha_expenses', JSON.stringify(expenses)); }, [expenses]);
   useEffect(() => { localStorage.setItem('gha_inventory', JSON.stringify(inventory)); }, [inventory]);
   useEffect(() => { localStorage.setItem('gha_events', JSON.stringify(events)); }, [events]);
+  useEffect(() => { localStorage.setItem('gha_feestructure', JSON.stringify(feeStructure)); }, [feeStructure]);
+  useEffect(() => { localStorage.setItem('gha_othercharges', JSON.stringify(otherCharges)); }, [otherCharges]);
+  useEffect(() => { localStorage.setItem('gha_announcements', JSON.stringify(announcements)); }, [announcements]);
   useEffect(() => { localStorage.setItem('gha_currentTerm', JSON.stringify(currentTerm)); }, [currentTerm]);
 
   const addStudent = (student: Student) => setStudents(prev => [...prev, student]);
@@ -465,9 +632,46 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setEvents(prev => prev.map(e => e.id === id ? { ...e, ...updated } : e));
   const deleteEvent = (id: string) => setEvents(prev => prev.filter(e => e.id !== id));
 
+  const addFeeStructureItem = (item: FeeStructureItem) => setFeeStructure(prev => [...prev, item]);
+  const updateFeeStructureItem = (id: string, updated: Partial<FeeStructureItem>) =>
+    setFeeStructure(prev => prev.map(f => f.id === id ? { ...f, ...updated } : f));
+  const deleteFeeStructureItem = (id: string) => setFeeStructure(prev => prev.filter(f => f.id !== id));
+
+  const addOtherCharge = (charge: OtherCharge) => setOtherCharges(prev => [...prev, charge]);
+  const updateOtherCharge = (id: string, updated: Partial<OtherCharge>) =>
+    setOtherCharges(prev => prev.map(c => c.id === id ? { ...c, ...updated } : c));
+  const deleteOtherCharge = (id: string) => setOtherCharges(prev => prev.filter(c => c.id !== id));
+
+  const addAnnouncement = (announcement: Announcement) => setAnnouncements(prev => [...prev, announcement]);
+  const updateAnnouncement = (id: string, updated: Partial<Announcement>) =>
+    setAnnouncements(prev => prev.map(a => a.id === id ? { ...a, ...updated } : a));
+  const deleteAnnouncement = (id: string) => setAnnouncements(prev => prev.filter(a => a.id !== id));
+
+  const saveAttendance = (records: AttendanceRecord[]) => {
+    if (records.length === 0) return;
+    const { date, classGrade } = records[0];
+    setAttendance(prev => [
+      ...prev.filter(r => !(r.date === date && r.classGrade === classGrade)),
+      ...records
+    ]);
+  };
+  const deleteAttendanceForDate = (date: string, classGrade: string) =>
+    setAttendance(prev => prev.filter(r => !(r.date === date && r.classGrade === classGrade)));
+
+  const saveTimetable = (timetable: Timetable) =>
+    setTimetables(prev => {
+      const exists = prev.find(t => t.id === timetable.id);
+      return exists ? prev.map(t => t.id === timetable.id ? timetable : t) : [...prev, timetable];
+    });
+
+  const updateBranding = (b: Partial<SchoolBranding>) => setBranding(prev => ({ ...prev, ...b }));
+  const updateTheme = (t: Partial<AppTheme>) => setTheme(prev => ({ ...prev, ...t }));
+
   return (
     <AppContext.Provider value={{
-      students, payments, uniforms, requirements, teachers, expenses, inventory, events, currentTerm, setCurrentTerm,
+      students, payments, uniforms, requirements, teachers, expenses, inventory, events,
+      feeStructure, otherCharges, announcements,
+      currentTerm, setCurrentTerm,
       addStudent, updateStudent, deleteStudent,
       addPayment, updatePayment, deletePayment,
       addUniformPurchase,
@@ -475,7 +679,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       addTeacher, updateTeacher, deleteTeacher,
       addExpense, updateExpense, deleteExpense,
       addInventoryItem, updateInventoryItem, deleteInventoryItem,
-      addEvent, updateEvent, deleteEvent
+      addEvent, updateEvent, deleteEvent,
+      addFeeStructureItem, updateFeeStructureItem, deleteFeeStructureItem,
+      addOtherCharge, updateOtherCharge, deleteOtherCharge,
+      addAnnouncement, updateAnnouncement, deleteAnnouncement,
+      attendance, saveAttendance, deleteAttendanceForDate,
+      timetables, saveTimetable,
+      branding, updateBranding,
+      theme, updateTheme
     }}>
       {children}
     </AppContext.Provider>

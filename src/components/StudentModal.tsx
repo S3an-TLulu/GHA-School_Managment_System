@@ -10,7 +10,15 @@ interface StudentModalProps {
 
 const GRADES = ['Baby Class', 'Middle Class', 'Reception', 'Grade 1', 'Grade 2', 'Grade 3', 'Grade 4', 'Grade 5', 'Grade 6', 'Grade 7'];
 
+function generateAdmissionNumber(): string {
+  return `GHA-${new Date().getFullYear()}-${String(Date.now()).slice(-3)}`;
+}
+
 export function StudentModal({ student, onSave, onClose }: StudentModalProps) {
+  const [admissionNumber] = useState<string>(() =>
+    student?.admissionNumber || generateAdmissionNumber()
+  );
+
   const [formData, setFormData] = useState({
     name: '',
     grade: 'Reception',
@@ -46,6 +54,7 @@ export function StudentModal({ student, onSave, onClose }: StudentModalProps) {
     onSave({
       ...formData,
       id: student?.id || `student-${Date.now()}`,
+      admissionNumber,
       enrollmentDate: new Date(formData.enrollmentDate).toISOString()
     });
   };
@@ -63,6 +72,16 @@ export function StudentModal({ student, onSave, onClose }: StudentModalProps) {
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Admission Number</label>
+            <input
+              type="text"
+              readOnly
+              value={admissionNumber}
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-gray-50 text-gray-600 cursor-not-allowed"
+            />
+          </div>
+
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Student Full Name *</label>
             <input type="text" required
