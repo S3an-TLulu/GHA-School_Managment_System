@@ -118,6 +118,26 @@ export interface Announcement {
   createdBy: string;
 }
 
+export interface SchoolBranding {
+  schoolName: string;
+  motto: string;
+  address: string;
+  phone: string;
+  email: string;
+  website: string;
+  bankName: string;
+  bankBranch: string;
+  bankAccountNumber: string;
+  principalName: string;
+  logoUrl: string;
+}
+
+export interface AppTheme {
+  colorScheme: 'blue' | 'green' | 'purple' | 'orange' | 'red';
+  darkMode: boolean;
+  sidebarStyle: 'default' | 'compact';
+}
+
 export interface AttendanceRecord {
   id: string;
   date: string;
@@ -174,6 +194,10 @@ interface AppContextType {
   attendance: AttendanceRecord[];
   saveAttendance: (records: AttendanceRecord[]) => void;
   deleteAttendanceForDate: (date: string, classGrade: string) => void;
+  branding: SchoolBranding;
+  updateBranding: (b: Partial<SchoolBranding>) => void;
+  theme: AppTheme;
+  updateTheme: (t: Partial<AppTheme>) => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -499,8 +523,30 @@ const INITIAL_ANNOUNCEMENTS: Announcement[] = [
   }
 ];
 
+const DEFAULT_BRANDING: SchoolBranding = {
+  schoolName: 'Great Highway Academy',
+  motto: 'Excellence in Education',
+  address: 'Great East Road, Lusaka, Zambia',
+  phone: '+260 97X XXX XXX',
+  email: 'info@greathighwayacademy.edu.zm',
+  website: 'www.greathighwayacademy.edu.zm',
+  bankName: 'First Alliance Bank',
+  bankBranch: 'East Park Branch',
+  bankAccountNumber: '0060700054001',
+  principalName: 'Mrs. Tembo',
+  logoUrl: '',
+};
+
+const DEFAULT_THEME: AppTheme = {
+  colorScheme: 'blue',
+  darkMode: false,
+  sidebarStyle: 'default',
+};
+
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const [attendance, setAttendance] = useState<AttendanceRecord[]>(() => loadFromStorage('gha_attendance', []));
+  const [branding, setBranding] = useState<SchoolBranding>(() => loadFromStorage('gha_branding', DEFAULT_BRANDING));
+  const [theme, setTheme] = useState<AppTheme>(() => loadFromStorage('gha_theme', DEFAULT_THEME));
   const [students, setStudents] = useState<Student[]>(() => loadFromStorage('gha_students', INITIAL_STUDENTS));
   const [payments, setPayments] = useState<Payment[]>(() => loadFromStorage('gha_payments', INITIAL_PAYMENTS));
   const [uniforms, setUniforms] = useState<Uniform[]>(() => loadFromStorage('gha_uniforms', INITIAL_UNIFORMS));
@@ -515,6 +561,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [currentTerm, setCurrentTerm] = useState<string>(() => loadFromStorage('gha_currentTerm', 'Term 1 2026'));
 
   useEffect(() => { localStorage.setItem('gha_attendance', JSON.stringify(attendance)); }, [attendance]);
+  useEffect(() => { localStorage.setItem('gha_branding', JSON.stringify(branding)); }, [branding]);
+  useEffect(() => { localStorage.setItem('gha_theme', JSON.stringify(theme)); }, [theme]);
   useEffect(() => { localStorage.setItem('gha_students', JSON.stringify(students)); }, [students]);
   useEffect(() => { localStorage.setItem('gha_payments', JSON.stringify(payments)); }, [payments]);
   useEffect(() => { localStorage.setItem('gha_uniforms', JSON.stringify(uniforms)); }, [uniforms]);
@@ -595,6 +643,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const deleteAttendanceForDate = (date: string, classGrade: string) =>
     setAttendance(prev => prev.filter(r => !(r.date === date && r.classGrade === classGrade)));
 
+  const updateBranding = (b: Partial<SchoolBranding>) => setBranding(prev => ({ ...prev, ...b }));
+  const updateTheme = (t: Partial<AppTheme>) => setTheme(prev => ({ ...prev, ...t }));
+
   return (
     <AppContext.Provider value={{
       students, payments, uniforms, requirements, teachers, expenses, inventory, events,
@@ -611,7 +662,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       addFeeStructureItem, updateFeeStructureItem, deleteFeeStructureItem,
       addOtherCharge, updateOtherCharge, deleteOtherCharge,
       addAnnouncement, updateAnnouncement, deleteAnnouncement,
-      attendance, saveAttendance, deleteAttendanceForDate
+      attendance, saveAttendance, deleteAttendanceForDate,
+      branding, updateBranding,
+      theme, updateTheme
     }}>
       {children}
     </AppContext.Provider>

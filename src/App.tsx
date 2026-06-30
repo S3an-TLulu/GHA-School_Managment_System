@@ -17,13 +17,21 @@ import { FamilyStatements } from './components/FamilyStatements';
 import { OfficeCashier } from './components/OfficeCashier';
 import { Attendance } from './components/Attendance';
 import { SchoolCalendar } from './components/SchoolCalendar';
+import { BrandingManager } from './components/BrandingManager';
+import { ThemeManager, applyTheme } from './components/ThemeManager';
+import { DocumentTemplates } from './components/DocumentTemplates';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { useAppContext } from './context/AppContext';
+import { useEffect } from 'react';
 import { Login } from './components/Login';
 import { AppProvider } from './context/AppContext';
 
 function AppContent() {
   const [activeSection, setActiveSection] = useState('dashboard');
   const { isAuthenticated } = useAuth();
+  const { theme } = useAppContext();
+
+  useEffect(() => { applyTheme(theme); }, [theme]);
 
   if (!isAuthenticated) {
     return <Login />;
@@ -47,6 +55,9 @@ function AppContent() {
       case 'events':       return <Events />;
       case 'attendance':   return <Attendance />;
       case 'calendar':     return <SchoolCalendar />;
+      case 'branding':     return <BrandingManager />;
+      case 'theme':        return <ThemeManager />;
+      case 'templates':    return <DocumentTemplates />;
       case 'reports':      return <Reports />;
       default:             return <Dashboard />;
     }

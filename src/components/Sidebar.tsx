@@ -14,7 +14,10 @@ import {
   Bell,
   MonitorCheck,
   ClipboardCheck,
-  CalendarDays
+  CalendarDays,
+  Palette,
+  Building2,
+  LayoutTemplate
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -61,7 +64,15 @@ const menuGroups = [
   {
     label: 'Reports',
     items: [
-      { id: 'reports', label: 'Reports', icon: BarChart3 },
+      { id: 'reports',   label: 'Reports Centre',    icon: BarChart3 },
+      { id: 'templates', label: 'Document Templates', icon: LayoutTemplate },
+    ]
+  },
+  {
+    label: 'Personalise',
+    items: [
+      { id: 'branding', label: 'Branding Manager', icon: Building2 },
+      { id: 'theme',    label: 'Theme Manager',    icon: Palette },
     ]
   }
 ];
