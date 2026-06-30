@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { Plus, Search, Pencil, Trash2, UserCheck, X, GraduationCap } from 'lucide-react';
 import { useAppContext, Teacher } from '../context/AppContext';
+import { useToast } from './ToastProvider';
+import { useThemeClasses } from '../hooks/useThemeClasses';
 
 const ROLES = ['Teacher', 'Deputy Head', 'Head Teacher', 'Support Staff'] as const;
 const CLASSES = ['Baby Class', 'Middle Class', 'Reception', 'Grade 1', 'Grade 2', 'Grade 3', 'Grade 4', 'Grade 5', 'Grade 6', 'Grade 7'];
@@ -162,6 +164,8 @@ const roleColors: Record<string, string> = {
 
 export function Teachers() {
   const { teachers, addTeacher, updateTeacher, deleteTeacher } = useAppContext();
+  const { toast } = useToast();
+  const tc = useThemeClasses();
   const [activeTab, setActiveTab] = useState<'staff' | 'assignments'>('staff');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingTeacher, setEditingTeacher] = useState<Teacher | null>(null);
@@ -180,7 +184,9 @@ export function Teachers() {
   };
 
   const handleDelete = (id: string) => {
-    if (confirm('Remove this staff member?')) deleteTeacher(id);
+    const t = teachers.find(t => t.id === id);
+    deleteTeacher(id);
+    toast(`${t?.name || 'Staff member'} removed.`, 'info');
   };
 
   const handleModalClose = () => {
@@ -218,8 +224,8 @@ export function Teachers() {
           <p className="text-gray-600">{activeCount} active staff members</p>
         </div>
         <button onClick={() => setIsModalOpen(true)}
-          className="flex items-center space-x-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors">
-          <Plus className="h-5 w-5" />
+          className={`flex items-center space-x-2 ${tc.btn} text-white px-4 py-2 rounded-lg transition-colors text-sm font-medium`}>
+          <Plus className="h-4 w-4" />
           <span>Add Staff</span>
         </button>
       </div>
@@ -241,13 +247,13 @@ export function Teachers() {
           <div className="flex">
             <button
               onClick={() => setActiveTab('staff')}
-              className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors ${activeTab === 'staff' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+              className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors ${activeTab === 'staff' ? `border-current ${tc.text}` : 'border-transparent text-gray-500 hover:text-gray-700'}`}
             >
               Staff List
             </button>
             <button
               onClick={() => setActiveTab('assignments')}
-              className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors ${activeTab === 'assignments' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+              className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors ${activeTab === 'assignments' ? `border-current ${tc.text}` : 'border-transparent text-gray-500 hover:text-gray-700'}`}
             >
               Class Assignments
             </button>
@@ -279,8 +285,8 @@ export function Teachers() {
                     <tr key={teacher.id} className="hover:bg-gray-50">
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center">
-                          <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-                            <UserCheck className="h-5 w-5 text-blue-600" />
+                          <div className={`w-10 h-10 ${tc.light} rounded-full flex items-center justify-center`}>
+                            <UserCheck className={`h-5 w-5 ${tc.text}`} />
                           </div>
                           <div className="ml-3">
                             <p className="text-sm font-medium text-gray-900">{teacher.name}</p>
@@ -337,8 +343,8 @@ export function Teachers() {
                     onClick={() => setAssigningClass(className)}
                     className="border border-gray-200 rounded-lg p-4 text-left hover:border-blue-400 hover:shadow-md transition-all group"
                   >
-                    <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center mb-3 group-hover:bg-blue-200 transition-colors">
-                      <GraduationCap className="h-5 w-5 text-blue-600" />
+                    <div className={`w-10 h-10 ${tc.light} rounded-lg flex items-center justify-center mb-3 transition-colors`}>
+                      <GraduationCap className={`h-5 w-5 ${tc.text}`} />
                     </div>
                     <p className="font-semibold text-gray-900 text-sm">{className}</p>
                     {assigned ? (
@@ -358,7 +364,13 @@ export function Teachers() {
         <TeacherModal
           teacher={editingTeacher}
           onSave={data => {
-            editingTeacher ? updateTeacher(editingTeacher.id, data) : addTeacher(data);
+            if (editingTeacher) {
+              updateTeacher(editingTeacher.id, data);
+              toast(`${data.name}'s record updated.`, 'success');
+            } else {
+              addTeacher(data);
+              toast(`${data.name} added to staff.`, 'success');
+            }
             handleModalClose();
           }}
           onClose={handleModalClose}

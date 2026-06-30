@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { Plus, Search, Check, X, Clock, Trash2, Printer } from 'lucide-react';
 import { useAppContext, Payment, Student } from '../context/AppContext';
 import { PaymentModal } from './PaymentModal';
+import { useToast } from './ToastProvider';
+import { useThemeClasses } from '../hooks/useThemeClasses';
 
 const TERMS = ['Term 1 2026', 'Term 2 2026', 'Term 3 2026', 'Term 1 2025', 'Term 2 2025', 'Term 3 2025'];
 
@@ -107,6 +109,8 @@ function printReceipt(payment: Payment, student: Student | undefined) {
 
 export function Payments() {
   const { payments, students, addPayment, updatePayment, deletePayment, currentTerm } = useAppContext();
+  const { toast } = useToast();
+  const tc = useThemeClasses();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
@@ -139,10 +143,12 @@ export function Payments() {
 
   const handleMarkPaid = (paymentId: string) => {
     updatePayment(paymentId, { status: 'paid', paidDate: new Date().toISOString() });
+    toast('Payment marked as paid.', 'success');
   };
 
   const handleDelete = (paymentId: string) => {
-    if (confirm('Delete this payment record?')) deletePayment(paymentId);
+    deletePayment(paymentId);
+    toast('Payment record deleted.', 'info');
   };
 
   return (
@@ -153,7 +159,7 @@ export function Payments() {
           <p className="text-gray-600">Track student payments and outstanding fees</p>
         </div>
         <button onClick={() => setIsModalOpen(true)}
-          className="flex items-center space-x-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors">
+          className={`flex items-center space-x-2 ${tc.btn} text-white px-4 py-2 rounded-lg transition-colors text-sm font-medium`}>
           <Plus className="h-5 w-5" />
           <span>Record Payment</span>
         </button>
@@ -273,6 +279,7 @@ export function Payments() {
         <PaymentModal
           onSave={paymentData => {
             addPayment(paymentData);
+            toast('Payment recorded successfully.', 'success');
             setIsModalOpen(false);
           }}
           onClose={() => setIsModalOpen(false)}

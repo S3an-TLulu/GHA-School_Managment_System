@@ -1,8 +1,10 @@
 import { Users, GraduationCap, DollarSign, AlertCircle, TrendingUp, TrendingDown, Calendar, UserCheck, Bell } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
+import { useThemeClasses } from '../hooks/useThemeClasses';
 
 export function Dashboard() {
-  const { students, payments, teachers, expenses, events, announcements, currentTerm } = useAppContext();
+  const { students, payments, teachers, expenses, events, announcements, currentTerm, branding } = useAppContext();
+  const tc = useThemeClasses();
 
   const activeStudents = students.filter(s => !s.status || s.status === 'active').length;
   const activeTeachers = teachers.filter(t => t.status === 'active').length;
@@ -52,7 +54,7 @@ export function Dashboard() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-          <p className="text-gray-500 text-sm">Great Highway Academy — {currentTerm}</p>
+          <p className="text-gray-500 text-sm">{branding.schoolName} — {currentTerm}</p>
         </div>
         <div className="text-right">
           <p className="text-sm text-gray-500">{new Date().toLocaleDateString('en-ZM', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
@@ -62,7 +64,7 @@ export function Dashboard() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-5">
           <div className="flex items-center space-x-3">
-            <div className="bg-blue-50 p-2.5 rounded-lg"><Users className="h-5 w-5 text-blue-600" /></div>
+            <div className={`${tc.light} p-2.5 rounded-lg`}><Users className={`h-5 w-5 ${tc.text}`} /></div>
             <div>
               <p className="text-xs text-gray-500">Students</p>
               <p className="text-2xl font-bold text-gray-900">{activeStudents}</p>
@@ -137,7 +139,7 @@ export function Dashboard() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
           <div className="flex items-center space-x-2 mb-4">
-            <GraduationCap className="h-5 w-5 text-blue-600" />
+            <GraduationCap className={`h-5 w-5 ${tc.text}`} />
             <h3 className="text-base font-semibold text-gray-900">Students by Class</h3>
           </div>
           <div className="space-y-2">
@@ -146,7 +148,7 @@ export function Dashboard() {
                 <span className="text-sm text-gray-600">{grade}</span>
                 <div className="flex items-center space-x-2">
                   <div className="w-24 bg-gray-100 rounded-full h-1.5">
-                    <div className="bg-blue-500 h-1.5 rounded-full"
+                    <div className={`${tc.btn.split(' ')[0]} h-1.5 rounded-full`}
                       style={{ width: `${Math.min(100, ((gradeCounts[grade] || 0) / activeStudents) * 100)}%` }} />
                   </div>
                   <span className="text-sm font-medium text-gray-900 w-4">{gradeCounts[grade] || 0}</span>
@@ -161,14 +163,14 @@ export function Dashboard() {
 
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
           <div className="flex items-center space-x-2 mb-4">
-            <Users className="h-5 w-5 text-blue-600" />
+            <Users className={`h-5 w-5 ${tc.text}`} />
             <h3 className="text-base font-semibold text-gray-900">Recent Enrolments</h3>
           </div>
           <div className="space-y-3">
             {recentStudents.map(student => (
               <div key={student.id} className="flex items-center space-x-3">
-                <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
-                  <span className="text-xs font-semibold text-blue-700">{student.name.charAt(0)}</span>
+                <div className={`w-8 h-8 ${tc.light} rounded-full flex items-center justify-center flex-shrink-0`}>
+                  <span className={`text-xs font-semibold ${tc.text}`}>{student.name.charAt(0)}</span>
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-gray-900 truncate">{student.name}</p>
@@ -185,17 +187,17 @@ export function Dashboard() {
 
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
           <div className="flex items-center space-x-2 mb-4">
-            <Calendar className="h-5 w-5 text-blue-600" />
+            <Calendar className={`h-5 w-5 ${tc.text}`} />
             <h3 className="text-base font-semibold text-gray-900">Upcoming Events</h3>
           </div>
           <div className="space-y-3">
             {upcomingEvents.map(event => (
               <div key={event.id} className="flex items-start space-x-3">
-                <div className="flex-shrink-0 w-10 h-10 bg-blue-50 rounded-lg flex flex-col items-center justify-center">
-                  <span className="text-xs font-bold text-blue-600">
+                <div className={`flex-shrink-0 w-10 h-10 ${tc.light} rounded-lg flex flex-col items-center justify-center`}>
+                  <span className={`text-xs font-bold ${tc.text}`}>
                     {new Date(event.date).toLocaleDateString('en-US', { month: 'short' }).toUpperCase()}
                   </span>
-                  <span className="text-sm font-bold text-blue-800 leading-none">{new Date(event.date).getDate()}</span>
+                  <span className={`text-sm font-bold ${tc.text} leading-none`}>{new Date(event.date).getDate()}</span>
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-gray-900 truncate">{event.title}</p>
@@ -210,7 +212,7 @@ export function Dashboard() {
 
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
         <div className="flex items-center space-x-2 mb-4">
-          <Bell className="h-5 w-5 text-blue-600" />
+          <Bell className={`h-5 w-5 ${tc.text}`} />
           <h3 className="text-base font-semibold text-gray-900">Recent Announcements</h3>
         </div>
         {recentAnnouncements.length === 0 ? (
@@ -241,15 +243,15 @@ export function Dashboard() {
         <h3 className="text-base font-semibold text-gray-900 mb-4">Banking Information</h3>
         <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
           {[
-            { label: 'Bank', value: 'First Alliance Bank' },
-            { label: 'Branch', value: 'East Park Branch' },
-            { label: 'Account Name', value: 'Great Highway Academy' },
-            { label: 'Account No.', value: '0060700054001' },
+            { label: 'Bank', value: branding.bankName },
+            { label: 'Branch', value: branding.bankBranch },
+            { label: 'Account Name', value: branding.schoolName },
+            { label: 'Account No.', value: branding.bankAccountNumber },
             { label: 'Currency', value: 'Zambian Kwacha (ZMW)' }
           ].map(({ label, value }) => (
             <div key={label}>
               <p className="text-xs text-gray-500">{label}</p>
-              <p className="text-sm font-semibold text-gray-900 mt-0.5">{value}</p>
+              <p className="text-sm font-semibold text-gray-900 mt-0.5">{value || '—'}</p>
             </div>
           ))}
         </div>

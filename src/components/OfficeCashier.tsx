@@ -1,6 +1,8 @@
 import { useState, useMemo } from 'react';
 import { Search, Printer, Plus, CheckCircle, Clock, Receipt, X } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
+import { useToast } from './ToastProvider';
+import { useThemeClasses } from '../hooks/useThemeClasses';
 
 const PAYMENT_TYPES = ['Tuition Fee', 'Enrollment Form', 'Lunch', 'Transport', 'Water', 'Assessment Tests', 'Uniform', 'Other'];
 
@@ -10,6 +12,8 @@ function todayISO() {
 
 export function OfficeCashier() {
   const { students, payments, feeStructure, addPayment, currentTerm } = useAppContext();
+  const { toast } = useToast();
+  const tc = useThemeClasses();
 
   const [studentSearch, setStudentSearch] = useState('');
   const [selectedStudent, setSelectedStudent] = useState<typeof students[0] | null>(null);
@@ -80,6 +84,7 @@ export function OfficeCashier() {
     });
 
     setSessionIds(prev => [...prev, id]);
+    toast(`K${parseFloat(amount).toLocaleString()} recorded for ${selectedStudent.name}.`, 'success');
     setSuccessMessage(`K${parseFloat(amount).toLocaleString()} recorded for ${selectedStudent.name}`);
     setTimeout(() => setSuccessMessage(''), 3000);
 
