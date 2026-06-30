@@ -118,6 +118,15 @@ export interface Announcement {
   createdBy: string;
 }
 
+export interface AttendanceRecord {
+  id: string;
+  date: string;
+  classGrade: string;
+  studentId: string;
+  status: 'present' | 'absent' | 'late' | 'excused';
+  notes?: string;
+}
+
 interface AppContextType {
   students: Student[];
   payments: Payment[];
@@ -162,6 +171,9 @@ interface AppContextType {
   addAnnouncement: (announcement: Announcement) => void;
   updateAnnouncement: (id: string, announcement: Partial<Announcement>) => void;
   deleteAnnouncement: (id: string) => void;
+  attendance: AttendanceRecord[];
+  saveAttendance: (records: AttendanceRecord[]) => void;
+  deleteAttendanceForDate: (date: string, classGrade: string) => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -488,6 +500,7 @@ const INITIAL_ANNOUNCEMENTS: Announcement[] = [
 ];
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
+  const [attendance, setAttendance] = useState<AttendanceRecord[]>(() => loadFromStorage('gha_attendance', []));
   const [students, setStudents] = useState<Student[]>(() => loadFromStorage('gha_students', INITIAL_STUDENTS));
   const [payments, setPayments] = useState<Payment[]>(() => loadFromStorage('gha_payments', INITIAL_PAYMENTS));
   const [uniforms, setUniforms] = useState<Uniform[]>(() => loadFromStorage('gha_uniforms', INITIAL_UNIFORMS));
@@ -501,6 +514,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [announcements, setAnnouncements] = useState<Announcement[]>(() => loadFromStorage('gha_announcements', INITIAL_ANNOUNCEMENTS));
   const [currentTerm, setCurrentTerm] = useState<string>(() => loadFromStorage('gha_currentTerm', 'Term 1 2026'));
 
+  useEffect(() => { localStorage.setItem('gha_attendance', JSON.stringify(attendance)); }, [attendance]);
   useEffect(() => { localStorage.setItem('gha_students', JSON.stringify(students)); }, [students]);
   useEffect(() => { localStorage.setItem('gha_payments', JSON.stringify(payments)); }, [payments]);
   useEffect(() => { localStorage.setItem('gha_uniforms', JSON.stringify(uniforms)); }, [uniforms]);
@@ -570,6 +584,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setAnnouncements(prev => prev.map(a => a.id === id ? { ...a, ...updated } : a));
   const deleteAnnouncement = (id: string) => setAnnouncements(prev => prev.filter(a => a.id !== id));
 
+  const saveAttendance = (records: AttendanceRecord[]) => {
+    if (records.length === 0) return;
+    const { date, classGrade } = records[0];
+    setAttendance(prev => [
+      ...prev.filter(r => !(r.date === date && r.classGrade === classGrade)),
+      ...records
+    ]);
+  };
+  const deleteAttendanceForDate = (date: string, classGrade: string) =>
+    setAttendance(prev => prev.filter(r => !(r.date === date && r.classGrade === classGrade)));
+
   return (
     <AppContext.Provider value={{
       students, payments, uniforms, requirements, teachers, expenses, inventory, events,
@@ -585,7 +610,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       addEvent, updateEvent, deleteEvent,
       addFeeStructureItem, updateFeeStructureItem, deleteFeeStructureItem,
       addOtherCharge, updateOtherCharge, deleteOtherCharge,
-      addAnnouncement, updateAnnouncement, deleteAnnouncement
+      addAnnouncement, updateAnnouncement, deleteAnnouncement,
+      attendance, saveAttendance, deleteAttendanceForDate
     }}>
       {children}
     </AppContext.Provider>

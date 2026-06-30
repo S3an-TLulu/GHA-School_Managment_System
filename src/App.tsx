@@ -15,6 +15,8 @@ import { Inventory } from './components/Inventory';
 import { Events } from './components/Events';
 import { FamilyStatements } from './components/FamilyStatements';
 import { OfficeCashier } from './components/OfficeCashier';
+import { Attendance } from './components/Attendance';
+import { SchoolCalendar } from './components/SchoolCalendar';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { Login } from './components/Login';
 import { AppProvider } from './context/AppContext';
@@ -43,6 +45,8 @@ function AppContent() {
       case 'requirements': return <Requirements />;
       case 'inventory':    return <Inventory />;
       case 'events':       return <Events />;
+      case 'attendance':   return <Attendance />;
+      case 'calendar':     return <SchoolCalendar />;
       case 'reports':      return <Reports />;
       default:             return <Dashboard />;
     }

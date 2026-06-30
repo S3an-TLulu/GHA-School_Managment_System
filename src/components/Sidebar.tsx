@@ -12,7 +12,9 @@ import {
   FileText,
   DollarSign,
   Bell,
-  MonitorCheck
+  MonitorCheck,
+  ClipboardCheck,
+  CalendarDays
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -46,11 +48,13 @@ const menuGroups = [
   {
     label: 'School',
     items: [
+      { id: 'attendance', label: 'Attendance', icon: ClipboardCheck },
+      { id: 'calendar', label: 'School Calendar', icon: CalendarDays },
       { id: 'feestructure', label: 'Fee Structure', icon: DollarSign },
       { id: 'uniforms', label: 'Uniforms', icon: ShoppingBag },
       { id: 'requirements', label: 'Requirements', icon: ClipboardList },
       { id: 'inventory', label: 'Inventory', icon: Package },
-      { id: 'events', label: 'Events & Calendar', icon: Calendar },
+      { id: 'events', label: 'Events', icon: Calendar },
       { id: 'announcements', label: 'Announcements', icon: Bell },
     ]
   },
