@@ -138,6 +138,17 @@ export interface AppTheme {
   sidebarStyle: 'default' | 'compact';
 }
 
+export interface TimetableCell {
+  subject: string;
+  teacherName: string;
+}
+
+export interface Timetable {
+  id: string;
+  classGrade: string;
+  slots: Record<string, TimetableCell>;
+}
+
 export interface AttendanceRecord {
   id: string;
   date: string;
@@ -194,6 +205,8 @@ interface AppContextType {
   attendance: AttendanceRecord[];
   saveAttendance: (records: AttendanceRecord[]) => void;
   deleteAttendanceForDate: (date: string, classGrade: string) => void;
+  timetables: Timetable[];
+  saveTimetable: (timetable: Timetable) => void;
   branding: SchoolBranding;
   updateBranding: (b: Partial<SchoolBranding>) => void;
   theme: AppTheme;
@@ -545,6 +558,7 @@ const DEFAULT_THEME: AppTheme = {
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const [attendance, setAttendance] = useState<AttendanceRecord[]>(() => loadFromStorage('gha_attendance', []));
+  const [timetables, setTimetables] = useState<Timetable[]>(() => loadFromStorage('gha_timetables', []));
   const [branding, setBranding] = useState<SchoolBranding>(() => loadFromStorage('gha_branding', DEFAULT_BRANDING));
   const [theme, setTheme] = useState<AppTheme>(() => loadFromStorage('gha_theme', DEFAULT_THEME));
   const [students, setStudents] = useState<Student[]>(() => loadFromStorage('gha_students', INITIAL_STUDENTS));
@@ -561,6 +575,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [currentTerm, setCurrentTerm] = useState<string>(() => loadFromStorage('gha_currentTerm', 'Term 1 2026'));
 
   useEffect(() => { localStorage.setItem('gha_attendance', JSON.stringify(attendance)); }, [attendance]);
+  useEffect(() => { localStorage.setItem('gha_timetables', JSON.stringify(timetables)); }, [timetables]);
   useEffect(() => { localStorage.setItem('gha_branding', JSON.stringify(branding)); }, [branding]);
   useEffect(() => { localStorage.setItem('gha_theme', JSON.stringify(theme)); }, [theme]);
   useEffect(() => { localStorage.setItem('gha_students', JSON.stringify(students)); }, [students]);
@@ -643,6 +658,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const deleteAttendanceForDate = (date: string, classGrade: string) =>
     setAttendance(prev => prev.filter(r => !(r.date === date && r.classGrade === classGrade)));
 
+  const saveTimetable = (timetable: Timetable) =>
+    setTimetables(prev => {
+      const exists = prev.find(t => t.id === timetable.id);
+      return exists ? prev.map(t => t.id === timetable.id ? timetable : t) : [...prev, timetable];
+    });
+
   const updateBranding = (b: Partial<SchoolBranding>) => setBranding(prev => ({ ...prev, ...b }));
   const updateTheme = (t: Partial<AppTheme>) => setTheme(prev => ({ ...prev, ...t }));
 
@@ -663,6 +684,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       addOtherCharge, updateOtherCharge, deleteOtherCharge,
       addAnnouncement, updateAnnouncement, deleteAnnouncement,
       attendance, saveAttendance, deleteAttendanceForDate,
+      timetables, saveTimetable,
       branding, updateBranding,
       theme, updateTheme
     }}>

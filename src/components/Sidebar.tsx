@@ -17,7 +17,9 @@ import {
   CalendarDays,
   Palette,
   Building2,
-  LayoutTemplate
+  LayoutTemplate,
+  Clock,
+  Layers
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -44,6 +46,7 @@ const menuGroups = [
     items: [
       { id: 'cashier', label: 'Office Cashier', icon: MonitorCheck },
       { id: 'payments', label: 'Fees & Payments', icon: CreditCard },
+      { id: 'bulkfees', label: 'Bulk Fee Collection', icon: Layers },
       { id: 'expenses', label: 'Expenses', icon: TrendingDown },
       { id: 'statements', label: 'Family Statements', icon: FileText },
     ]
@@ -52,6 +55,7 @@ const menuGroups = [
     label: 'School',
     items: [
       { id: 'attendance', label: 'Attendance', icon: ClipboardCheck },
+      { id: 'timetable', label: 'Class Timetable', icon: Clock },
       { id: 'calendar', label: 'School Calendar', icon: CalendarDays },
       { id: 'feestructure', label: 'Fee Structure', icon: DollarSign },
       { id: 'uniforms', label: 'Uniforms', icon: ShoppingBag },

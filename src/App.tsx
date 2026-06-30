@@ -20,6 +20,8 @@ import { SchoolCalendar } from './components/SchoolCalendar';
 import { BrandingManager } from './components/BrandingManager';
 import { ThemeManager, applyTheme } from './components/ThemeManager';
 import { DocumentTemplates } from './components/DocumentTemplates';
+import { ClassTimetable } from './components/ClassTimetable';
+import { BulkFeeCollection } from './components/BulkFeeCollection';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { useAppContext } from './context/AppContext';
 import { useEffect } from 'react';
@@ -59,6 +61,8 @@ function AppContent() {
       case 'theme':        return <ThemeManager />;
       case 'templates':    return <DocumentTemplates />;
       case 'reports':      return <Reports />;
+      case 'timetable':    return <ClassTimetable />;
+      case 'bulkfees':     return <BulkFeeCollection />;
       default:             return <Dashboard />;
     }
   };
