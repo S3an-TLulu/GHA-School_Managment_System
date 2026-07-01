@@ -22,6 +22,7 @@ import { ThemeManager, applyTheme } from './components/ThemeManager';
 import { DocumentTemplates } from './components/DocumentTemplates';
 import { ClassTimetable } from './components/ClassTimetable';
 import { BulkFeeCollection } from './components/BulkFeeCollection';
+import { Results } from './components/Results';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { useAppContext } from './context/AppContext';
 import { useEffect } from 'react';
@@ -63,6 +64,7 @@ function AppContent() {
       case 'templates':    return <DocumentTemplates />;
       case 'reports':      return <Reports />;
       case 'timetable':    return <ClassTimetable />;
+      case 'results':      return <Results />;
       case 'bulkfees':     return <BulkFeeCollection />;
       default:             return <Dashboard />;
     }

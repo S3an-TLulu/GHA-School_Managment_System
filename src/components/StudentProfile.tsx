@@ -1,5 +1,6 @@
 import { Student, useAppContext } from '../context/AppContext';
 import { X, User, Printer } from 'lucide-react';
+import { useThemeClasses } from '../hooks/useThemeClasses';
 
 interface StudentProfileProps {
   student: Student;
@@ -8,6 +9,7 @@ interface StudentProfileProps {
 
 export function StudentProfile({ student, onClose }: StudentProfileProps) {
   const { payments, uniforms, requirements } = useAppContext();
+  const tc = useThemeClasses();
 
   const studentPayments = payments.filter(p => p.studentId === student.id);
   const studentUniforms = uniforms.filter(u => u.studentId === student.id);
@@ -148,8 +150,8 @@ export function StudentProfile({ student, onClose }: StudentProfileProps) {
       <div className="bg-white rounded-xl shadow-xl w-full max-w-3xl max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between p-6 border-b border-gray-200">
           <div className="flex items-center space-x-4">
-            <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
-              <span className="text-xl font-bold text-blue-600">{student.name.charAt(0)}</span>
+            <div className={`w-12 h-12 ${tc.light} rounded-full flex items-center justify-center`}>
+              <span className={`text-xl font-bold ${tc.text}`}>{student.name.charAt(0)}</span>
             </div>
             <div>
               <h2 className="text-xl font-bold text-gray-900">{student.name}</h2>
