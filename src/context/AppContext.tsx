@@ -15,6 +15,8 @@ export interface Student {
   admissionNumber?: string;
 }
 
+export type PaymentMethod = 'Cash' | 'Mobile Money' | 'Bank Transfer' | 'Cheque' | 'Other';
+
 export interface Payment {
   id: string;
   studentId: string;
@@ -27,6 +29,7 @@ export interface Payment {
   term?: string;
   receiptNumber?: string;
   notes?: string;
+  paymentMethod?: PaymentMethod;
 }
 
 export interface Uniform {
@@ -286,7 +289,8 @@ const INITIAL_PAYMENTS: Payment[] = [
     paidDate: '2026-01-28T00:00:00.000Z',
     createdDate: '2026-01-15T00:00:00.000Z',
     term: 'Term 1 2026',
-    receiptNumber: 'RCP-001'
+    receiptNumber: 'RCP-001',
+    paymentMethod: 'Cash'
   },
   {
     id: 'payment-2',
@@ -307,7 +311,8 @@ const INITIAL_PAYMENTS: Payment[] = [
     status: 'paid',
     paidDate: '2026-02-01T00:00:00.000Z',
     createdDate: '2026-01-15T00:00:00.000Z',
-    term: 'Term 1 2026'
+    term: 'Term 1 2026',
+    paymentMethod: 'Mobile Money'
   },
   {
     id: 'payment-4',
