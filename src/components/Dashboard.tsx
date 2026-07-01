@@ -3,7 +3,7 @@ import { useAppContext } from '../context/AppContext';
 import { useThemeClasses } from '../hooks/useThemeClasses';
 
 export function Dashboard() {
-  const { students, payments, teachers, expenses, events, announcements, currentTerm, branding } = useAppContext();
+  const { students, payments, teachers, expenses, events, announcements, results, currentTerm, branding } = useAppContext();
   const tc = useThemeClasses();
 
   const activeStudents = students.filter(s => !s.status || s.status === 'active').length;
@@ -42,6 +42,12 @@ export function Dashboard() {
   }, {} as Record<string, number>);
 
   const gradeOrder = ['Baby Class', 'Middle Class', 'Reception', 'Grade 1', 'Grade 2', 'Grade 3', 'Grade 4', 'Grade 5', 'Grade 6', 'Grade 7'];
+
+  const latestResultTerm = [...new Set(results.map(r => r.term))].sort().reverse()[0];
+  const latestResults = latestResultTerm ? results.filter(r => r.term === latestResultTerm) : [];
+  const resultAvgs = latestResults.map(r => { const v = Object.values(r.subjects); return v.length ? Math.round(v.reduce((a,b)=>a+b,0)/v.length) : 0; });
+  const academicPassRate = resultAvgs.length ? Math.round((resultAvgs.filter(a => a >= 50).length / resultAvgs.length) * 100) : null;
+  const academicAvg = resultAvgs.length ? Math.round(resultAvgs.reduce((a,b)=>a+b,0)/resultAvgs.length) : null;
 
   const priorityDot: Record<string, string> = {
     normal: 'bg-blue-400',
@@ -238,6 +244,39 @@ export function Dashboard() {
           </div>
         )}
       </div>
+
+      {academicPassRate !== null && (
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+          <div className="flex items-center space-x-2 mb-4">
+            <GraduationCap className={`h-5 w-5 ${tc.text}`} />
+            <h3 className="text-base font-semibold text-gray-900">Academic Performance</h3>
+            <span className="text-xs text-gray-400 ml-1">— {latestResultTerm}</span>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="bg-gray-50 rounded-lg p-4 text-center">
+              <p className="text-xs text-gray-500 mb-1">Results Recorded</p>
+              <p className="text-2xl font-bold text-gray-900">{latestResults.length}</p>
+            </div>
+            <div className="bg-blue-50 rounded-lg p-4 text-center">
+              <p className="text-xs text-blue-600 mb-1">Overall Average</p>
+              <p className="text-2xl font-bold text-blue-700">{academicAvg}%</p>
+            </div>
+            <div className={`${academicPassRate >= 70 ? 'bg-green-50' : 'bg-red-50'} rounded-lg p-4 text-center`}>
+              <p className={`text-xs mb-1 ${academicPassRate >= 70 ? 'text-green-600' : 'text-red-600'}`}>Pass Rate</p>
+              <p className={`text-2xl font-bold ${academicPassRate >= 70 ? 'text-green-700' : 'text-red-700'}`}>{academicPassRate}%</p>
+            </div>
+            <div className="bg-gray-50 rounded-lg p-4 text-center">
+              <p className="text-xs text-gray-500 mb-1">Students Passed</p>
+              <p className="text-2xl font-bold text-gray-900">{resultAvgs.filter(a => a >= 50).length}/{latestResults.length}</p>
+            </div>
+          </div>
+          <div className="mt-3 w-full bg-gray-200 rounded-full h-2">
+            <div className={`h-2 rounded-full transition-all ${academicPassRate >= 70 ? 'bg-green-500' : academicPassRate >= 50 ? 'bg-yellow-500' : 'bg-red-500'}`}
+              style={{ width: `${academicPassRate}%` }} />
+          </div>
+          <p className="text-xs text-gray-400 mt-1">{academicPassRate}% of students passed in {latestResultTerm}</p>
+        </div>
+      )}
 
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
         <h3 className="text-base font-semibold text-gray-900 mb-4">Banking Information</h3>
