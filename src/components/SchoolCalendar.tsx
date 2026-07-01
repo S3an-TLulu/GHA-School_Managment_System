@@ -1,6 +1,8 @@
 import { useState, useMemo } from 'react';
 import { ChevronLeft, ChevronRight, Plus, X, Calendar } from 'lucide-react';
 import { useAppContext, SchoolEvent } from '../context/AppContext';
+import { useToast } from './ToastProvider';
+import { useThemeClasses } from '../hooks/useThemeClasses';
 
 const EVENT_COLORS: Record<string, { bg: string; text: string; dot: string }> = {
   Academic: { bg: 'bg-blue-100',   text: 'text-blue-800',   dot: 'bg-blue-500' },
@@ -33,6 +35,8 @@ const EMPTY_FORM: EventFormData = {
 
 export function SchoolCalendar() {
   const { events, addEvent, updateEvent, deleteEvent } = useAppContext();
+  const { toast } = useToast();
+  const tc = useThemeClasses();
 
   const today = new Date();
   const [viewYear, setViewYear] = useState(today.getFullYear());
@@ -105,8 +109,10 @@ export function SchoolCalendar() {
     };
     if (editingEvent) {
       updateEvent(editingEvent.id, payload);
+      toast('Event updated.', 'success');
     } else {
       addEvent({ id: `event-${Date.now()}`, ...payload });
+      toast('Event added to calendar.', 'success');
     }
     setShowForm(false);
     setForm(EMPTY_FORM);
@@ -131,7 +137,7 @@ export function SchoolCalendar() {
           <p className="text-gray-600">View and manage all school events and dates</p>
         </div>
         <button onClick={() => openNewEvent()}
-          className="flex items-center space-x-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors">
+          className={`flex items-center space-x-2 ${tc.btn} text-white px-4 py-2 rounded-lg transition-colors`}>
           <Plus className="h-4 w-4" />
           <span>Add Event</span>
         </button>
@@ -229,7 +235,7 @@ export function SchoolCalendar() {
                   <p className="text-xs text-gray-500">{selectedDayEvents.length} event{selectedDayEvents.length !== 1 ? 's' : ''}</p>
                 </div>
                 <button onClick={() => openNewEvent(selectedDay)}
-                  className="flex items-center space-x-1 text-xs bg-blue-600 text-white px-2.5 py-1.5 rounded-lg hover:bg-blue-700">
+                  className={`flex items-center space-x-1 text-xs ${tc.btn} text-white px-2.5 py-1.5 rounded-lg`}>
                   <Plus className="h-3 w-3" /><span>Add</span>
                 </button>
               </div>
@@ -255,7 +261,7 @@ export function SchoolCalendar() {
                           </div>
                           <div className="flex gap-1 ml-2">
                             <button onClick={() => openEdit(e)} className="text-xs text-blue-600 hover:underline">Edit</button>
-                            <button onClick={() => { if (confirm('Delete this event?')) deleteEvent(e.id); }} className="text-xs text-red-500 hover:underline">Del</button>
+                            <button onClick={() => { deleteEvent(e.id); toast('Event deleted.', 'info'); }} className="text-xs text-red-500 hover:underline">Del</button>
                           </div>
                         </div>
                       </div>
@@ -370,7 +376,7 @@ export function SchoolCalendar() {
                 <button onClick={() => { setShowForm(false); setForm(EMPTY_FORM); setEditingEvent(null); }}
                   className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50">Cancel</button>
                 <button onClick={handleSave} disabled={!form.title || !form.date}
-                  className="flex-1 bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 disabled:opacity-40">
+                  className={`flex-1 ${tc.btn} text-white py-2 px-4 rounded-lg disabled:opacity-40`}>
                   {editingEvent ? 'Update Event' : 'Add Event'}
                 </button>
               </div>

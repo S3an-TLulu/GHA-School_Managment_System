@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { Plus, Search, Pencil, Trash2, TrendingDown, X } from 'lucide-react';
 import { useAppContext, Expense } from '../context/AppContext';
+import { useToast } from './ToastProvider';
+import { useThemeClasses } from '../hooks/useThemeClasses';
 
 const CATEGORIES = ['Utilities', 'Salaries', 'Supplies', 'Maintenance', 'Food', 'Transport', 'Other'] as const;
 const TERMS = ['Term 1 2026', 'Term 2 2026', 'Term 3 2026', 'Term 1 2025', 'Term 2 2025', 'Term 3 2025'];
@@ -91,8 +93,8 @@ function ExpenseModal({ expense, onSave, onClose }: {
           </div>
           <div className="flex space-x-3 pt-4">
             <button type="button" onClick={onClose} className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors">Cancel</button>
-            <button type="submit" className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
-              {expense ? 'Update' : 'Record Expense'}
+            <button type="submit" className="flex-1 px-4 py-2 gha-primary-btn text-white rounded-lg transition-colors text-sm font-medium">
+              {expense ? 'Update Expense' : 'Record Expense'}
             </button>
           </div>
         </form>
@@ -103,6 +105,8 @@ function ExpenseModal({ expense, onSave, onClose }: {
 
 export function Expenses() {
   const { expenses, addExpense, updateExpense, deleteExpense, currentTerm } = useAppContext();
+  const { toast } = useToast();
+  const tc = useThemeClasses();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -129,7 +133,8 @@ export function Expenses() {
   };
 
   const handleDelete = (id: string) => {
-    if (confirm('Delete this expense record?')) deleteExpense(id);
+    deleteExpense(id);
+    toast('Expense record deleted.', 'info');
   };
 
   const handleClose = () => {
@@ -145,7 +150,7 @@ export function Expenses() {
           <p className="text-gray-600">Monitor school expenditure</p>
         </div>
         <button onClick={() => setIsModalOpen(true)}
-          className="flex items-center space-x-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors">
+          className={`flex items-center space-x-2 ${tc.btn} text-white px-4 py-2 rounded-lg transition-colors text-sm font-medium`}>
           <Plus className="h-5 w-5" />
           <span>Record Expense</span>
         </button>
@@ -247,7 +252,8 @@ export function Expenses() {
         <ExpenseModal
           expense={editingExpense}
           onSave={data => {
-            editingExpense ? updateExpense(editingExpense.id, data) : addExpense(data);
+            if (editingExpense) { updateExpense(editingExpense.id, data); toast('Expense updated.', 'success'); }
+            else { addExpense(data); toast('Expense recorded.', 'success'); }
             handleClose();
           }}
           onClose={handleClose}

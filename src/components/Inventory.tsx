@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { Plus, Search, Pencil, Trash2, Package, X } from 'lucide-react';
 import { useAppContext, InventoryItem } from '../context/AppContext';
+import { useToast } from './ToastProvider';
+import { useThemeClasses } from '../hooks/useThemeClasses';
 
 const CATEGORIES = ['Furniture', 'Electronics', 'Stationery', 'Sports', 'Cleaning', 'Kitchen', 'Other'] as const;
 const CONDITIONS = ['Good', 'Fair', 'Poor', 'Damaged'] as const;
@@ -89,7 +91,7 @@ function InventoryModal({ item, onSave, onClose }: {
           </div>
           <div className="flex space-x-3 pt-4">
             <button type="button" onClick={onClose} className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors">Cancel</button>
-            <button type="submit" className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+            <button type="submit" className="flex-1 px-4 py-2 gha-primary-btn text-white rounded-lg transition-colors">
               {item ? 'Update' : 'Add Item'}
             </button>
           </div>
@@ -101,6 +103,8 @@ function InventoryModal({ item, onSave, onClose }: {
 
 export function Inventory() {
   const { inventory, addInventoryItem, updateInventoryItem, deleteInventoryItem } = useAppContext();
+  const { toast } = useToast();
+  const tc = useThemeClasses();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -125,7 +129,8 @@ export function Inventory() {
   };
 
   const handleDelete = (id: string) => {
-    if (confirm('Remove this inventory item?')) deleteInventoryItem(id);
+    deleteInventoryItem(id);
+    toast('Inventory item removed.', 'info');
   };
 
   const handleClose = () => {
@@ -141,7 +146,7 @@ export function Inventory() {
           <p className="text-gray-600">Track school assets and supplies</p>
         </div>
         <button onClick={() => setIsModalOpen(true)}
-          className="flex items-center space-x-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors">
+          className={`flex items-center space-x-2 ${tc.btn} text-white px-4 py-2 rounded-lg transition-colors`}>
           <Plus className="h-5 w-5" />
           <span>Add Item</span>
         </button>
@@ -249,7 +254,8 @@ export function Inventory() {
         <InventoryModal
           item={editingItem}
           onSave={data => {
-            editingItem ? updateInventoryItem(editingItem.id, data) : addInventoryItem(data);
+            if (editingItem) { updateInventoryItem(editingItem.id, data); toast('Item updated.', 'success'); }
+            else { addInventoryItem(data); toast('Item added to inventory.', 'success'); }
             handleClose();
           }}
           onClose={handleClose}

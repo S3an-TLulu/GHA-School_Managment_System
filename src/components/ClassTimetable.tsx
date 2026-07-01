@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Clock, Printer, Save, Plus, X, Edit2 } from 'lucide-react';
 import { useAppContext, Timetable, TimetableCell } from '../context/AppContext';
+import { useThemeClasses } from '../hooks/useThemeClasses';
 
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
 const PERIODS = ['Period 1\n07:30–08:30', 'Period 2\n08:30–09:30', 'Break\n09:30–10:00', 'Period 3\n10:00–11:00', 'Period 4\n11:00–12:00', 'Lunch\n12:00–12:45', 'Period 5\n12:45–13:45', 'Period 6\n13:45–14:45'];
@@ -15,6 +16,7 @@ function slotKey(day: string, period: string) {
 
 export function ClassTimetable() {
   const { timetables, saveTimetable, teachers } = useAppContext();
+  const tc = useThemeClasses();
   const [selectedClass, setSelectedClass] = useState(CLASSES[0]);
   const [editing, setEditing] = useState<{ day: string; period: string } | null>(null);
   const [cellForm, setCellForm] = useState<TimetableCell>({ subject: '', teacherName: '' });
@@ -97,7 +99,7 @@ export function ClassTimetable() {
           <h1 className="text-2xl font-bold text-gray-900">Class Timetable</h1>
           <p className="text-gray-600">Weekly schedule per class with teacher assignments</p>
         </div>
-        <button onClick={printTimetable} className="flex items-center space-x-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 text-sm font-medium">
+        <button onClick={printTimetable} className={`flex items-center space-x-2 ${tc.btn} text-white px-4 py-2 rounded-lg text-sm font-medium`}>
           <Printer className="h-4 w-4" />
           <span>Print Timetable</span>
         </button>
@@ -110,7 +112,7 @@ export function ClassTimetable() {
           {CLASSES.map(cls => (
             <button key={cls} onClick={() => setSelectedClass(cls)}
               className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors ${
-                selectedClass === cls ? 'bg-blue-600 text-white border-blue-600' : 'border-gray-300 text-gray-700 hover:border-blue-400'
+                selectedClass === cls ? `${tc.btn.split(' ')[0]} text-white border-transparent` : 'border-gray-300 text-gray-700 hover:border-gray-400'
               }`}>
               {cls}
             </button>
@@ -128,7 +130,7 @@ export function ClassTimetable() {
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="bg-blue-600 text-white">
+              <tr className="text-white" style={{ background: 'var(--gha-primary, #1d4ed8)' }}>
                 <th className="py-3 px-4 text-left font-medium w-32">Period</th>
                 {DAYS.map(day => (
                   <th key={day} className="py-3 px-4 text-left font-medium">{day}</th>
@@ -241,7 +243,7 @@ export function ClassTimetable() {
                   Clear Slot
                 </button>
               )}
-              <button onClick={saveCell} className="flex-1 flex items-center justify-center space-x-2 bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700">
+              <button onClick={saveCell} className={`flex-1 flex items-center justify-center space-x-2 ${tc.btn} text-white px-4 py-2 rounded-lg text-sm`}>
                 <Save className="h-4 w-4" />
                 <span>Save</span>
               </button>

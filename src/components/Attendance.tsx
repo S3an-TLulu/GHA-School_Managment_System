@@ -1,6 +1,8 @@
 import { useState, useMemo } from 'react';
 import { CheckCircle, XCircle, Clock, AlertCircle, Printer, ChevronLeft, ChevronRight, BarChart2 } from 'lucide-react';
 import { useAppContext, AttendanceRecord } from '../context/AppContext';
+import { useToast } from './ToastProvider';
+import { useThemeClasses } from '../hooks/useThemeClasses';
 
 const GRADES = ['Baby Class', 'Middle Class', 'Reception', 'Grade 1', 'Grade 2', 'Grade 3', 'Grade 4', 'Grade 5', 'Grade 6', 'Grade 7'];
 
@@ -19,6 +21,8 @@ function todayStr() {
 
 export function Attendance() {
   const { students, attendance, saveAttendance, deleteAttendanceForDate } = useAppContext();
+  const { toast } = useToast();
+  const tc = useThemeClasses();
 
   const [activeTab, setActiveTab] = useState<'mark' | 'history' | 'summary'>('mark');
   const [selectedGrade, setSelectedGrade] = useState(GRADES[0]);
@@ -63,7 +67,7 @@ export function Attendance() {
     }));
     saveAttendance(records);
     setDraft({});
-    alert(`Attendance saved for ${selectedGrade} — ${new Date(selectedDate + 'T00:00:00').toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}`);
+    toast(`Attendance saved for ${selectedGrade}.`, 'success');
   };
 
   const handlePrint = () => {
@@ -268,7 +272,7 @@ export function Attendance() {
 
               <div className="p-5 border-t border-gray-100">
                 <button onClick={handleSave}
-                  className="w-full bg-blue-600 text-white py-2.5 rounded-lg font-semibold hover:bg-blue-700 transition-colors">
+                  className={`w-full ${tc.btn} text-white py-2.5 rounded-lg font-semibold transition-colors`}>
                   Save Attendance for {selectedGrade}
                 </button>
               </div>
@@ -314,7 +318,7 @@ export function Attendance() {
                       </span>
                       <button onClick={() => { setSelectedDate(date); setActiveTab('mark'); setDraft({}); }}
                         className="text-xs text-blue-600 hover:underline">View</button>
-                      <button onClick={() => { if (confirm('Delete attendance for this date?')) deleteAttendanceForDate(date, selectedGrade); }}
+                      <button onClick={() => { deleteAttendanceForDate(date, selectedGrade); toast('Attendance record deleted.', 'info'); }}
                         className="text-xs text-red-500 hover:underline">Delete</button>
                     </div>
                   </div>

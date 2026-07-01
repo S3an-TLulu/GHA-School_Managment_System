@@ -163,7 +163,7 @@ export function PaymentModal({ onSave, onClose }: PaymentModalProps) {
               Cancel
             </button>
             <button type="submit"
-              className="flex-1 bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium">
+              className="flex-1 gha-primary-btn text-white py-2 px-4 rounded-lg transition-colors text-sm font-medium">
               Record Payment
             </button>
           </div>
