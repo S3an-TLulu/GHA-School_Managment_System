@@ -13,12 +13,13 @@ const METHOD_CONFIG: Record<string, { icon: React.ReactNode; color: string }> = 
   'Other':         { icon: <MoreHorizontal className="h-3 w-3" />, color: 'bg-gray-100 text-gray-600'    },
 };
 
-function MethodBadge({ method }: { method?: PaymentMethod }) {
+function MethodBadge({ method, network }: { method?: PaymentMethod; network?: string }) {
   const cfg = METHOD_CONFIG[method || 'Cash'] || METHOD_CONFIG['Cash'];
+  const label = method === 'Mobile Money' && network ? network : (method || 'Cash');
   return (
     <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full ${cfg.color}`}>
       {cfg.icon}
-      {method || 'Cash'}
+      {label}
     </span>
   );
 }
@@ -90,7 +91,7 @@ function printReceipt(payment: Payment, student: Student | undefined) {
       </div>
       <div class="row">
         <span class="label">Payment Method</span>
-        <span class="value">${payment.paymentMethod || 'Cash'}</span>
+        <span class="value">${payment.paymentMethod === 'Mobile Money' && payment.mobileNetwork ? payment.mobileNetwork : (payment.paymentMethod || 'Cash')}</span>
       </div>
       <div class="row">
         <span class="label">Term</span>
@@ -248,7 +249,7 @@ export function Payments() {
                       {payment.receiptNumber && <p className="text-xs text-gray-400">{payment.receiptNumber}</p>}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <MethodBadge method={payment.paymentMethod} />
+                      <MethodBadge method={payment.paymentMethod} network={payment.mobileNetwork} />
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-xs text-gray-500">{payment.term || '—'}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">K{payment.amount.toLocaleString()}</td>
