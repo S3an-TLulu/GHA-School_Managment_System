@@ -27,6 +27,7 @@ import { useAppContext } from './context/AppContext';
 import { useEffect } from 'react';
 import { Login } from './components/Login';
 import { AppProvider } from './context/AppContext';
+import { ToastProvider } from './components/ToastProvider';
 
 function AppContent() {
   const [activeSection, setActiveSection] = useState('dashboard');
@@ -84,7 +85,9 @@ function App() {
   return (
     <AuthProvider>
       <AppProvider>
-        <AppContent />
+        <ToastProvider>
+          <AppContent />
+        </ToastProvider>
       </AppProvider>
     </AuthProvider>
   );

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { FileText, Printer, Receipt, CreditCard, Award, ClipboardList, Users, X } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
+import { useThemeClasses } from '../hooks/useThemeClasses';
 
 type TemplateType = 'receipt' | 'statement' | 'admission' | 'idcard' | 'certificate' | 'attendance-report' | 'financial-report';
 
@@ -24,6 +25,7 @@ const TEMPLATES: TemplateConfig[] = [
 
 export function DocumentTemplates() {
   const { students, payments, expenses, attendance, branding, currentTerm } = useAppContext();
+  const tc = useThemeClasses();
   const [selected, setSelected] = useState<TemplateType | null>(null);
   const [studentId, setStudentId] = useState('');
   const [termFilter, setTermFilter] = useState(currentTerm);
@@ -413,7 +415,7 @@ export function DocumentTemplates() {
               <button
                 onClick={ACTION_MAP[selected]}
                 disabled={needsStudent(selected) && !studentId}
-                className="flex items-center space-x-2 bg-blue-600 text-white px-5 py-2.5 rounded-lg hover:bg-blue-700 transition-colors font-medium disabled:opacity-40 disabled:cursor-not-allowed">
+                className={`flex items-center space-x-2 ${tc.btn} text-white px-5 py-2.5 rounded-lg transition-colors font-medium disabled:opacity-40 disabled:cursor-not-allowed`}>
                 <Printer className="h-4 w-4" />
                 <span>Print Preview</span>
               </button>

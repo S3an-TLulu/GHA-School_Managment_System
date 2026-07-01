@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { Plus, Pencil, Trash2, X, Bell, AlertTriangle, AlertCircle, Info } from 'lucide-react';
 import { useAppContext, Announcement } from '../context/AppContext';
+import { useToast } from './ToastProvider';
+import { useThemeClasses } from '../hooks/useThemeClasses';
 
 const PRIORITIES = ['normal', 'important', 'urgent'] as const;
 const AUDIENCES = ['All', 'Students', 'Teachers', 'Parents'] as const;
@@ -78,8 +80,8 @@ function AnnouncementModal({ announcement, onSave, onClose }: {
             </div>
           </div>
           <div className="flex space-x-3 pt-2">
-            <button type="button" onClick={onClose} className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50">Cancel</button>
-            <button type="submit" className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">{announcement ? 'Update' : 'Post'}</button>
+            <button type="button" onClick={onClose} className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm font-medium">Cancel</button>
+            <button type="submit" className="flex-1 px-4 py-2 gha-primary-btn text-white rounded-lg text-sm font-medium">{announcement ? 'Update' : 'Post Announcement'}</button>
           </div>
         </form>
       </div>
@@ -95,6 +97,8 @@ const priorityConfig = {
 
 export function Announcements() {
   const { announcements, addAnnouncement, updateAnnouncement, deleteAnnouncement } = useAppContext();
+  const { toast } = useToast();
+  const tc = useThemeClasses();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingAnn, setEditingAnn] = useState<Announcement | null>(null);
   const [filterPriority, setFilterPriority] = useState('all');
@@ -114,14 +118,17 @@ export function Announcements() {
   };
 
   const handleDelete = (id: string) => {
-    if (confirm('Delete this announcement?')) deleteAnnouncement(id);
+    deleteAnnouncement(id);
+    toast('Announcement deleted.', 'info');
   };
 
   const handleSave = (data: Announcement) => {
     if (editingAnn) {
       updateAnnouncement(editingAnn.id, data);
+      toast('Announcement updated.', 'success');
     } else {
       addAnnouncement(data);
+      toast('Announcement posted.', 'success');
     }
     setIsModalOpen(false);
     setEditingAnn(null);
@@ -135,7 +142,7 @@ export function Announcements() {
           <p className="text-gray-600">School notice board and communications</p>
         </div>
         <button onClick={() => { setEditingAnn(null); setIsModalOpen(true); }}
-          className="flex items-center space-x-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors">
+          className={`flex items-center space-x-2 ${tc.btn} text-white px-4 py-2 rounded-lg transition-colors text-sm font-medium`}>
           <Plus className="h-5 w-5" />
           <span>New Announcement</span>
         </button>

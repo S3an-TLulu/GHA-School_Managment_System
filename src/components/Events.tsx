@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { Plus, Calendar, Pencil, Trash2, X } from 'lucide-react';
 import { useAppContext, SchoolEvent } from '../context/AppContext';
+import { useToast } from './ToastProvider';
+import { useThemeClasses } from '../hooks/useThemeClasses';
 
 const EVENT_TYPES = ['Academic', 'Sports', 'Cultural', 'Meeting', 'Holiday', 'Other'] as const;
 const AUDIENCES = ['All', 'Students', 'Teachers', 'Parents'] as const;
@@ -81,7 +83,7 @@ function EventModal({ event, onSave, onClose }: {
           </div>
           <div className="flex space-x-3 pt-4">
             <button type="button" onClick={onClose} className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors">Cancel</button>
-            <button type="submit" className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+            <button type="submit" className="flex-1 px-4 py-2 gha-primary-btn text-white rounded-lg transition-colors">
               {event ? 'Update' : 'Add Event'}
             </button>
           </div>
@@ -93,6 +95,8 @@ function EventModal({ event, onSave, onClose }: {
 
 export function Events() {
   const { events, addEvent, updateEvent, deleteEvent } = useAppContext();
+  const { toast } = useToast();
+  const tc = useThemeClasses();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingEvent, setEditingEvent] = useState<SchoolEvent | null>(null);
   const [filterType, setFilterType] = useState('all');
@@ -112,7 +116,8 @@ export function Events() {
   };
 
   const handleDelete = (id: string) => {
-    if (confirm('Delete this event?')) deleteEvent(id);
+    deleteEvent(id);
+    toast('Event deleted.', 'info');
   };
 
   const handleClose = () => {
@@ -166,7 +171,7 @@ export function Events() {
           <p className="text-gray-600">{upcoming.length} upcoming events</p>
         </div>
         <button onClick={() => setIsModalOpen(true)}
-          className="flex items-center space-x-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors">
+          className={`flex items-center space-x-2 ${tc.btn} text-white px-4 py-2 rounded-lg transition-colors`}>
           <Plus className="h-5 w-5" />
           <span>Add Event</span>
         </button>
@@ -235,7 +240,8 @@ export function Events() {
         <EventModal
           event={editingEvent}
           onSave={data => {
-            editingEvent ? updateEvent(editingEvent.id, data) : addEvent(data);
+            if (editingEvent) { updateEvent(editingEvent.id, data); toast('Event updated.', 'success'); }
+            else { addEvent(data); toast('Event added.', 'success'); }
             handleClose();
           }}
           onClose={handleClose}

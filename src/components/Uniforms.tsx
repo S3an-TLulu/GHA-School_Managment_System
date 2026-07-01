@@ -1,8 +1,12 @@
 import { useState } from 'react';
 import { useAppContext } from '../context/AppContext';
+import { useToast } from './ToastProvider';
+import { useThemeClasses } from '../hooks/useThemeClasses';
 
 export function Uniforms() {
   const { uniforms, students, addUniformPurchase } = useAppContext();
+  const { toast } = useToast();
+  const tc = useThemeClasses();
   const [selectedStudent, setSelectedStudent] = useState('');
   
   const uniformItems = [
@@ -23,21 +27,18 @@ export function Uniforms() {
 
   const handlePurchase = (item: { name: string; price: number; category: string }) => {
     if (!selectedStudent) {
-      alert('Please select a student first');
+      toast('Please select a student first.', 'warning');
       return;
     }
-    
-    const purchase = {
+    addUniformPurchase({
       id: `uniform-${Date.now()}`,
       studentId: selectedStudent,
       item: item.name,
       price: item.price,
       purchaseDate: new Date().toISOString(),
       status: 'purchased'
-    };
-    
-    addUniformPurchase(purchase);
-    alert(`${item.name} purchased for student`);
+    });
+    toast(`${item.name} purchased successfully.`, 'success');
   };
 
   const getStudentUniforms = (studentId: string) => {
@@ -90,7 +91,7 @@ export function Uniforms() {
                         <button
                           onClick={() => handlePurchase(item)}
                           disabled={!selectedStudent}
-                          className="mt-1 px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                          className={`mt-1 px-3 py-1 ${tc.btn} text-white text-sm rounded disabled:opacity-50 disabled:cursor-not-allowed transition-colors`}
                         >
                           Purchase
                         </button>

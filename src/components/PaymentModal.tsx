@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { X } from 'lucide-react';
-import { useAppContext } from '../context/AppContext';
+import { X, Banknote, Smartphone, Building2, FileText, MoreHorizontal } from 'lucide-react';
+import { useAppContext, PaymentMethod } from '../context/AppContext';
 
 interface PaymentModalProps {
   onSave: (paymentData: ReturnType<typeof buildPayment>) => void;
@@ -10,9 +10,18 @@ interface PaymentModalProps {
 const PAYMENT_TYPES = ['Tuition Fee', 'Enrollment Form', 'Lunch', 'Transport', 'Water', 'Assessment Tests', 'Uniform', 'Other'];
 const TERMS = ['Term 1 2026', 'Term 2 2026', 'Term 3 2026', 'Term 1 2025', 'Term 2 2025', 'Term 3 2025'];
 
+const METHODS: { value: PaymentMethod; label: string; icon: React.ReactNode; color: string }[] = [
+  { value: 'Cash',          label: 'Cash',          icon: <Banknote    className="h-4 w-4" />, color: 'text-green-600  bg-green-50  border-green-200'  },
+  { value: 'Mobile Money',  label: 'Mobile Money',  icon: <Smartphone  className="h-4 w-4" />, color: 'text-blue-600   bg-blue-50   border-blue-200'   },
+  { value: 'Bank Transfer', label: 'Bank Transfer', icon: <Building2   className="h-4 w-4" />, color: 'text-purple-600 bg-purple-50 border-purple-200' },
+  { value: 'Cheque',        label: 'Cheque',        icon: <FileText    className="h-4 w-4" />, color: 'text-amber-600  bg-amber-50  border-amber-200'  },
+  { value: 'Other',         label: 'Other',         icon: <MoreHorizontal className="h-4 w-4" />, color: 'text-gray-600  bg-gray-50   border-gray-200'  },
+];
+
 function buildPayment(formData: {
   studentId: string; type: string; amount: string; dueDate: string;
   status: string; term: string; receiptNumber: string; notes: string;
+  paymentMethod: PaymentMethod;
 }) {
   return {
     id: `payment-${Date.now()}`,
@@ -25,7 +34,8 @@ function buildPayment(formData: {
     createdDate: new Date().toISOString(),
     term: formData.term,
     receiptNumber: formData.receiptNumber || undefined,
-    notes: formData.notes || undefined
+    notes: formData.notes || undefined,
+    paymentMethod: formData.paymentMethod,
   };
 }
 
@@ -39,7 +49,8 @@ export function PaymentModal({ onSave, onClose }: PaymentModalProps) {
     status: 'pending',
     term: currentTerm,
     receiptNumber: '',
-    notes: ''
+    notes: '',
+    paymentMethod: 'Cash' as PaymentMethod,
   });
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -88,6 +99,25 @@ export function PaymentModal({ onSave, onClose }: PaymentModalProps) {
             </div>
           </div>
 
+          {/* Payment Method */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Payment Method *</label>
+            <div className="grid grid-cols-5 gap-2">
+              {METHODS.map(m => (
+                <button key={m.value} type="button"
+                  onClick={() => setFormData({ ...formData, paymentMethod: m.value })}
+                  className={`flex flex-col items-center gap-1 py-2.5 px-1 rounded-lg border-2 text-xs font-medium transition-all ${
+                    formData.paymentMethod === m.value
+                      ? `${m.color} border-current shadow-sm`
+                      : 'border-gray-200 text-gray-500 hover:border-gray-300'
+                  }`}>
+                  {m.icon}
+                  <span className="leading-tight text-center">{m.label}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Amount (K) *</label>
@@ -122,17 +152,18 @@ export function PaymentModal({ onSave, onClose }: PaymentModalProps) {
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
-            <input type="text" placeholder="Optional notes..." value={formData.notes}
+            <input type="text" placeholder="Optional notes…" value={formData.notes}
               onChange={e => setFormData({ ...formData, notes: e.target.value })}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
           </div>
 
-          <div className="flex space-x-3 pt-4">
+          <div className="flex space-x-3 pt-2">
             <button type="button" onClick={onClose}
-              className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors">
+              className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium">
               Cancel
             </button>
-            <button type="submit" className="flex-1 bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors">
+            <button type="submit"
+              className="flex-1 gha-primary-btn text-white py-2 px-4 rounded-lg transition-colors text-sm font-medium">
               Record Payment
             </button>
           </div>

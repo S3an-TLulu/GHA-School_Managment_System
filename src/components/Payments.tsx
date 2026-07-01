@@ -1,7 +1,27 @@
-import { useState } from 'react';
-import { Plus, Search, Check, X, Clock, Trash2, Printer } from 'lucide-react';
-import { useAppContext, Payment, Student } from '../context/AppContext';
+import React, { useState } from 'react';
+import { Plus, Search, Check, X, Clock, Trash2, Printer, Banknote, Smartphone, Building2, FileText, MoreHorizontal } from 'lucide-react';
+import { useAppContext, Payment, Student, PaymentMethod } from '../context/AppContext';
 import { PaymentModal } from './PaymentModal';
+import { useToast } from './ToastProvider';
+import { useThemeClasses } from '../hooks/useThemeClasses';
+
+const METHOD_CONFIG: Record<string, { icon: React.ReactNode; color: string }> = {
+  'Cash':          { icon: <Banknote       className="h-3 w-3" />, color: 'bg-green-100 text-green-700'  },
+  'Mobile Money':  { icon: <Smartphone     className="h-3 w-3" />, color: 'bg-blue-100 text-blue-700'    },
+  'Bank Transfer': { icon: <Building2      className="h-3 w-3" />, color: 'bg-purple-100 text-purple-700' },
+  'Cheque':        { icon: <FileText       className="h-3 w-3" />, color: 'bg-amber-100 text-amber-700'  },
+  'Other':         { icon: <MoreHorizontal className="h-3 w-3" />, color: 'bg-gray-100 text-gray-600'    },
+};
+
+function MethodBadge({ method }: { method?: PaymentMethod }) {
+  const cfg = METHOD_CONFIG[method || 'Cash'] || METHOD_CONFIG['Cash'];
+  return (
+    <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full ${cfg.color}`}>
+      {cfg.icon}
+      {method || 'Cash'}
+    </span>
+  );
+}
 
 const TERMS = ['Term 1 2026', 'Term 2 2026', 'Term 3 2026', 'Term 1 2025', 'Term 2 2025', 'Term 3 2025'];
 
@@ -69,6 +89,10 @@ function printReceipt(payment: Payment, student: Student | undefined) {
         <span class="value">${payment.type}</span>
       </div>
       <div class="row">
+        <span class="label">Payment Method</span>
+        <span class="value">${payment.paymentMethod || 'Cash'}</span>
+      </div>
+      <div class="row">
         <span class="label">Term</span>
         <span class="value">${payment.term || '—'}</span>
       </div>
@@ -107,6 +131,8 @@ function printReceipt(payment: Payment, student: Student | undefined) {
 
 export function Payments() {
   const { payments, students, addPayment, updatePayment, deletePayment, currentTerm } = useAppContext();
+  const { toast } = useToast();
+  const tc = useThemeClasses();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
@@ -139,10 +165,12 @@ export function Payments() {
 
   const handleMarkPaid = (paymentId: string) => {
     updatePayment(paymentId, { status: 'paid', paidDate: new Date().toISOString() });
+    toast('Payment marked as paid.', 'success');
   };
 
   const handleDelete = (paymentId: string) => {
-    if (confirm('Delete this payment record?')) deletePayment(paymentId);
+    deletePayment(paymentId);
+    toast('Payment record deleted.', 'info');
   };
 
   return (
@@ -153,7 +181,7 @@ export function Payments() {
           <p className="text-gray-600">Track student payments and outstanding fees</p>
         </div>
         <button onClick={() => setIsModalOpen(true)}
-          className="flex items-center space-x-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors">
+          className={`flex items-center space-x-2 ${tc.btn} text-white px-4 py-2 rounded-lg transition-colors text-sm font-medium`}>
           <Plus className="h-5 w-5" />
           <span>Record Payment</span>
         </button>
@@ -201,7 +229,7 @@ export function Payments() {
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                {['Student', 'Payment Type', 'Term', 'Amount', 'Due Date', 'Status', 'Actions'].map(h => (
+                {['Student', 'Payment Type', 'Method', 'Term', 'Amount', 'Due Date', 'Status', 'Actions'].map(h => (
                   <th key={h} className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{h}</th>
                 ))}
               </tr>
@@ -218,6 +246,9 @@ export function Payments() {
                     <td className="px-6 py-4 whitespace-nowrap">
                       <p className="text-sm text-gray-900">{payment.type}</p>
                       {payment.receiptNumber && <p className="text-xs text-gray-400">{payment.receiptNumber}</p>}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <MethodBadge method={payment.paymentMethod} />
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-xs text-gray-500">{payment.term || '—'}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">K{payment.amount.toLocaleString()}</td>
@@ -273,6 +304,7 @@ export function Payments() {
         <PaymentModal
           onSave={paymentData => {
             addPayment(paymentData);
+            toast('Payment recorded successfully.', 'success');
             setIsModalOpen(false);
           }}
           onClose={() => setIsModalOpen(false)}

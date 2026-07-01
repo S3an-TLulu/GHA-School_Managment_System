@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { BarChart3, Download, FileText, DollarSign, TrendingDown, Printer } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
+import { useThemeClasses } from '../hooks/useThemeClasses';
 
 function downloadCSV(rows: string[][], filename: string) {
   const csvContent = rows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',')).join('\n');
@@ -17,6 +18,7 @@ function downloadCSV(rows: string[][], filename: string) {
 
 export function Reports() {
   const { students, payments, uniforms, expenses, currentTerm } = useAppContext();
+  const tc = useThemeClasses();
   const [selectedReport, setSelectedReport] = useState('financial');
   const [termFilter, setTermFilter] = useState(currentTerm);
 
@@ -321,7 +323,7 @@ export function Reports() {
             ].map(tab => (
               <button key={tab.id} onClick={() => setSelectedReport(tab.id)}
                 className={`flex items-center space-x-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                  selectedReport === tab.id ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                  selectedReport === tab.id ? `${tc.light} ${tc.text}` : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
                 }`}>
                 <tab.icon className="h-4 w-4" />
                 <span>{tab.label}</span>

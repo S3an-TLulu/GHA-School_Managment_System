@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { Plus, Pencil, Trash2, X, DollarSign, GraduationCap, List } from 'lucide-react';
 import { useAppContext, FeeStructureItem, OtherCharge } from '../context/AppContext';
+import { useToast } from './ToastProvider';
+import { useThemeClasses } from '../hooks/useThemeClasses';
 
 const ALL_CLASSES = ['Baby Class', 'Middle Class', 'Reception', 'Grade 1', 'Grade 2', 'Grade 3', 'Grade 4', 'Grade 5', 'Grade 6', 'Grade 7'];
 const PER_OPTIONS = ['per term', 'per month', 'once-off', 'per year'];
@@ -60,7 +62,7 @@ function FeeModal({ item, onSave, onClose }: {
           </div>
           <div className="flex space-x-3 pt-2">
             <button type="button" onClick={onClose} className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50">Cancel</button>
-            <button type="submit" className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">{item ? 'Update' : 'Add'}</button>
+            <button type="submit" className="flex-1 px-4 py-2 gha-primary-btn text-white rounded-lg">{item ? 'Update' : 'Add'}</button>
           </div>
         </form>
       </div>
@@ -116,7 +118,7 @@ function ChargeModal({ charge, onSave, onClose }: {
           </div>
           <div className="flex space-x-3 pt-2">
             <button type="button" onClick={onClose} className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50">Cancel</button>
-            <button type="submit" className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">{charge ? 'Update' : 'Add'}</button>
+            <button type="submit" className="flex-1 px-4 py-2 gha-primary-btn text-white rounded-lg">{charge ? 'Update' : 'Add'}</button>
           </div>
         </form>
       </div>
@@ -128,6 +130,8 @@ export function FeeStructure() {
   const { feeStructure, otherCharges, addFeeStructureItem, updateFeeStructureItem, deleteFeeStructureItem,
     addOtherCharge, updateOtherCharge, deleteOtherCharge } = useAppContext();
 
+  const { toast } = useToast();
+  const tc = useThemeClasses();
   const [editingFee, setEditingFee] = useState<FeeStructureItem | null>(null);
   const [feeModalOpen, setFeeModalOpen] = useState(false);
   const [editingCharge, setEditingCharge] = useState<OtherCharge | null>(null);
@@ -138,21 +142,15 @@ export function FeeStructure() {
     : 0;
 
   const handleSaveFee = (data: FeeStructureItem) => {
-    if (editingFee) {
-      updateFeeStructureItem(editingFee.id, data);
-    } else {
-      addFeeStructureItem(data);
-    }
+    if (editingFee) { updateFeeStructureItem(editingFee.id, data); toast('Fee updated.', 'success'); }
+    else { addFeeStructureItem(data); toast('Fee entry added.', 'success'); }
     setFeeModalOpen(false);
     setEditingFee(null);
   };
 
   const handleSaveCharge = (data: OtherCharge) => {
-    if (editingCharge) {
-      updateOtherCharge(editingCharge.id, data);
-    } else {
-      addOtherCharge(data);
-    }
+    if (editingCharge) { updateOtherCharge(editingCharge.id, data); toast('Charge updated.', 'success'); }
+    else { addOtherCharge(data); toast('Charge added.', 'success'); }
     setChargeModalOpen(false);
     setEditingCharge(null);
   };
@@ -168,11 +166,13 @@ export function FeeStructure() {
   };
 
   const handleDeleteFee = (id: string) => {
-    if (confirm('Delete this fee entry?')) deleteFeeStructureItem(id);
+    deleteFeeStructureItem(id);
+    toast('Fee entry deleted.', 'info');
   };
 
   const handleDeleteCharge = (id: string) => {
-    if (confirm('Delete this charge?')) deleteOtherCharge(id);
+    deleteOtherCharge(id);
+    toast('Charge deleted.', 'info');
   };
 
   return (
@@ -218,7 +218,7 @@ export function FeeStructure() {
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
           <h2 className="text-lg font-semibold text-gray-900">Tuition Fees (Per Term)</h2>
           <button onClick={() => { setEditingFee(null); setFeeModalOpen(true); }}
-            className="flex items-center space-x-2 bg-blue-600 text-white px-3 py-1.5 rounded-lg hover:bg-blue-700 transition-colors text-sm">
+            className={`flex items-center space-x-2 ${tc.btn} text-white px-3 py-1.5 rounded-lg transition-colors text-sm`}>
             <Plus className="h-4 w-4" />
             <span>Add Class</span>
           </button>
@@ -279,7 +279,7 @@ export function FeeStructure() {
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
           <h2 className="text-lg font-semibold text-gray-900">Other Charges</h2>
           <button onClick={() => { setEditingCharge(null); setChargeModalOpen(true); }}
-            className="flex items-center space-x-2 bg-blue-600 text-white px-3 py-1.5 rounded-lg hover:bg-blue-700 transition-colors text-sm">
+            className={`flex items-center space-x-2 ${tc.btn} text-white px-3 py-1.5 rounded-lg transition-colors text-sm`}>
             <Plus className="h-4 w-4" />
             <span>Add Charge</span>
           </button>

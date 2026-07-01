@@ -1,6 +1,8 @@
 import { useState, useMemo } from 'react';
-import { Search, Printer, Plus, CheckCircle, Clock, Receipt, X } from 'lucide-react';
-import { useAppContext } from '../context/AppContext';
+import { Search, Printer, Plus, CheckCircle, Clock, Receipt, X, Banknote, Smartphone, Building2, FileText } from 'lucide-react';
+import { useAppContext, PaymentMethod } from '../context/AppContext';
+import { useToast } from './ToastProvider';
+import { useThemeClasses } from '../hooks/useThemeClasses';
 
 const PAYMENT_TYPES = ['Tuition Fee', 'Enrollment Form', 'Lunch', 'Transport', 'Water', 'Assessment Tests', 'Uniform', 'Other'];
 
@@ -10,10 +12,13 @@ function todayISO() {
 
 export function OfficeCashier() {
   const { students, payments, feeStructure, addPayment, currentTerm } = useAppContext();
+  const { toast } = useToast();
+  const tc = useThemeClasses();
 
   const [studentSearch, setStudentSearch] = useState('');
   const [selectedStudent, setSelectedStudent] = useState<typeof students[0] | null>(null);
   const [paymentType, setPaymentType] = useState('Tuition Fee');
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('Cash');
   const [amount, setAmount] = useState('');
   const [receiptNumber, setReceiptNumber] = useState(`RCP-${Date.now().toString().slice(-5)}`);
   const [notes, setNotes] = useState('');
@@ -76,10 +81,12 @@ export function OfficeCashier() {
       createdDate: new Date().toISOString(),
       term: currentTerm,
       receiptNumber: receiptNumber || undefined,
-      notes: notes || undefined
+      notes: notes || undefined,
+      paymentMethod,
     });
 
     setSessionIds(prev => [...prev, id]);
+    toast(`K${parseFloat(amount).toLocaleString()} recorded for ${selectedStudent.name}.`, 'success');
     setSuccessMessage(`K${parseFloat(amount).toLocaleString()} recorded for ${selectedStudent.name}`);
     setTimeout(() => setSuccessMessage(''), 3000);
 
@@ -283,6 +290,28 @@ export function OfficeCashier() {
               ))}
             </div>
 
+            {/* Payment Method */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Payment Method</label>
+              <div className="grid grid-cols-4 gap-2">
+                {([
+                  { value: 'Cash' as PaymentMethod,          label: 'Cash',          icon: <Banknote    className="h-4 w-4" />, active: 'bg-green-50 border-green-500 text-green-700'  },
+                  { value: 'Mobile Money' as PaymentMethod,  label: 'Mobile Money',  icon: <Smartphone  className="h-4 w-4" />, active: 'bg-blue-50 border-blue-500 text-blue-700'    },
+                  { value: 'Bank Transfer' as PaymentMethod, label: 'Bank Transfer', icon: <Building2   className="h-4 w-4" />, active: 'bg-purple-50 border-purple-500 text-purple-700'},
+                  { value: 'Cheque' as PaymentMethod,        label: 'Cheque',        icon: <FileText    className="h-4 w-4" />, active: 'bg-amber-50 border-amber-500 text-amber-700'  },
+                ] as const).map(m => (
+                  <button key={m.value} type="button"
+                    onClick={() => setPaymentMethod(m.value)}
+                    className={`flex flex-col items-center gap-1.5 py-2.5 rounded-lg border-2 text-xs font-medium transition-all ${
+                      paymentMethod === m.value ? m.active : 'border-gray-200 text-gray-500 hover:border-gray-300'
+                    }`}>
+                    {m.icon}
+                    <span>{m.label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
             {/* Receipt & Notes */}
             <div className="grid grid-cols-2 gap-4">
               <div>
@@ -356,7 +385,7 @@ export function OfficeCashier() {
                       <div key={p.id} className="flex items-start justify-between text-sm border-b border-gray-100 pb-2">
                         <div>
                           <p className="font-medium text-gray-900">{student?.name}</p>
-                          <p className="text-xs text-gray-500">{p.type} • {p.receiptNumber || 'no receipt'}</p>
+                          <p className="text-xs text-gray-500">{p.type} • {p.paymentMethod || 'Cash'} • {p.receiptNumber || 'no receipt'}</p>
                         </div>
                         <span className="font-bold text-green-700 ml-2 whitespace-nowrap">K{p.amount.toLocaleString()}</span>
                       </div>

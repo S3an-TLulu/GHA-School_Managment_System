@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { Users, CheckCircle2, Circle, Printer, CreditCard, AlertCircle } from 'lucide-react';
-import { useAppContext, Payment } from '../context/AppContext';
+import { Users, CheckCircle2, Circle, Printer, CreditCard, AlertCircle, Banknote, Smartphone, Building2, FileText } from 'lucide-react';
+import { useAppContext, Payment, PaymentMethod } from '../context/AppContext';
 
 const CLASSES = ['Baby Class', 'Middle Class', 'Reception', 'Grade 1', 'Grade 2', 'Grade 3', 'Grade 4', 'Grade 5', 'Grade 6', 'Grade 7'];
 
@@ -18,6 +18,7 @@ export function BulkFeeCollection() {
 
   const [selectedClass, setSelectedClass] = useState(CLASSES[0]);
   const [feeType, setFeeType] = useState(FEE_TYPES[0]);
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('Cash');
   const [amount, setAmount] = useState('');
   const [payDate, setPayDate] = useState(new Date().toISOString().slice(0, 10));
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -97,6 +98,7 @@ export function BulkFeeCollection() {
         createdDate: new Date().toISOString(),
         term: currentTerm,
         receiptNumber: generateReceipt(),
+        paymentMethod,
       };
       addPayment(payment);
       batch.push(payment);
@@ -121,6 +123,7 @@ export function BulkFeeCollection() {
           <p style="margin:2px 0;font-size:13px;"><strong>Fee Type:</strong> ${p.type}</p>
           <p style="margin:2px 0;font-size:13px;"><strong>Term:</strong> ${p.term}</p>
           <p style="margin:2px 0;font-size:13px;"><strong>Amount Paid:</strong> K${p.amount.toLocaleString()}</p>
+          <p style="margin:2px 0;font-size:13px;"><strong>Payment Method:</strong> ${p.paymentMethod || 'Cash'}</p>
           <p style="margin:2px 0;font-size:13px;"><strong>Date:</strong> ${new Date(p.paidDate!).toLocaleDateString()}</p>
           <div style="margin-top:8px;padding-top:8px;border-top:1px dashed #e5e7eb;display:flex;justify-content:space-between;">
             <span style="font-size:12px;color:#6b7280;">Thank you for your payment</span>
@@ -188,6 +191,26 @@ export function BulkFeeCollection() {
             <label className="block text-xs font-medium text-gray-600 mb-1">Payment Date</label>
             <input type="date" value={payDate} onChange={e => setPayDate(e.target.value)}
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+          </div>
+        </div>
+        <div className="mt-4">
+          <label className="block text-xs font-medium text-gray-600 mb-2">Payment Method</label>
+          <div className="flex flex-wrap gap-2">
+            {([
+              { value: 'Cash' as PaymentMethod,          label: 'Cash',          icon: <Banknote   className="h-3.5 w-3.5" />, active: 'bg-green-50 border-green-500 text-green-700'   },
+              { value: 'Mobile Money' as PaymentMethod,  label: 'Mobile Money',  icon: <Smartphone className="h-3.5 w-3.5" />, active: 'bg-blue-50 border-blue-500 text-blue-700'     },
+              { value: 'Bank Transfer' as PaymentMethod, label: 'Bank Transfer', icon: <Building2  className="h-3.5 w-3.5" />, active: 'bg-purple-50 border-purple-500 text-purple-700'},
+              { value: 'Cheque' as PaymentMethod,        label: 'Cheque',        icon: <FileText   className="h-3.5 w-3.5" />, active: 'bg-amber-50 border-amber-500 text-amber-700'   },
+            ] as const).map(m => (
+              <button key={m.value} type="button"
+                onClick={() => setPaymentMethod(m.value)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border-2 text-xs font-medium transition-all ${
+                  paymentMethod === m.value ? m.active : 'border-gray-200 text-gray-500 hover:border-gray-300'
+                }`}>
+                {m.icon}
+                {m.label}
+              </button>
+            ))}
           </div>
         </div>
       </div>

@@ -1,9 +1,11 @@
 import { useState } from 'react';
 import { ClipboardList, Check, X } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
+import { useThemeClasses } from '../hooks/useThemeClasses';
 
 export function Requirements() {
   const { requirements, students, addRequirement, updateRequirement } = useAppContext();
+  const tc = useThemeClasses();
   const [selectedStudent, setSelectedStudent] = useState('');
   
   const requiredItems = [
@@ -149,8 +151,8 @@ export function Requirements() {
                         </span>
                       </div>
                       <div className="w-full bg-gray-200 rounded-full h-2">
-                        <div 
-                          className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                        <div
+                          className={`${tc.btn.split(' ')[0]} h-2 rounded-full transition-all duration-300`}
                           style={{ width: `${completionRate}%` }}
                         ></div>
                       </div>
