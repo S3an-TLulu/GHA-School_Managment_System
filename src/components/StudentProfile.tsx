@@ -1,6 +1,14 @@
 import { Student, useAppContext } from '../context/AppContext';
-import { X, User, Printer } from 'lucide-react';
+import { X, User, Printer, GraduationCap } from 'lucide-react';
 import { useThemeClasses } from '../hooks/useThemeClasses';
+
+function getGrade(mark: number): { letter: string; color: string } {
+  if (mark >= 80) return { letter: 'A', color: 'text-green-600' };
+  if (mark >= 70) return { letter: 'B', color: 'text-blue-600' };
+  if (mark >= 60) return { letter: 'C', color: 'text-yellow-600' };
+  if (mark >= 50) return { letter: 'D', color: 'text-orange-600' };
+  return { letter: 'F', color: 'text-red-600' };
+}
 
 interface StudentProfileProps {
   student: Student;
@@ -8,12 +16,15 @@ interface StudentProfileProps {
 }
 
 export function StudentProfile({ student, onClose }: StudentProfileProps) {
-  const { payments, uniforms, requirements } = useAppContext();
+  const { payments, uniforms, requirements, results } = useAppContext();
   const tc = useThemeClasses();
 
   const studentPayments = payments.filter(p => p.studentId === student.id);
   const studentUniforms = uniforms.filter(u => u.studentId === student.id);
   const studentRequirements = requirements.filter(r => r.studentId === student.id);
+  const studentResults = results
+    .filter(r => r.studentId === student.id)
+    .sort((a, b) => b.term.localeCompare(a.term));
 
   const totalPaid = studentPayments.filter(p => p.status === 'paid').reduce((s, p) => s + p.amount, 0);
   const totalPending = studentPayments.filter(p => p.status === 'pending').reduce((s, p) => s + p.amount, 0);
@@ -284,6 +295,50 @@ export function StudentProfile({ student, onClose }: StudentProfileProps) {
               </div>
             </div>
           )}
+
+          <div>
+            <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wider mb-3 flex items-center space-x-2">
+              <GraduationCap className="h-4 w-4" />
+              <span>Academic Results</span>
+            </h3>
+            {studentResults.length === 0 ? (
+              <p className="text-sm text-gray-400 text-center py-4">No results recorded</p>
+            ) : (
+              <div className="space-y-3">
+                {studentResults.map(r => {
+                  const vals = Object.values(r.subjects);
+                  const avg = vals.length ? Math.round(vals.reduce((a, b) => a + b, 0) / vals.length) : 0;
+                  const { letter, color } = getGrade(avg);
+                  return (
+                    <div key={r.id} className="border border-gray-100 rounded-lg p-3 bg-gray-50">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm font-medium text-gray-900">{r.term}</span>
+                        <div className="flex items-center space-x-2">
+                          <span className="text-xs text-gray-500">Avg: {avg}%</span>
+                          <span className={`text-sm font-bold ${color}`}>{letter}</span>
+                          <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${avg >= 50 ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                            {avg >= 50 ? 'Pass' : 'Fail'}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {Object.entries(r.subjects).map(([sub, mark]) => {
+                          const g = getGrade(mark);
+                          return (
+                            <span key={sub} className="inline-flex items-center gap-1 text-xs bg-white border border-gray-200 rounded px-2 py-0.5">
+                              <span className="text-gray-600">{sub}</span>
+                              <span className="font-semibold text-gray-900">{mark}%</span>
+                              <span className={`font-bold ${g.color}`}>{g.letter}</span>
+                            </span>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>

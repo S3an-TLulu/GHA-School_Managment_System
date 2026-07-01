@@ -18,10 +18,12 @@ const METHODS: { value: PaymentMethod; label: string; icon: React.ReactNode; col
   { value: 'Other',         label: 'Other',         icon: <MoreHorizontal className="h-4 w-4" />, color: 'text-gray-600  bg-gray-50   border-gray-200'  },
 ];
 
+const MOBILE_NETWORKS = ['MTN Mobile Money', 'Airtel Money', 'Zamtel Kwacha'];
+
 function buildPayment(formData: {
   studentId: string; type: string; amount: string; dueDate: string;
   status: string; term: string; receiptNumber: string; notes: string;
-  paymentMethod: PaymentMethod;
+  paymentMethod: PaymentMethod; mobileNetwork: string;
 }) {
   return {
     id: `payment-${Date.now()}`,
@@ -36,6 +38,7 @@ function buildPayment(formData: {
     receiptNumber: formData.receiptNumber || undefined,
     notes: formData.notes || undefined,
     paymentMethod: formData.paymentMethod,
+    mobileNetwork: formData.paymentMethod === 'Mobile Money' ? (formData.mobileNetwork || undefined) : undefined,
   };
 }
 
@@ -51,6 +54,7 @@ export function PaymentModal({ onSave, onClose }: PaymentModalProps) {
     receiptNumber: '',
     notes: '',
     paymentMethod: 'Cash' as PaymentMethod,
+    mobileNetwork: '',
   });
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -105,7 +109,7 @@ export function PaymentModal({ onSave, onClose }: PaymentModalProps) {
             <div className="grid grid-cols-5 gap-2">
               {METHODS.map(m => (
                 <button key={m.value} type="button"
-                  onClick={() => setFormData({ ...formData, paymentMethod: m.value })}
+                  onClick={() => setFormData({ ...formData, paymentMethod: m.value, mobileNetwork: '' })}
                   className={`flex flex-col items-center gap-1 py-2.5 px-1 rounded-lg border-2 text-xs font-medium transition-all ${
                     formData.paymentMethod === m.value
                       ? `${m.color} border-current shadow-sm`
@@ -116,6 +120,24 @@ export function PaymentModal({ onSave, onClose }: PaymentModalProps) {
                 </button>
               ))}
             </div>
+            {formData.paymentMethod === 'Mobile Money' && (
+              <div className="mt-3">
+                <label className="block text-xs font-medium text-gray-600 mb-1.5">Mobile Network *</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {MOBILE_NETWORKS.map(net => (
+                    <button key={net} type="button"
+                      onClick={() => setFormData({ ...formData, mobileNetwork: net })}
+                      className={`py-2 px-2 rounded-lg border-2 text-xs font-medium transition-all text-center ${
+                        formData.mobileNetwork === net
+                          ? 'bg-blue-50 text-blue-800 border-blue-400 shadow-sm'
+                          : 'border-gray-200 text-gray-500 hover:border-blue-200 hover:bg-blue-50'
+                      }`}>
+                      {net}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="grid grid-cols-2 gap-4">

@@ -1,9 +1,9 @@
 import { useState } from 'react';
-import { FileText, Printer, Receipt, CreditCard, Award, ClipboardList, Users, X } from 'lucide-react';
+import { FileText, Printer, Receipt, CreditCard, Award, ClipboardList, Users, X, GraduationCap } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 import { useThemeClasses } from '../hooks/useThemeClasses';
 
-type TemplateType = 'receipt' | 'statement' | 'admission' | 'idcard' | 'certificate' | 'attendance-report' | 'financial-report';
+type TemplateType = 'receipt' | 'statement' | 'admission' | 'idcard' | 'certificate' | 'attendance-report' | 'financial-report' | 'report-card';
 
 interface TemplateConfig {
   id: TemplateType;
@@ -20,11 +20,12 @@ const TEMPLATES: TemplateConfig[] = [
   { id: 'idcard',            label: 'Student ID Card',        description: 'Printable student identity card',           icon: <CreditCard className="h-6 w-6" />,  color: 'bg-orange-50 border-orange-200 text-orange-700' },
   { id: 'certificate',       label: 'Certificate',            description: 'Certificate of enrolment or completion',    icon: <Award className="h-6 w-6" />,       color: 'bg-yellow-50 border-yellow-200 text-yellow-700' },
   { id: 'attendance-report', label: 'Attendance Report',      description: 'Per-student or class attendance summary',   icon: <ClipboardList className="h-6 w-6" />,color: 'bg-teal-50 border-teal-200 text-teal-700' },
-  { id: 'financial-report',  label: 'Financial Report',       description: 'Term income, expenses and net summary',     icon: <Users className="h-6 w-6" />,       color: 'bg-red-50 border-red-200 text-red-700' },
+  { id: 'financial-report',  label: 'Financial Report',       description: 'Term income, expenses and net summary',     icon: <Users className="h-6 w-6" />,            color: 'bg-red-50 border-red-200 text-red-700' },
+  { id: 'report-card',       label: 'Academic Report Card',   description: 'Printable term report card with grades',    icon: <GraduationCap className="h-6 w-6" />,     color: 'bg-indigo-50 border-indigo-200 text-indigo-700' },
 ];
 
 export function DocumentTemplates() {
-  const { students, payments, expenses, attendance, branding, currentTerm } = useAppContext();
+  const { students, payments, expenses, attendance, results, branding, currentTerm } = useAppContext();
   const tc = useThemeClasses();
   const [selected, setSelected] = useState<TemplateType | null>(null);
   const [studentId, setStudentId] = useState('');
@@ -32,6 +33,7 @@ export function DocumentTemplates() {
 
   const activeStudents = students.filter(s => !s.status || s.status === 'active');
   const allTerms = [...new Set([...payments.map(p => p.term), ...expenses.map(e => e.term)].filter(Boolean))].sort().reverse() as string[];
+  const resultTerms = [...new Set(results.map(r => r.term))].sort().reverse();
 
   const B = branding;
 
@@ -345,14 +347,112 @@ export function DocumentTemplates() {
     printDoc(html, `Financial Report — ${termFilter || 'All'}`);
   }
 
+  function printReportCard() {
+    if (!studentId || !termFilter) return;
+    const student = students.find(s => s.id === studentId);
+    if (!student) return;
+    const result = results.find(r => r.studentId === studentId && r.term === termFilter);
+    if (!result) { alert(`No results recorded for ${student.name} in ${termFilter}.`); return; }
+
+    const vals = Object.values(result.subjects);
+    const avg = vals.length ? Math.round(vals.reduce((a, b) => a + b, 0) / vals.length) : 0;
+    const passed = avg >= 50;
+
+    function grade(mark: number) {
+      if (mark >= 80) return { letter: 'A', color: '#16a34a' };
+      if (mark >= 70) return { letter: 'B', color: '#2563eb' };
+      if (mark >= 60) return { letter: 'C', color: '#d97706' };
+      if (mark >= 50) return { letter: 'D', color: '#ea580c' };
+      return { letter: 'F', color: '#dc2626' };
+    }
+
+    const avgGrade = grade(avg);
+    const subjectRows = Object.entries(result.subjects).map(([sub, mark]) => {
+      const g = grade(mark);
+      return `<tr>
+        <td style="padding:8px 12px;border:1px solid #e5e7eb">${sub}</td>
+        <td style="padding:8px 12px;border:1px solid #e5e7eb;text-align:center;font-weight:600">${mark}%</td>
+        <td style="padding:8px 12px;border:1px solid #e5e7eb;text-align:center;font-weight:700;color:${g.color}">${g.letter}</td>
+        <td style="padding:8px 12px;border:1px solid #e5e7eb;font-size:11px;color:#6b7280">${
+          mark >= 80 ? 'Excellent' : mark >= 70 ? 'Very Good' : mark >= 60 ? 'Good' : mark >= 50 ? 'Satisfactory' : 'Needs Improvement'
+        }</td>
+      </tr>`;
+    }).join('');
+
+    const gradeLegend = [
+      { l: 'A', r: '80–100%', d: 'Excellent' },
+      { l: 'B', r: '70–79%', d: 'Very Good' },
+      { l: 'C', r: '60–69%', d: 'Good' },
+      { l: 'D', r: '50–59%', d: 'Satisfactory' },
+      { l: 'F', r: 'Below 50%', d: 'Fail' },
+    ].map(g => `<td style="border:1px solid #e5e7eb;padding:4px 8px;text-align:center;font-size:11px"><strong>${g.l}</strong> ${g.r}</td>`).join('');
+
+    const html = `
+      ${schoolHeader()}
+      <div style="text-align:center;margin:16px 0 20px">
+        <h2 style="margin:0;font-size:17px;text-transform:uppercase;letter-spacing:1px;color:#374151">Academic Report Card</h2>
+        <p style="margin:4px 0 0;color:#6b7280;font-size:12px">${termFilter}</p>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">
+        <div style="background:#f9fafb;border-radius:6px;padding:12px">
+          <p style="margin:0 0 4px;font-size:11px;color:#6b7280;text-transform:uppercase">Student</p>
+          <p style="margin:0;font-weight:700;font-size:15px">${student.name}</p>
+          <p style="margin:2px 0 0;font-size:12px;color:#374151">${student.grade}${student.admissionNumber ? ' · ' + student.admissionNumber : ''}</p>
+        </div>
+        <div style="background:#f9fafb;border-radius:6px;padding:12px">
+          <p style="margin:0 0 4px;font-size:11px;color:#6b7280;text-transform:uppercase">Overall Result</p>
+          <div style="display:flex;align-items:center;gap:12px">
+            <span style="font-size:32px;font-weight:bold;color:${avgGrade.color}">${avgGrade.letter}</span>
+            <div>
+              <p style="margin:0;font-size:18px;font-weight:bold;color:${avgGrade.color}">${avg}%</p>
+              <p style="margin:2px 0 0;font-size:12px;font-weight:600;color:${passed ? '#166534' : '#991b1b'};background:${passed ? '#dcfce7' : '#fee2e2'};padding:2px 8px;border-radius:9999px;display:inline-block">${passed ? 'PASSED' : 'FAILED'}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+      <table style="margin-bottom:16px">
+        <thead><tr>
+          <th style="text-align:left">Subject</th>
+          <th style="text-align:center">Mark</th>
+          <th style="text-align:center">Grade</th>
+          <th style="text-align:left">Remark</th>
+        </tr></thead>
+        <tbody>${subjectRows}</tbody>
+        <tfoot>
+          <tr style="background:#f3f4f6">
+            <td style="padding:8px 12px;border:1px solid #e5e7eb;font-weight:700">Overall Average</td>
+            <td style="padding:8px 12px;border:1px solid #e5e7eb;text-align:center;font-weight:700">${avg}%</td>
+            <td style="padding:8px 12px;border:1px solid #e5e7eb;text-align:center;font-weight:700;color:${avgGrade.color}">${avgGrade.letter}</td>
+            <td style="padding:8px 12px;border:1px solid #e5e7eb;font-size:11px;color:#6b7280">${passed ? 'Promoted to next class' : 'Remedial required'}</td>
+          </tr>
+        </tfoot>
+      </table>
+      <table style="margin-bottom:20px"><thead><tr style="background:#f3f4f6">${gradeLegend}</tr></thead></table>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:24px;margin-top:32px">
+        <div>
+          <div style="border-top:1px solid #374151;padding-top:4px;font-size:11px;color:#6b7280;text-align:center">Class Teacher</div>
+        </div>
+        <div>
+          <div style="border-top:1px solid #374151;padding-top:4px;font-size:11px;color:#6b7280;text-align:center">Head Teacher / ${B.principalName}</div>
+        </div>
+        <div>
+          <div style="border-top:1px solid #374151;padding-top:4px;font-size:11px;color:#6b7280;text-align:center">Parent / Guardian</div>
+        </div>
+      </div>
+      <p style="text-align:center;color:#9ca3af;font-size:10px;margin-top:20px">Generated by ${B.schoolName} School Management System · ${new Date().toLocaleDateString()}</p>`;
+
+    printDoc(html, `Report Card — ${student.name} — ${termFilter}`);
+  }
+
   const ACTION_MAP: Record<TemplateType, () => void> = {
     receipt: printReceipt, statement: printStatement, admission: printAdmission,
     idcard: printIDCard, certificate: printCertificate,
     'attendance-report': printAttendanceReport, 'financial-report': printFinancialReport,
+    'report-card': printReportCard,
   };
 
-  const needsStudent = (id: TemplateType) => ['receipt', 'statement', 'admission', 'idcard', 'certificate'].includes(id);
-  const needsTerm = (id: TemplateType) => id === 'financial-report';
+  const needsStudent = (id: TemplateType) => ['receipt', 'statement', 'admission', 'idcard', 'certificate', 'report-card'].includes(id);
+  const needsTerm = (id: TemplateType) => ['financial-report', 'report-card'].includes(id);
 
   return (
     <div className="space-y-6">
@@ -402,19 +502,26 @@ export function DocumentTemplates() {
             )}
             {needsTerm(selected) && (
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Term Filter</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  {selected === 'report-card' ? 'Term *' : 'Term Filter'}
+                </label>
                 <select value={termFilter} onChange={e => setTermFilter(e.target.value)}
                   className="w-full max-w-sm px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm">
-                  <option value="">All Terms</option>
-                  {allTerms.map(t => <option key={t} value={t}>{t}</option>)}
+                  {selected !== 'report-card' && <option value="">All Terms</option>}
+                  {(selected === 'report-card' ? resultTerms : allTerms).map(t => (
+                    <option key={t} value={t}>{t}</option>
+                  ))}
                 </select>
+                {selected === 'report-card' && resultTerms.length === 0 && (
+                  <p className="text-xs text-amber-600 mt-1">No results recorded yet. Enter marks in Academic Results first.</p>
+                )}
               </div>
             )}
 
             <div className="flex items-center space-x-2 pt-2">
               <button
                 onClick={ACTION_MAP[selected]}
-                disabled={needsStudent(selected) && !studentId}
+                disabled={(needsStudent(selected) && !studentId) || (selected === 'report-card' && !termFilter)}
                 className={`flex items-center space-x-2 ${tc.btn} text-white px-5 py-2.5 rounded-lg transition-colors font-medium disabled:opacity-40 disabled:cursor-not-allowed`}>
                 <Printer className="h-4 w-4" />
                 <span>Print Preview</span>

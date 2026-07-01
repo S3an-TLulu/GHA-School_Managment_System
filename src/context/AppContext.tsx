@@ -30,6 +30,7 @@ export interface Payment {
   receiptNumber?: string;
   notes?: string;
   paymentMethod?: PaymentMethod;
+  mobileNetwork?: string;
 }
 
 export interface Uniform {
@@ -92,8 +93,11 @@ export interface SchoolEvent {
   description: string;
   date: string;
   endDate?: string;
-  type: 'Academic' | 'Sports' | 'Cultural' | 'Meeting' | 'Holiday' | 'Other';
+  type: 'Academic' | 'Sports' | 'Cultural' | 'Meeting' | 'Holiday' | 'Fundraiser' | 'Other';
   targetAudience: 'All' | 'Students' | 'Teachers' | 'Parents';
+  participationFee?: number;
+  expectedParticipants?: number;
+  actualRevenue?: number;
 }
 
 export interface FeeStructureItem {

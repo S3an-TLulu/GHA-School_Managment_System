@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { BarChart3, Download, FileText, DollarSign, TrendingDown, Printer } from 'lucide-react';
+import { BarChart3, Download, FileText, DollarSign, TrendingDown, Printer, GraduationCap } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 import { useThemeClasses } from '../hooks/useThemeClasses';
 
@@ -17,7 +17,7 @@ function downloadCSV(rows: string[][], filename: string) {
 }
 
 export function Reports() {
-  const { students, payments, uniforms, expenses, currentTerm } = useAppContext();
+  const { students, payments, uniforms, expenses, results, currentTerm } = useAppContext();
   const tc = useThemeClasses();
   const [selectedReport, setSelectedReport] = useState('financial');
   const [termFilter, setTermFilter] = useState(currentTerm);
@@ -33,6 +33,8 @@ export function Reports() {
   const netIncome = totalRevenue - totalExpenses;
 
   const allTerms = [...new Set([...payments.map(p => p.term), ...expenses.map(e => e.term)].filter(Boolean))].sort().reverse();
+  const resultTerms = [...new Set(results.map(r => r.term))].sort().reverse();
+  const [academicTerm, setAcademicTerm] = useState(() => resultTerms[0] ?? currentTerm);
 
   const getClassSummary = () => {
     const summary: Record<string, { students: number; paid: number; pending: number; overdue: number }> = {};
@@ -234,6 +236,170 @@ export function Reports() {
     );
   };
 
+  const handleExportAcademic = () => {
+    const termResults = results.filter(r => r.term === academicTerm);
+    const subjectSet = new Set<string>();
+    termResults.forEach(r => Object.keys(r.subjects).forEach(s => subjectSet.add(s)));
+    const subjects = [...subjectSet];
+    const header = ['Student', 'Grade', 'Term', ...subjects, 'Average', 'Grade', 'Result'];
+    const rows = termResults.map(r => {
+      const student = students.find(s => s.id === r.studentId);
+      const vals = Object.values(r.subjects);
+      const avg = vals.length ? Math.round(vals.reduce((a, b) => a + b, 0) / vals.length) : 0;
+      const letter = avg >= 80 ? 'A' : avg >= 70 ? 'B' : avg >= 60 ? 'C' : avg >= 50 ? 'D' : 'F';
+      return [student?.name ?? '', student?.grade ?? '', r.term, ...subjects.map(s => r.subjects[s] ?? ''), `${avg}%`, letter, avg >= 50 ? 'Pass' : 'Fail'];
+    });
+    downloadCSV([header, ...rows] as string[][], `GHA_Academic_Results_${academicTerm.replace(/\s/g, '_')}.csv`);
+  };
+
+  const renderAcademicReport = () => {
+    const termResults = results.filter(r => r.term === academicTerm);
+    const gradeOrder = ['Baby Class', 'Middle Class', 'Reception', 'Grade 1', 'Grade 2', 'Grade 3', 'Grade 4', 'Grade 5', 'Grade 6', 'Grade 7'];
+
+    const classSummary = gradeOrder.map(grade => {
+      const classStudents = students.filter(s => s.grade === grade && (!s.status || s.status === 'active'));
+      const classResults = termResults.filter(r => classStudents.some(s => s.id === r.studentId));
+      if (classStudents.length === 0) return null;
+      const avgs = classResults.map(r => {
+        const vals = Object.values(r.subjects);
+        return vals.length ? Math.round(vals.reduce((a, b) => a + b, 0) / vals.length) : 0;
+      });
+      const classAvg = avgs.length ? Math.round(avgs.reduce((a, b) => a + b, 0) / avgs.length) : null;
+      const passCount = avgs.filter(a => a >= 50).length;
+      return { grade, total: classStudents.length, recorded: classResults.length, classAvg, passCount };
+    }).filter(Boolean) as { grade: string; total: number; recorded: number; classAvg: number | null; passCount: number }[];
+
+    const totalRecorded = termResults.length;
+    const allAvgs = termResults.map(r => { const v = Object.values(r.subjects); return v.length ? Math.round(v.reduce((a,b)=>a+b,0)/v.length) : 0; });
+    const overallAvg = allAvgs.length ? Math.round(allAvgs.reduce((a,b)=>a+b,0)/allAvgs.length) : 0;
+    const overallPass = allAvgs.filter(a => a >= 50).length;
+    const passRate = allAvgs.length ? Math.round((overallPass / allAvgs.length) * 100) : 0;
+
+    const studentRows = termResults.map(r => {
+      const student = students.find(s => s.id === r.studentId);
+      const vals = Object.values(r.subjects);
+      const avg = vals.length ? Math.round(vals.reduce((a,b)=>a+b,0)/vals.length) : 0;
+      const letter = avg >= 80 ? 'A' : avg >= 70 ? 'B' : avg >= 60 ? 'C' : avg >= 50 ? 'D' : 'F';
+      const color = avg >= 80 ? 'text-green-600' : avg >= 70 ? 'text-blue-600' : avg >= 60 ? 'text-yellow-600' : avg >= 50 ? 'text-orange-600' : 'text-red-600';
+      return { student, r, avg, letter, color, passed: avg >= 50 };
+    }).sort((a, b) => b.avg - a.avg);
+
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center gap-3 flex-wrap">
+          <label className="text-sm font-medium text-gray-700">Term:</label>
+          <select value={academicTerm} onChange={e => setAcademicTerm(e.target.value)}
+            className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500">
+            {resultTerms.length === 0
+              ? <option value="">No results recorded</option>
+              : resultTerms.map(t => <option key={t} value={t}>{t}</option>)}
+          </select>
+          <button onClick={handleExportAcademic} disabled={totalRecorded === 0}
+            className="flex items-center space-x-1.5 px-3 py-1.5 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+            <Download className="h-3.5 w-3.5" />
+            <span>Export CSV</span>
+          </button>
+        </div>
+
+        {totalRecorded === 0 ? (
+          <div className="text-center py-12 text-gray-400">
+            <GraduationCap className="h-12 w-12 mx-auto mb-3 opacity-30" />
+            <p>No results recorded for {academicTerm}.</p>
+            <p className="text-sm mt-1">Enter marks in Academic Results to see data here.</p>
+          </div>
+        ) : (
+          <>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {[
+                { label: 'Results Recorded', value: totalRecorded, color: 'text-gray-900', bg: 'bg-gray-50 border-gray-200' },
+                { label: 'Overall Average', value: `${overallAvg}%`, color: 'text-blue-700', bg: 'bg-blue-50 border-blue-200' },
+                { label: 'Pass Rate', value: `${passRate}%`, color: passRate >= 70 ? 'text-green-700' : 'text-red-700', bg: passRate >= 70 ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200' },
+                { label: 'Passed / Total', value: `${overallPass} / ${totalRecorded}`, color: 'text-green-700', bg: 'bg-green-50 border-green-200' },
+              ].map(stat => (
+                <div key={stat.label} className={`border rounded-lg p-4 ${stat.bg}`}>
+                  <p className="text-xs text-gray-500 mb-1">{stat.label}</p>
+                  <p className={`text-2xl font-bold ${stat.color}`}>{stat.value}</p>
+                </div>
+              ))}
+            </div>
+
+            <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+              <div className="px-5 py-3 border-b border-gray-100 bg-gray-50">
+                <p className="text-sm font-semibold text-gray-700">Class Performance Summary</p>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="min-w-full text-sm divide-y divide-gray-100">
+                  <thead className="bg-gray-50">
+                    <tr>{['Class','Students','Results In','Class Avg','Passed','Pass Rate'].map(h =>
+                      <th key={h} className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">{h}</th>
+                    )}</tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {classSummary.map(cls => {
+                      const rate = cls.recorded > 0 ? Math.round((cls.passCount / cls.recorded) * 100) : 0;
+                      return (
+                        <tr key={cls.grade} className="hover:bg-gray-50">
+                          <td className="px-4 py-2 font-medium text-gray-900">{cls.grade}</td>
+                          <td className="px-4 py-2 text-gray-600">{cls.total}</td>
+                          <td className="px-4 py-2 text-gray-600">{cls.recorded}/{cls.total}</td>
+                          <td className={`px-4 py-2 font-semibold ${cls.classAvg === null ? 'text-gray-400' : cls.classAvg >= 50 ? 'text-blue-600' : 'text-red-600'}`}>
+                            {cls.classAvg !== null ? `${cls.classAvg}%` : '—'}
+                          </td>
+                          <td className="px-4 py-2 text-green-600">{cls.recorded > 0 ? cls.passCount : '—'}</td>
+                          <td className="px-4 py-2">
+                            {cls.recorded > 0 ? (
+                              <div className="flex items-center gap-2">
+                                <div className="w-16 bg-gray-200 rounded-full h-1.5">
+                                  <div className={`h-1.5 rounded-full ${rate >= 70 ? 'bg-green-500' : rate >= 50 ? 'bg-yellow-500' : 'bg-red-500'}`} style={{ width: `${rate}%` }} />
+                                </div>
+                                <span className="text-xs font-medium">{rate}%</span>
+                              </div>
+                            ) : '—'}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+              <div className="px-5 py-3 border-b border-gray-100 bg-gray-50">
+                <p className="text-sm font-semibold text-gray-700">Student Results (ranked by average)</p>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="min-w-full text-sm divide-y divide-gray-100">
+                  <thead className="bg-gray-50">
+                    <tr>{['Rank','Student','Class','Average','Grade','Result'].map(h =>
+                      <th key={h} className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">{h}</th>
+                    )}</tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {studentRows.map(({ student, avg, letter, color, passed }, i) => (
+                      <tr key={i} className="hover:bg-gray-50">
+                        <td className="px-4 py-2 text-gray-400 text-xs">{i + 1}</td>
+                        <td className="px-4 py-2 font-medium text-gray-900">{student?.name ?? '—'}</td>
+                        <td className="px-4 py-2 text-gray-500 text-xs">{student?.grade ?? '—'}</td>
+                        <td className={`px-4 py-2 font-semibold ${color}`}>{avg}%</td>
+                        <td className={`px-4 py-2 font-bold ${color}`}>{letter}</td>
+                        <td className="px-4 py-2">
+                          <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${passed ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                            {passed ? 'Pass' : 'Fail'}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+    );
+  };
+
   const renderStudentReport = () => (
     <div className="bg-white rounded-lg shadow-sm border border-gray-200">
       <div className="px-6 py-4 border-b border-gray-200">
@@ -319,7 +485,8 @@ export function Reports() {
             {[
               { id: 'financial', label: 'Financial Summary', icon: DollarSign },
               { id: 'class', label: 'Class Summary', icon: BarChart3 },
-              { id: 'student', label: 'Student Report', icon: FileText }
+              { id: 'student', label: 'Student Report', icon: FileText },
+              { id: 'academic', label: 'Academic Results', icon: GraduationCap },
             ].map(tab => (
               <button key={tab.id} onClick={() => setSelectedReport(tab.id)}
                 className={`flex items-center space-x-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
@@ -335,6 +502,7 @@ export function Reports() {
           {selectedReport === 'financial' && renderFinancialReport()}
           {selectedReport === 'class' && renderClassReport()}
           {selectedReport === 'student' && renderStudentReport()}
+          {selectedReport === 'academic' && renderAcademicReport()}
         </div>
       </div>
     </div>
