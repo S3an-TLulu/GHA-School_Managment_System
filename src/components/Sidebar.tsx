@@ -2,7 +2,7 @@ import {
   LayoutDashboard, Users, CreditCard, ShoppingBag, ClipboardList,
   BarChart3, UserCheck, TrendingDown, Package, Calendar, FileText,
   DollarSign, Bell, MonitorCheck, ClipboardCheck, CalendarDays,
-  Palette, Building2, LayoutTemplate, Clock, Layers
+  Palette, Building2, LayoutTemplate, Clock, Layers, GraduationCap
 } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 import { useThemeClasses } from '../hooks/useThemeClasses';
@@ -40,6 +40,7 @@ const menuGroups = [
     label: 'School',
     items: [
       { id: 'attendance',   label: 'Attendance',      icon: ClipboardCheck },
+      { id: 'results',      label: 'Academic Results',icon: GraduationCap },
       { id: 'timetable',    label: 'Class Timetable', icon: Clock },
       { id: 'calendar',     label: 'School Calendar', icon: CalendarDays },
       { id: 'feestructure', label: 'Fee Structure',   icon: DollarSign },

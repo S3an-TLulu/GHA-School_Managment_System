@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Search, Printer, Users, ChevronDown, ChevronRight } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
+import { useThemeClasses } from '../hooks/useThemeClasses';
 
 interface FamilyGroup {
   guardianName: string;
@@ -18,6 +19,7 @@ interface FamilyGroup {
 
 export function FamilyStatements() {
   const { students, payments } = useAppContext();
+  const tc = useThemeClasses();
   const [searchTerm, setSearchTerm] = useState('');
   const [expandedFamily, setExpandedFamily] = useState<string | null>(null);
 
@@ -226,7 +228,7 @@ export function FamilyStatements() {
                       </p>
                     </div>
                     <button onClick={e => { e.stopPropagation(); handlePrint(family); }}
-                      className="flex items-center space-x-1 px-3 py-1.5 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors">
+                      className={`flex items-center space-x-1 px-3 py-1.5 ${tc.btn} text-white text-sm rounded-lg transition-colors`}>
                       <Printer className="h-3.5 w-3.5" />
                       <span>Print</span>
                     </button>

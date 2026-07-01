@@ -161,6 +161,16 @@ export interface AttendanceRecord {
   notes?: string;
 }
 
+export interface StudentResult {
+  id: string;
+  studentId: string;
+  classGrade: string;
+  term: string;
+  subjects: Record<string, number>;
+  recordedBy: string;
+  date: string;
+}
+
 interface AppContextType {
   students: Student[];
   payments: Payment[];
@@ -208,6 +218,11 @@ interface AppContextType {
   attendance: AttendanceRecord[];
   saveAttendance: (records: AttendanceRecord[]) => void;
   deleteAttendanceForDate: (date: string, classGrade: string) => void;
+  results: StudentResult[];
+  addResult: (result: StudentResult) => void;
+  updateResult: (id: string, result: Partial<StudentResult>) => void;
+  deleteResult: (id: string) => void;
+  saveClassResults: (classGrade: string, term: string, records: StudentResult[]) => void;
   timetables: Timetable[];
   saveTimetable: (timetable: Timetable) => void;
   branding: SchoolBranding;
@@ -563,6 +578,7 @@ const DEFAULT_THEME: AppTheme = {
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const [attendance, setAttendance] = useState<AttendanceRecord[]>(() => loadFromStorage('gha_attendance', []));
+  const [results, setResults] = useState<StudentResult[]>(() => loadFromStorage('gha_results', []));
   const [timetables, setTimetables] = useState<Timetable[]>(() => loadFromStorage('gha_timetables', []));
   const [branding, setBranding] = useState<SchoolBranding>(() => loadFromStorage('gha_branding', DEFAULT_BRANDING));
   const [theme, setTheme] = useState<AppTheme>(() => loadFromStorage('gha_theme', DEFAULT_THEME));
@@ -580,6 +596,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [currentTerm, setCurrentTerm] = useState<string>(() => loadFromStorage('gha_currentTerm', 'Term 1 2026'));
 
   useEffect(() => { localStorage.setItem('gha_attendance', JSON.stringify(attendance)); }, [attendance]);
+  useEffect(() => { localStorage.setItem('gha_results', JSON.stringify(results)); }, [results]);
   useEffect(() => { localStorage.setItem('gha_timetables', JSON.stringify(timetables)); }, [timetables]);
   useEffect(() => { localStorage.setItem('gha_branding', JSON.stringify(branding)); }, [branding]);
   useEffect(() => { localStorage.setItem('gha_theme', JSON.stringify(theme)); }, [theme]);
@@ -604,6 +621,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setPayments(prev => prev.filter(p => p.studentId !== id));
     setUniforms(prev => prev.filter(u => u.studentId !== id));
     setRequirements(prev => prev.filter(r => r.studentId !== id));
+    setResults(prev => prev.filter(r => r.studentId !== id));
   };
 
   const addPayment = (payment: Payment) => setPayments(prev => [...prev, payment]);
@@ -652,6 +670,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setAnnouncements(prev => prev.map(a => a.id === id ? { ...a, ...updated } : a));
   const deleteAnnouncement = (id: string) => setAnnouncements(prev => prev.filter(a => a.id !== id));
 
+  const addResult = (result: StudentResult) => setResults(prev => [...prev, result]);
+  const updateResult = (id: string, updated: Partial<StudentResult>) =>
+    setResults(prev => prev.map(r => r.id === id ? { ...r, ...updated } : r));
+  const deleteResult = (id: string) => setResults(prev => prev.filter(r => r.id !== id));
+  const saveClassResults = (classGrade: string, term: string, records: StudentResult[]) =>
+    setResults(prev => [
+      ...prev.filter(r => !(r.classGrade === classGrade && r.term === term)),
+      ...records
+    ]);
+
   const saveAttendance = (records: AttendanceRecord[]) => {
     if (records.length === 0) return;
     const { date, classGrade } = records[0];
@@ -689,6 +717,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       addOtherCharge, updateOtherCharge, deleteOtherCharge,
       addAnnouncement, updateAnnouncement, deleteAnnouncement,
       attendance, saveAttendance, deleteAttendanceForDate,
+      results, addResult, updateResult, deleteResult, saveClassResults,
       timetables, saveTimetable,
       branding, updateBranding,
       theme, updateTheme
