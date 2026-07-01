@@ -1,9 +1,9 @@
-import { Users, GraduationCap, DollarSign, AlertCircle, TrendingUp, TrendingDown, Calendar, UserCheck, Bell } from 'lucide-react';
+import { Users, GraduationCap, DollarSign, AlertCircle, TrendingUp, TrendingDown, Calendar, UserCheck, Bell, Check, X as XIcon } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 import { useThemeClasses } from '../hooks/useThemeClasses';
 
 export function Dashboard() {
-  const { students, payments, teachers, expenses, events, announcements, results, currentTerm, branding } = useAppContext();
+  const { students, payments, teachers, expenses, events, announcements, results, currentTerm, branding, fundraiserParticipants, toggleFundraiserParticipant } = useAppContext();
   const tc = useThemeClasses();
 
   const activeStudents = students.filter(s => !s.status || s.status === 'active').length;
@@ -48,6 +48,12 @@ export function Dashboard() {
   const resultAvgs = latestResults.map(r => { const v = Object.values(r.subjects); return v.length ? Math.round(v.reduce((a,b)=>a+b,0)/v.length) : 0; });
   const academicPassRate = resultAvgs.length ? Math.round((resultAvgs.filter(a => a >= 50).length / resultAvgs.length) * 100) : null;
   const academicAvg = resultAvgs.length ? Math.round(resultAvgs.reduce((a,b)=>a+b,0)/resultAvgs.length) : null;
+
+  const activeFundraisers = events
+    .filter(e => e.type === 'Fundraiser' && e.participationFee)
+    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+  const activeStudentList = students.filter(s => !s.status || s.status === 'active');
 
   const priorityDot: Record<string, string> = {
     normal: 'bg-blue-400',
@@ -275,6 +281,85 @@ export function Dashboard() {
               style={{ width: `${academicPassRate}%` }} />
           </div>
           <p className="text-xs text-gray-400 mt-1">{academicPassRate}% of students passed in {latestResultTerm}</p>
+        </div>
+      )}
+
+      {activeFundraisers.length > 0 && (
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+          <div className="flex items-center space-x-2 mb-5">
+            <DollarSign className="h-5 w-5 text-amber-600" />
+            <h3 className="text-base font-semibold text-gray-900">Fundraiser Fee Tracker</h3>
+            <span className="text-xs bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full font-medium">{activeFundraisers.length} active</span>
+          </div>
+          <div className="space-y-6">
+            {activeFundraisers.map(ev => {
+              const paid = fundraiserParticipants.filter(p => p.eventId === ev.id);
+              const paidIds = new Set(paid.map(p => p.studentId));
+              const collected = paid.reduce((s, p) => s + p.amountPaid, 0);
+              const target = ev.participationFee! * (ev.expectedParticipants ?? activeStudentList.length);
+              const pct = target > 0 ? Math.min(100, Math.round((collected / target) * 100)) : 0;
+              const isPast = new Date(ev.date) < today;
+
+              return (
+                <div key={ev.id} className="border border-amber-100 rounded-xl overflow-hidden">
+                  {/* Header */}
+                  <div className="bg-amber-50 px-4 py-3 flex items-center justify-between flex-wrap gap-2">
+                    <div>
+                      <p className="text-sm font-semibold text-amber-900">{ev.title}</p>
+                      <p className="text-xs text-amber-700">
+                        {new Date(ev.date).toLocaleDateString('en-ZM', { day: 'numeric', month: 'short', year: 'numeric' })}
+                        {ev.collectionStartDate && ev.collectionEndDate && (
+                          <> &bull; Collection: {new Date(ev.collectionStartDate).toLocaleDateString('en-ZM', { day: 'numeric', month: 'short' })} – {new Date(ev.collectionEndDate).toLocaleDateString('en-ZM', { day: 'numeric', month: 'short' })}</>
+                        )}
+                        {isPast && <span className="ml-2 text-gray-500">(Past)</span>}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm font-bold text-amber-900">K{collected.toLocaleString()} / K{target.toLocaleString()}</p>
+                      <p className="text-xs text-amber-700">{paidIds.size} of {ev.expectedParticipants ?? activeStudentList.length} paid &bull; K{ev.participationFee}/person</p>
+                    </div>
+                  </div>
+                  {/* Progress bar */}
+                  <div className="px-4 pt-2 pb-1">
+                    <div className="w-full bg-gray-100 rounded-full h-2">
+                      <div className={`h-2 rounded-full transition-all ${pct >= 100 ? 'bg-green-500' : pct >= 60 ? 'bg-amber-500' : 'bg-red-400'}`}
+                        style={{ width: `${pct}%` }} />
+                    </div>
+                    <p className="text-xs text-gray-400 mt-1">{pct}% of target collected</p>
+                  </div>
+                  {/* Student list */}
+                  <div className="px-4 pb-4">
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2 mt-2">Students</p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                      {activeStudentList.map(student => {
+                        const hasPaid = paidIds.has(student.id);
+                        return (
+                          <button key={student.id}
+                            onClick={() => toggleFundraiserParticipant(ev.id, student.id, ev.participationFee!)}
+                            className={`flex items-center justify-between px-3 py-2 rounded-lg border text-left transition-all ${
+                              hasPaid
+                                ? 'bg-green-50 border-green-200 hover:bg-green-100'
+                                : 'bg-gray-50 border-gray-200 hover:bg-gray-100'
+                            }`}>
+                            <div className="flex items-center space-x-2 min-w-0">
+                              <span className={`flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-white text-xs ${hasPaid ? 'bg-green-500' : 'bg-gray-300'}`}>
+                                {hasPaid ? <Check className="h-3 w-3" /> : <XIcon className="h-3 w-3" />}
+                              </span>
+                              <span className="text-sm text-gray-900 truncate">{student.name}</span>
+                            </div>
+                            <div className="text-right flex-shrink-0 ml-2">
+                              <span className="text-xs text-gray-500">{student.grade}</span>
+                              {hasPaid && <span className="ml-2 text-xs font-semibold text-green-700">K{ev.participationFee}</span>}
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
 

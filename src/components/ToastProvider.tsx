@@ -52,7 +52,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
               <div className={`w-1 self-stretch flex-shrink-0 ${cfg.bar}`} />
               <div className={`flex items-start space-x-3 px-4 py-3 flex-1 ${cfg.text}`}>
                 {cfg.icon}
-                <p className="text-sm font-medium text-gray-800 flex-1 leading-snug">{t.message}</p>
+                <p className="text-sm font-medium text-gray-900 flex-1 leading-snug">{t.message}</p>
                 <button onClick={() => dismiss(t.id)} className="text-gray-400 hover:text-gray-600 -mt-0.5 flex-shrink-0">
                   <X className="h-4 w-4" />
                 </button>

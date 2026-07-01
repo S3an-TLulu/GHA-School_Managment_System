@@ -45,6 +45,8 @@ function EventModal({ event, onSave, onClose }: {
     participationFee: event?.participationFee,
     expectedParticipants: event?.expectedParticipants,
     actualRevenue: event?.actualRevenue,
+    collectionStartDate: event?.collectionStartDate ? event.collectionStartDate.split('T')[0] : '',
+    collectionEndDate: event?.collectionEndDate ? event.collectionEndDate.split('T')[0] : '',
   });
 
   const isFundraiser = form.type === 'Fundraiser';
@@ -118,6 +120,20 @@ function EventModal({ event, onSave, onClose }: {
           {isFundraiser && (
             <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 space-y-3">
               <p className="text-xs font-semibold text-amber-800 uppercase tracking-wide">Fundraiser Tracking</p>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Fee Collection Opens</label>
+                  <input type="date"
+                    className="w-full px-2 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-400 focus:border-transparent"
+                    value={form.collectionStartDate || ''} onChange={e => setForm({ ...form, collectionStartDate: e.target.value })} />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Fee Collection Closes</label>
+                  <input type="date"
+                    className="w-full px-2 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-400 focus:border-transparent"
+                    value={form.collectionEndDate || ''} onChange={e => setForm({ ...form, collectionEndDate: e.target.value })} />
+                </div>
+              </div>
               <div className="grid grid-cols-3 gap-3">
                 <div>
                   <label className="block text-xs font-medium text-gray-700 mb-1">Fee per Person (K)</label>
@@ -228,6 +244,12 @@ export function Events() {
               {event.endDate && (
                 <p className="text-xs text-gray-400 mt-1">
                   Until {new Date(event.endDate).toLocaleDateString()}
+                </p>
+              )}
+              {isFundraiser && (event.collectionStartDate || event.collectionEndDate) && (
+                <p className="text-xs text-amber-700 mt-1">
+                  Collection: {event.collectionStartDate ? new Date(event.collectionStartDate).toLocaleDateString() : '…'}
+                  {' → '}{event.collectionEndDate ? new Date(event.collectionEndDate).toLocaleDateString() : '…'}
                 </p>
               )}
               {isFundraiser && (event.participationFee || event.actualRevenue !== undefined) && (
