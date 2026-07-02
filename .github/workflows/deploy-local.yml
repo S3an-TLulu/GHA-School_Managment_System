@@ -1,0 +1,37 @@
+name: Deploy Local
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    types: [closed]
+
+jobs:
+  deploy:
+    if: github.event_name == 'push' || github.event.pull_request.merged == true
+    runs-on: self-hosted
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type check
+        run: npm run typecheck
+
+      - name: Build
+        run: npm run build
+
+      - name: Restart app
+        run: |
+          pkill -f "vite preview" || true
+          nohup npm run preview -- --host 0.0.0.0 --port 4173 > ~/school-app.log 2>&1 &
+          echo "App restarted on http://localhost:4173"
