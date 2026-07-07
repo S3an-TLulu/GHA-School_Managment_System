@@ -98,6 +98,16 @@ export interface SchoolEvent {
   participationFee?: number;
   expectedParticipants?: number;
   actualRevenue?: number;
+  collectionStartDate?: string;
+  collectionEndDate?: string;
+}
+
+export interface FundraiserParticipant {
+  id: string;
+  eventId: string;
+  studentId: string;
+  amountPaid: number;
+  paidDate: string;
 }
 
 export interface FeeStructureItem {
@@ -210,6 +220,8 @@ interface AppContextType {
   addEvent: (event: SchoolEvent) => void;
   updateEvent: (id: string, event: Partial<SchoolEvent>) => void;
   deleteEvent: (id: string) => void;
+  fundraiserParticipants: FundraiserParticipant[];
+  toggleFundraiserParticipant: (eventId: string, studentId: string, fee: number) => void;
   addFeeStructureItem: (item: FeeStructureItem) => void;
   updateFeeStructureItem: (id: string, item: Partial<FeeStructureItem>) => void;
   deleteFeeStructureItem: (id: string) => void;
@@ -582,6 +594,7 @@ const DEFAULT_THEME: AppTheme = {
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const [attendance, setAttendance] = useState<AttendanceRecord[]>(() => loadFromStorage('gha_attendance', []));
+  const [fundraiserParticipants, setFundraiserParticipants] = useState<FundraiserParticipant[]>(() => loadFromStorage('gha_fundraiser_participants', []));
   const [results, setResults] = useState<StudentResult[]>(() => loadFromStorage('gha_results', []));
   const [timetables, setTimetables] = useState<Timetable[]>(() => loadFromStorage('gha_timetables', []));
   const [branding, setBranding] = useState<SchoolBranding>(() => loadFromStorage('gha_branding', DEFAULT_BRANDING));
@@ -600,6 +613,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [currentTerm, setCurrentTerm] = useState<string>(() => loadFromStorage('gha_currentTerm', 'Term 1 2026'));
 
   useEffect(() => { localStorage.setItem('gha_attendance', JSON.stringify(attendance)); }, [attendance]);
+  useEffect(() => { localStorage.setItem('gha_fundraiser_participants', JSON.stringify(fundraiserParticipants)); }, [fundraiserParticipants]);
   useEffect(() => { localStorage.setItem('gha_results', JSON.stringify(results)); }, [results]);
   useEffect(() => { localStorage.setItem('gha_timetables', JSON.stringify(timetables)); }, [timetables]);
   useEffect(() => { localStorage.setItem('gha_branding', JSON.stringify(branding)); }, [branding]);
@@ -657,7 +671,18 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const addEvent = (event: SchoolEvent) => setEvents(prev => [...prev, event]);
   const updateEvent = (id: string, updated: Partial<SchoolEvent>) =>
     setEvents(prev => prev.map(e => e.id === id ? { ...e, ...updated } : e));
-  const deleteEvent = (id: string) => setEvents(prev => prev.filter(e => e.id !== id));
+  const deleteEvent = (id: string) => {
+    setEvents(prev => prev.filter(e => e.id !== id));
+    setFundraiserParticipants(prev => prev.filter(p => p.eventId !== id));
+  };
+
+  const toggleFundraiserParticipant = (eventId: string, studentId: string, fee: number) => {
+    setFundraiserParticipants(prev => {
+      const existing = prev.find(p => p.eventId === eventId && p.studentId === studentId);
+      if (existing) return prev.filter(p => !(p.eventId === eventId && p.studentId === studentId));
+      return [...prev, { id: `fp-${Date.now()}`, eventId, studentId, amountPaid: fee, paidDate: new Date().toISOString() }];
+    });
+  };
 
   const addFeeStructureItem = (item: FeeStructureItem) => setFeeStructure(prev => [...prev, item]);
   const updateFeeStructureItem = (id: string, updated: Partial<FeeStructureItem>) =>
@@ -717,6 +742,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       addExpense, updateExpense, deleteExpense,
       addInventoryItem, updateInventoryItem, deleteInventoryItem,
       addEvent, updateEvent, deleteEvent,
+      fundraiserParticipants, toggleFundraiserParticipant,
       addFeeStructureItem, updateFeeStructureItem, deleteFeeStructureItem,
       addOtherCharge, updateOtherCharge, deleteOtherCharge,
       addAnnouncement, updateAnnouncement, deleteAnnouncement,

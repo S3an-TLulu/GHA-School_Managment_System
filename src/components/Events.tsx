@@ -1,8 +1,18 @@
 import React, { useState } from 'react';
-import { Plus, Calendar, Pencil, Trash2, X, DollarSign, Users } from 'lucide-react';
+import { Plus, Calendar, Pencil, Trash2, X, DollarSign, Users, ChevronDown, ChevronUp, Check, Download } from 'lucide-react';
 import { useAppContext, SchoolEvent } from '../context/AppContext';
 import { useToast } from './ToastProvider';
 import { useThemeClasses } from '../hooks/useThemeClasses';
+
+function downloadCSV(rows: string[][], filename: string) {
+  const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click();
+  document.body.removeChild(a); URL.revokeObjectURL(url);
+}
 
 const EVENT_TYPES = ['Academic', 'Sports', 'Cultural', 'Meeting', 'Holiday', 'Fundraiser', 'Other'] as const;
 const AUDIENCES = ['All', 'Students', 'Teachers', 'Parents'] as const;
@@ -45,6 +55,8 @@ function EventModal({ event, onSave, onClose }: {
     participationFee: event?.participationFee,
     expectedParticipants: event?.expectedParticipants,
     actualRevenue: event?.actualRevenue,
+    collectionStartDate: event?.collectionStartDate ? event.collectionStartDate.split('T')[0] : '',
+    collectionEndDate: event?.collectionEndDate ? event.collectionEndDate.split('T')[0] : '',
   });
 
   const isFundraiser = form.type === 'Fundraiser';
@@ -118,6 +130,20 @@ function EventModal({ event, onSave, onClose }: {
           {isFundraiser && (
             <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 space-y-3">
               <p className="text-xs font-semibold text-amber-800 uppercase tracking-wide">Fundraiser Tracking</p>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Fee Collection Opens</label>
+                  <input type="date"
+                    className="w-full px-2 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-400 focus:border-transparent"
+                    value={form.collectionStartDate || ''} onChange={e => setForm({ ...form, collectionStartDate: e.target.value })} />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Fee Collection Closes</label>
+                  <input type="date"
+                    className="w-full px-2 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-amber-400 focus:border-transparent"
+                    value={form.collectionEndDate || ''} onChange={e => setForm({ ...form, collectionEndDate: e.target.value })} />
+                </div>
+              </div>
               <div className="grid grid-cols-3 gap-3">
                 <div>
                   <label className="block text-xs font-medium text-gray-700 mb-1">Fee per Person (K)</label>
@@ -169,12 +195,22 @@ function EventModal({ event, onSave, onClose }: {
 }
 
 export function Events() {
-  const { events, addEvent, updateEvent, deleteEvent } = useAppContext();
+  const { events, addEvent, updateEvent, deleteEvent, students, fundraiserParticipants, toggleFundraiserParticipant } = useAppContext();
   const { toast } = useToast();
   const tc = useThemeClasses();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingEvent, setEditingEvent] = useState<SchoolEvent | null>(null);
   const [filterType, setFilterType] = useState('all');
+  const [expandedParticipants, setExpandedParticipants] = useState<Set<string>>(new Set());
+
+  const activeStudents = students.filter(s => !s.status || s.status === 'active');
+
+  const toggleParticipantPanel = (eventId: string) =>
+    setExpandedParticipants(prev => {
+      const next = new Set(prev);
+      next.has(eventId) ? next.delete(eventId) : next.add(eventId);
+      return next;
+    });
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -230,6 +266,12 @@ export function Events() {
                   Until {new Date(event.endDate).toLocaleDateString()}
                 </p>
               )}
+              {isFundraiser && (event.collectionStartDate || event.collectionEndDate) && (
+                <p className="text-xs text-amber-700 mt-1">
+                  Collection: {event.collectionStartDate ? new Date(event.collectionStartDate).toLocaleDateString() : '…'}
+                  {' → '}{event.collectionEndDate ? new Date(event.collectionEndDate).toLocaleDateString() : '…'}
+                </p>
+              )}
               {isFundraiser && (event.participationFee || event.actualRevenue !== undefined) && (
                 <div className="mt-2 flex flex-wrap gap-3">
                   {event.participationFee !== undefined && (
@@ -260,7 +302,13 @@ export function Events() {
               )}
             </div>
           </div>
-          <div className="flex space-x-1 ml-2">
+          <div className="flex space-x-1 ml-2 flex-shrink-0">
+            {isFundraiser && event.participationFee && (
+              <button onClick={() => toggleParticipantPanel(event.id)}
+                className="p-1.5 text-amber-600 hover:bg-amber-50 rounded" title="View participants">
+                <Users className="h-3.5 w-3.5" />
+              </button>
+            )}
             <button onClick={() => handleEdit(event)} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded">
               <Pencil className="h-3.5 w-3.5" />
             </button>
@@ -269,6 +317,78 @@ export function Events() {
             </button>
           </div>
         </div>
+
+        {/* Fundraiser participants panel */}
+        {isFundraiser && event.participationFee && expandedParticipants.has(event.id) && (() => {
+          const paid = fundraiserParticipants.filter(p => p.eventId === event.id);
+          const paidIds = new Set(paid.map(p => p.studentId));
+          const collected = paid.reduce((s, p) => s + p.amountPaid, 0);
+          const target = event.participationFee! * (event.expectedParticipants ?? activeStudents.length);
+          const pct = target > 0 ? Math.min(100, Math.round((collected / target) * 100)) : 0;
+
+          const exportParticipants = () => {
+            const rows = [
+              ['Student', 'Grade', 'Guardian', 'Phone', 'Status', 'Amount', 'Date Paid'],
+              ...activeStudents.map(s => {
+                const rec = paid.find(p => p.studentId === s.id);
+                return [s.name, s.grade, s.guardianName, s.guardianPhone,
+                  rec ? 'Paid' : 'Not Paid',
+                  rec ? `K${event.participationFee}` : '—',
+                  rec ? new Date(rec.paidDate).toLocaleDateString() : '—'];
+              })
+            ];
+            downloadCSV(rows as string[][], `${event.title.replace(/\s+/g,'_')}_participants.csv`);
+          };
+
+          return (
+            <div className="mt-3 border-t border-amber-100 pt-3">
+              <div className="flex items-center justify-between mb-2">
+                <div>
+                  <p className="text-xs font-semibold text-amber-800">
+                    {paidIds.size} / {event.expectedParticipants ?? activeStudents.length} paid
+                    &nbsp;&bull;&nbsp;K{collected.toLocaleString()} collected
+                    {target > 0 && <> / K{target.toLocaleString()} target ({pct}%)</>}
+                  </p>
+                  <div className="mt-1 w-48 bg-gray-100 rounded-full h-1.5">
+                    <div className={`h-1.5 rounded-full ${pct >= 100 ? 'bg-green-500' : pct >= 60 ? 'bg-amber-500' : 'bg-red-400'}`}
+                      style={{ width: `${pct}%` }} />
+                  </div>
+                </div>
+                <button onClick={exportParticipants}
+                  className="flex items-center gap-1 text-xs text-amber-700 hover:text-amber-900 border border-amber-200 hover:border-amber-400 rounded px-2 py-1 transition-colors">
+                  <Download className="h-3 w-3" />
+                  Export
+                </button>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 mt-2">
+                {activeStudents.map(student => {
+                  const hasPaid = paidIds.has(student.id);
+                  const rec = paid.find(p => p.studentId === student.id);
+                  return (
+                    <button key={student.id}
+                      onClick={() => toggleFundraiserParticipant(event.id, student.id, event.participationFee!)}
+                      className={`flex items-center justify-between px-3 py-1.5 rounded-lg border text-left transition-all ${
+                        hasPaid ? 'bg-green-50 border-green-200 hover:bg-green-100' : 'bg-gray-50 border-gray-200 hover:bg-amber-50'
+                      }`}>
+                      <div className="flex items-center space-x-2 min-w-0">
+                        <span className={`flex-shrink-0 w-4 h-4 rounded-full flex items-center justify-center ${hasPaid ? 'bg-green-500' : 'bg-gray-300'}`}>
+                          {hasPaid && <Check className="h-2.5 w-2.5 text-white" />}
+                        </span>
+                        <span className="text-xs text-gray-900 truncate">{student.name}</span>
+                      </div>
+                      <div className="flex items-center gap-2 flex-shrink-0 ml-2">
+                        <span className="text-xs text-gray-400">{student.grade}</span>
+                        {hasPaid && rec && (
+                          <span className="text-xs text-green-600 font-medium">{new Date(rec.paidDate).toLocaleDateString('en-ZM', { day: 'numeric', month: 'short' })}</span>
+                        )}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })()}
       </div>
     );
   };

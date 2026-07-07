@@ -42,13 +42,23 @@ function applyTheme(theme: AppTheme) {
     .bg-gray-50 { background-color: #0f172a !important; }
     .bg-gray-100 { background-color: #1e293b !important; }
     .border-gray-200 { border-color: #334155 !important; }
+    .border-gray-300 { border-color: #475569 !important; }
     .border-gray-100 { border-color: #1e293b !important; }
     .text-gray-900 { color: #f1f5f9 !important; }
+    .text-gray-800 { color: #e2e8f0 !important; }
     .text-gray-700 { color: #cbd5e1 !important; }
     .text-gray-600 { color: #94a3b8 !important; }
     .text-gray-500 { color: #64748b !important; }
+    .text-gray-400 { color: #94a3b8 !important; }
     .divide-gray-200 > * { border-color: #334155 !important; }
     .divide-gray-100 > * { border-color: #1e293b !important; }
+    input, select, textarea {
+      background-color: #0f172a !important;
+      color: #f1f5f9 !important;
+      border-color: #475569 !important;
+    }
+    input::placeholder, textarea::placeholder { color: #64748b !important; }
+    option { background-color: #1e293b !important; color: #f1f5f9 !important; }
     ` : ''}
   `;
 

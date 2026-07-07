@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { BarChart3, Download, FileText, DollarSign, TrendingDown, Printer, GraduationCap } from 'lucide-react';
+import { BarChart3, Download, FileText, DollarSign, TrendingDown, Printer, GraduationCap, Heart, Check } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 import { useThemeClasses } from '../hooks/useThemeClasses';
 
@@ -17,7 +17,7 @@ function downloadCSV(rows: string[][], filename: string) {
 }
 
 export function Reports() {
-  const { students, payments, uniforms, expenses, results, currentTerm } = useAppContext();
+  const { students, payments, uniforms, expenses, results, events, fundraiserParticipants, currentTerm } = useAppContext();
   const tc = useThemeClasses();
   const [selectedReport, setSelectedReport] = useState('financial');
   const [termFilter, setTermFilter] = useState(currentTerm);
@@ -30,7 +30,8 @@ export function Reports() {
   const overdueAmount = termPayments.filter(p => p.status === 'overdue').reduce((sum, p) => sum + p.amount, 0);
   const uniformRevenue = uniforms.reduce((sum, u) => sum + u.price, 0);
   const totalExpenses = termExpenses.reduce((sum, e) => sum + e.amount, 0);
-  const netIncome = totalRevenue - totalExpenses;
+  const fundraiserIncome = fundraiserParticipants.reduce((sum, p) => sum + p.amountPaid, 0);
+  const netIncome = totalRevenue + fundraiserIncome - totalExpenses;
 
   const allTerms = [...new Set([...payments.map(p => p.term), ...expenses.map(e => e.term)].filter(Boolean))].sort().reverse();
   const resultTerms = [...new Set(results.map(r => r.term))].sort().reverse();
@@ -60,6 +61,7 @@ export function Reports() {
       ['Pending Amount', `K${pendingAmount}`, '', ''],
       ['Overdue Amount', `K${overdueAmount}`, '', ''],
       ['Total Expenses', `K${totalExpenses}`, '', ''],
+      ['Fundraiser Income', `K${fundraiserIncome}`, '', ''],
       ['Net Income', `K${netIncome}`, '', ''],
       ['Uniform Sales', `K${uniformRevenue}`, '', ''],
       ['', '', '', ''],
@@ -145,12 +147,22 @@ export function Reports() {
               </div>
             </div>
           </div>
+          <div className="bg-amber-50 border border-amber-200 rounded-lg p-5">
+            <div className="flex items-center space-x-3">
+              <Heart className="h-7 w-7 text-amber-600" />
+              <div>
+                <p className="text-sm font-medium text-amber-700">Fundraiser Income</p>
+                <p className="text-2xl font-bold text-amber-900">K{fundraiserIncome.toLocaleString()}</p>
+              </div>
+            </div>
+          </div>
           <div className={`${netIncome >= 0 ? 'bg-blue-50 border-blue-200' : 'bg-orange-50 border-orange-200'} border rounded-lg p-5`}>
             <div className="flex items-center space-x-3">
               <DollarSign className={`h-7 w-7 ${netIncome >= 0 ? 'text-blue-600' : 'text-orange-600'}`} />
               <div>
                 <p className={`text-sm font-medium ${netIncome >= 0 ? 'text-blue-600' : 'text-orange-600'}`}>Net Income</p>
                 <p className={`text-2xl font-bold ${netIncome >= 0 ? 'text-blue-900' : 'text-orange-900'}`}>K{netIncome.toLocaleString()}</p>
+                {fundraiserIncome > 0 && <p className="text-xs text-gray-500">incl. fundraisers</p>}
               </div>
             </div>
           </div>
@@ -448,6 +460,152 @@ export function Reports() {
     </div>
   );
 
+  const fundraiserEvents = events.filter(e => e.type === 'Fundraiser' && e.participationFee);
+
+  const handleExportFundraiser = (eventId: string, eventTitle: string) => {
+    const ev = events.find(e => e.id === eventId)!;
+    const paid = fundraiserParticipants.filter(p => p.eventId === eventId);
+    const paidIds = new Set(paid.map(p => p.studentId));
+    const activeStudents = students.filter(s => !s.status || s.status === 'active');
+    const rows: string[][] = [
+      ['Great Highway Academy - Fundraiser Participant Report'],
+      [`Event: ${eventTitle}`],
+      [`Date: ${new Date(ev.date).toLocaleDateString()}`],
+      [`Fee Per Person: K${ev.participationFee}`],
+      [`Generated: ${new Date().toLocaleDateString()}`],
+      [],
+      ['Student', 'Grade', 'Guardian', 'Phone', 'Status', 'Amount Paid', 'Date Paid'],
+      ...activeStudents.map(s => {
+        const rec = paid.find(p => p.studentId === s.id);
+        return [s.name, s.grade, s.guardianName, s.guardianPhone,
+          rec ? 'Paid' : 'Not Paid', rec ? `K${ev.participationFee}` : '—',
+          rec ? new Date(rec.paidDate).toLocaleDateString() : '—'];
+      }),
+      [],
+      ['SUMMARY'],
+      ['Total Paid', `${paidIds.size}`],
+      ['Not Paid', `${activeStudents.length - paidIds.size}`],
+      ['Amount Collected', `K${paid.reduce((s, p) => s + p.amountPaid, 0)}`],
+      ['Target', `K${ev.participationFee! * (ev.expectedParticipants ?? activeStudents.length)}`],
+    ];
+    downloadCSV(rows, `Fundraiser_${eventTitle.replace(/\s+/g,'_')}.csv`);
+  };
+
+  const renderFundraiserReport = () => {
+    const activeStudents = students.filter(s => !s.status || s.status === 'active');
+
+    if (fundraiserEvents.length === 0) {
+      return (
+        <div className="text-center py-16 text-gray-400">
+          <Heart className="h-12 w-12 mx-auto mb-3 opacity-30" />
+          <p className="font-medium">No fundraiser events yet.</p>
+          <p className="text-sm mt-1">Add a Fundraiser event with a participation fee in the Events section.</p>
+        </div>
+      );
+    }
+
+    return (
+      <div className="space-y-6">
+        {fundraiserEvents.map(ev => {
+          const paid = fundraiserParticipants.filter(p => p.eventId === ev.id);
+          const paidIds = new Set(paid.map(p => p.studentId));
+          const collected = paid.reduce((s, p) => s + p.amountPaid, 0);
+          const totalParticipants = ev.expectedParticipants ?? activeStudents.length;
+          const target = ev.participationFee! * totalParticipants;
+          const pct = target > 0 ? Math.min(100, Math.round((collected / target) * 100)) : 0;
+          const isPast = new Date(ev.date) < new Date();
+
+          return (
+            <div key={ev.id} className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
+              {/* Event header */}
+              <div className="bg-amber-50 border-b border-amber-100 px-6 py-4 flex items-center justify-between flex-wrap gap-3">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-base font-semibold text-amber-900">{ev.title}</h3>
+                    {isPast && <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">Past</span>}
+                  </div>
+                  <p className="text-xs text-amber-700 mt-0.5">
+                    {new Date(ev.date).toLocaleDateString('en-ZM', { weekday: 'short', day: 'numeric', month: 'long', year: 'numeric' })}
+                    {ev.collectionStartDate && ev.collectionEndDate && (
+                      <> &bull; Collection: {new Date(ev.collectionStartDate).toLocaleDateString('en-ZM', { day: 'numeric', month: 'short' })} – {new Date(ev.collectionEndDate).toLocaleDateString('en-ZM', { day: 'numeric', month: 'short' })}</>
+                    )}
+                  </p>
+                </div>
+                <button onClick={() => handleExportFundraiser(ev.id, ev.title)}
+                  className="flex items-center gap-1.5 text-xs font-medium text-amber-700 border border-amber-300 hover:bg-amber-100 rounded-lg px-3 py-1.5 transition-colors">
+                  <Download className="h-3.5 w-3.5" />
+                  Export CSV
+                </button>
+              </div>
+
+              {/* Summary stats */}
+              <div className="px-6 py-4 grid grid-cols-2 md:grid-cols-4 gap-4 border-b border-gray-100">
+                {[
+                  { label: 'Fee / Person', value: `K${ev.participationFee}`, color: 'text-amber-700', bg: 'bg-amber-50' },
+                  { label: 'Students Paid', value: `${paidIds.size} / ${totalParticipants}`, color: 'text-green-700', bg: 'bg-green-50' },
+                  { label: 'Collected', value: `K${collected.toLocaleString()}`, color: 'text-green-700', bg: 'bg-green-50' },
+                  { label: 'Target', value: `K${target.toLocaleString()}`, color: pct >= 100 ? 'text-green-700' : 'text-amber-700', bg: pct >= 100 ? 'bg-green-50' : 'bg-amber-50' },
+                ].map(stat => (
+                  <div key={stat.label} className={`${stat.bg} rounded-lg p-3 text-center`}>
+                    <p className="text-xs text-gray-500 mb-1">{stat.label}</p>
+                    <p className={`text-lg font-bold ${stat.color}`}>{stat.value}</p>
+                  </div>
+                ))}
+              </div>
+
+              {/* Progress bar */}
+              <div className="px-6 pt-3 pb-1">
+                <div className="flex items-center justify-between text-xs text-gray-500 mb-1">
+                  <span>Collection Progress</span>
+                  <span className="font-semibold">{pct}%</span>
+                </div>
+                <div className="w-full bg-gray-100 rounded-full h-2">
+                  <div className={`h-2 rounded-full transition-all ${pct >= 100 ? 'bg-green-500' : pct >= 60 ? 'bg-amber-500' : 'bg-red-400'}`}
+                    style={{ width: `${pct}%` }} />
+                </div>
+              </div>
+
+              {/* Participant table */}
+              <div className="overflow-x-auto">
+                <table className="min-w-full text-sm divide-y divide-gray-100">
+                  <thead>
+                    <tr className="bg-gray-50">
+                      {['Student', 'Grade', 'Guardian', 'Phone', 'Status', 'Date Paid'].map(h =>
+                        <th key={h} className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{h}</th>
+                      )}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-50">
+                    {activeStudents.map(student => {
+                      const rec = paid.find(p => p.studentId === student.id);
+                      return (
+                        <tr key={student.id} className={rec ? 'bg-green-50/40' : ''}>
+                          <td className="px-4 py-2.5 font-medium text-gray-900">{student.name}</td>
+                          <td className="px-4 py-2.5 text-gray-500 text-xs">{student.grade}</td>
+                          <td className="px-4 py-2.5 text-gray-600">{student.guardianName}</td>
+                          <td className="px-4 py-2.5 text-gray-500 text-xs">{student.guardianPhone}</td>
+                          <td className="px-4 py-2.5">
+                            <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full ${rec ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}`}>
+                              {rec && <Check className="h-3 w-3" />}
+                              {rec ? `Paid — K${ev.participationFee}` : 'Not Paid'}
+                            </span>
+                          </td>
+                          <td className="px-4 py-2.5 text-gray-500 text-xs">
+                            {rec ? new Date(rec.paidDate).toLocaleDateString('en-ZM', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-4">
@@ -487,6 +645,7 @@ export function Reports() {
               { id: 'class', label: 'Class Summary', icon: BarChart3 },
               { id: 'student', label: 'Student Report', icon: FileText },
               { id: 'academic', label: 'Academic Results', icon: GraduationCap },
+              { id: 'fundraiser', label: 'Fundraisers', icon: Heart },
             ].map(tab => (
               <button key={tab.id} onClick={() => setSelectedReport(tab.id)}
                 className={`flex items-center space-x-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
@@ -503,6 +662,7 @@ export function Reports() {
           {selectedReport === 'class' && renderClassReport()}
           {selectedReport === 'student' && renderStudentReport()}
           {selectedReport === 'academic' && renderAcademicReport()}
+          {selectedReport === 'fundraiser' && renderFundraiserReport()}
         </div>
       </div>
     </div>
