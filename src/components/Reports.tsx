@@ -30,7 +30,8 @@ export function Reports() {
   const overdueAmount = termPayments.filter(p => p.status === 'overdue').reduce((sum, p) => sum + p.amount, 0);
   const uniformRevenue = uniforms.reduce((sum, u) => sum + u.price, 0);
   const totalExpenses = termExpenses.reduce((sum, e) => sum + e.amount, 0);
-  const netIncome = totalRevenue - totalExpenses;
+  const fundraiserIncome = fundraiserParticipants.reduce((sum, p) => sum + p.amountPaid, 0);
+  const netIncome = totalRevenue + fundraiserIncome - totalExpenses;
 
   const allTerms = [...new Set([...payments.map(p => p.term), ...expenses.map(e => e.term)].filter(Boolean))].sort().reverse();
   const resultTerms = [...new Set(results.map(r => r.term))].sort().reverse();
@@ -60,6 +61,7 @@ export function Reports() {
       ['Pending Amount', `K${pendingAmount}`, '', ''],
       ['Overdue Amount', `K${overdueAmount}`, '', ''],
       ['Total Expenses', `K${totalExpenses}`, '', ''],
+      ['Fundraiser Income', `K${fundraiserIncome}`, '', ''],
       ['Net Income', `K${netIncome}`, '', ''],
       ['Uniform Sales', `K${uniformRevenue}`, '', ''],
       ['', '', '', ''],
@@ -145,12 +147,22 @@ export function Reports() {
               </div>
             </div>
           </div>
+          <div className="bg-amber-50 border border-amber-200 rounded-lg p-5">
+            <div className="flex items-center space-x-3">
+              <Heart className="h-7 w-7 text-amber-600" />
+              <div>
+                <p className="text-sm font-medium text-amber-700">Fundraiser Income</p>
+                <p className="text-2xl font-bold text-amber-900">K{fundraiserIncome.toLocaleString()}</p>
+              </div>
+            </div>
+          </div>
           <div className={`${netIncome >= 0 ? 'bg-blue-50 border-blue-200' : 'bg-orange-50 border-orange-200'} border rounded-lg p-5`}>
             <div className="flex items-center space-x-3">
               <DollarSign className={`h-7 w-7 ${netIncome >= 0 ? 'text-blue-600' : 'text-orange-600'}`} />
               <div>
                 <p className={`text-sm font-medium ${netIncome >= 0 ? 'text-blue-600' : 'text-orange-600'}`}>Net Income</p>
                 <p className={`text-2xl font-bold ${netIncome >= 0 ? 'text-blue-900' : 'text-orange-900'}`}>K{netIncome.toLocaleString()}</p>
+                {fundraiserIncome > 0 && <p className="text-xs text-gray-500">incl. fundraisers</p>}
               </div>
             </div>
           </div>

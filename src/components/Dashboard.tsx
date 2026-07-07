@@ -15,7 +15,8 @@ export function Dashboard() {
   const overdueCount = termPayments.filter(p => p.status === 'overdue').length;
 
   const termExpenses = expenses.filter(e => e.term === currentTerm).reduce((sum, e) => sum + e.amount, 0);
-  const netIncome = totalRevenue - termExpenses;
+  const fundraiserIncome = fundraiserParticipants.reduce((sum, p) => sum + p.amountPaid, 0);
+  const netIncome = totalRevenue + fundraiserIncome - termExpenses;
 
   const collectionRate = totalRevenue + totalPending > 0
     ? Math.round((totalRevenue / (totalRevenue + totalPending)) * 100)
@@ -98,6 +99,9 @@ export function Dashboard() {
             <div>
               <p className="text-xs text-gray-500">Revenue ({currentTerm})</p>
               <p className="text-xl font-bold text-gray-900">K{totalRevenue.toLocaleString()}</p>
+              {fundraiserIncome > 0 && (
+                <p className="text-xs text-amber-600 font-medium">+ K{fundraiserIncome.toLocaleString()} fundraisers</p>
+              )}
             </div>
           </div>
         </div>
