@@ -102,7 +102,7 @@ function InventoryModal({ item, onSave, onClose }: {
 }
 
 export function Inventory() {
-  const { inventory, addInventoryItem, updateInventoryItem, deleteInventoryItem } = useAppContext();
+  const { inventory, addInventoryItem, updateInventoryItem, deleteInventoryItem, uniformCatalog } = useAppContext();
   const { toast } = useToast();
   const tc = useThemeClasses();
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -244,6 +244,49 @@ export function Inventory() {
               ))}
               {filtered.length === 0 && (
                 <tr><td colSpan={7} className="px-6 py-8 text-center text-gray-500">No inventory items found.</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Uniform stock — lives in the Uniforms catalog, mirrored here so Inventory shows everything in stock */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+        <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+          <div>
+            <h2 className="text-lg font-semibold text-gray-900">Uniform Stock</h2>
+            <p className="text-xs text-gray-500">Synced with the Uniform Store — edit quantities and prices in Uniforms → Catalog &amp; Prices</p>
+          </div>
+          <span className="text-sm text-gray-500">
+            {uniformCatalog.reduce((s, i) => s + i.stock, 0)} pieces &bull; value K{uniformCatalog.reduce((s, i) => s + i.price * i.stock, 0).toLocaleString()}
+          </span>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                {['Item', 'Category', 'In Stock', 'Unit Price', 'Stock Value'].map(h => (
+                  <th key={h} className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {uniformCatalog.map(item => (
+                <tr key={item.id} className="hover:bg-gray-50">
+                  <td className="px-6 py-3 text-sm font-medium text-gray-900">{item.name}</td>
+                  <td className="px-6 py-3 text-sm text-gray-600">{item.category}</td>
+                  <td className="px-6 py-3">
+                    <span className={`px-2 py-1 text-xs font-medium rounded-full ${
+                      item.stock === 0 ? 'bg-red-100 text-red-800' :
+                      item.stock <= 5 ? 'bg-amber-100 text-amber-800' : 'bg-green-100 text-green-800'
+                    }`}>{item.stock}</span>
+                  </td>
+                  <td className="px-6 py-3 text-sm text-gray-600">K{item.price.toLocaleString()}</td>
+                  <td className="px-6 py-3 text-sm font-medium text-gray-900">K{(item.price * item.stock).toLocaleString()}</td>
+                </tr>
+              ))}
+              {uniformCatalog.length === 0 && (
+                <tr><td colSpan={5} className="px-6 py-6 text-center text-gray-500 text-sm">No uniform items in the catalog.</td></tr>
               )}
             </tbody>
           </table>

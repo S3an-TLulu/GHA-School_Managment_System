@@ -22,6 +22,10 @@ import { ThemeManager, applyTheme } from './components/ThemeManager';
 import { DocumentTemplates } from './components/DocumentTemplates';
 import { ClassTimetable } from './components/ClassTimetable';
 import { BulkFeeCollection } from './components/BulkFeeCollection';
+import { Debtors } from './components/Debtors';
+import { Transport } from './components/Transport';
+import { Fundraisers } from './components/Fundraisers';
+import { Settings } from './components/Settings';
 import { Results } from './components/Results';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { useAppContext } from './context/AppContext';
@@ -66,6 +70,10 @@ function AppContent() {
       case 'timetable':    return <ClassTimetable />;
       case 'results':      return <Results />;
       case 'bulkfees':     return <BulkFeeCollection />;
+      case 'debtors':      return <Debtors />;
+      case 'transport':    return <Transport />;
+      case 'fundraisers':  return <Fundraisers />;
+      case 'settings':     return <Settings />;
       default:             return <Dashboard />;
     }
   };
