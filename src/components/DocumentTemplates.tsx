@@ -3,7 +3,7 @@ import { FileText, Printer, Receipt, CreditCard, Award, ClipboardList, Users, X,
 import { useAppContext } from '../context/AppContext';
 import { useThemeClasses } from '../hooks/useThemeClasses';
 
-type TemplateType = 'receipt' | 'statement' | 'admission' | 'idcard' | 'certificate' | 'attendance-report' | 'financial-report' | 'report-card';
+type TemplateType = 'receipt' | 'statement' | 'admission' | 'idcard' | 'certificate' | 'attendance-report' | 'financial-report' | 'report-card' | 'quotation';
 
 interface TemplateConfig {
   id: TemplateType;
@@ -22,6 +22,7 @@ const TEMPLATES: TemplateConfig[] = [
   { id: 'attendance-report', label: 'Attendance Report',      description: 'Per-student or class attendance summary',   icon: <ClipboardList className="h-6 w-6" />,color: 'bg-teal-50 border-teal-200 text-teal-700' },
   { id: 'financial-report',  label: 'Financial Report',       description: 'Term income, expenses and net summary',     icon: <Users className="h-6 w-6" />,            color: 'bg-red-50 border-red-200 text-red-700' },
   { id: 'report-card',       label: 'Academic Report Card',   description: 'Printable term report card with grades',    icon: <GraduationCap className="h-6 w-6" />,     color: 'bg-indigo-50 border-indigo-200 text-indigo-700' },
+  { id: 'quotation',         label: 'Quotation Form',         description: 'Blank quotation with items table & bank details', icon: <FileText className="h-6 w-6" />,   color: 'bg-cyan-50 border-cyan-200 text-cyan-700' },
 ];
 
 export function DocumentTemplates() {
@@ -37,23 +38,26 @@ export function DocumentTemplates() {
 
   const B = branding;
 
-  function schoolHeader(color = '#1d4ed8') {
+  // GHA document design language (matches official school document set):
+  // navy #12274a, muted #5a6b85, light-blue panel #eef3fa, borders #c9d4e6
+  const NAVY = '#12274a';
+  const MUTED = '#5a6b85';
+  const PANEL = '#eef3fa';
+  const BORDER = '#c9d4e6';
+  const LINE = '#b7c2d6';
+
+  function schoolHeader(docLabel = '') {
     return `
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px;padding-bottom:16px;border-bottom:3px solid ${color}">
-        <div style="display:flex;align-items:center;gap:14px">
-          ${B.logoUrl ? `<img src="${B.logoUrl}" style="height:60px;width:60px;object-fit:contain" />` : `<div style="width:60px;height:60px;background:${color};border-radius:50%;display:flex;align-items:center;justify-content:center;color:white;font-size:22px;font-weight:bold">${B.schoolName.charAt(0)}</div>`}
-          <div>
-            <h1 style="margin:0;color:${color};font-size:20px;font-weight:bold">${B.schoolName}</h1>
-            <p style="margin:2px 0 0;color:#6b7280;font-size:13px;font-style:italic">${B.motto}</p>
-            <p style="margin:2px 0 0;color:#6b7280;font-size:11px">${B.address}</p>
-          </div>
+      <div style="display:flex;align-items:center;gap:18px;border-bottom:3px solid ${NAVY};padding-bottom:14px;margin-bottom:20px">
+        ${B.logoUrl ? `<img src="${B.logoUrl}" style="width:62px;height:62px;object-fit:contain;flex-shrink:0" />` : `<div style="width:62px;height:62px;background:${NAVY};border-radius:50%;display:flex;align-items:center;justify-content:center;color:white;font-size:22px;font-weight:bold;flex-shrink:0">${B.schoolName.charAt(0)}</div>`}
+        <div style="flex:1">
+          <div style="font-family:'Playfair Display',Georgia,serif;font-size:23px;font-weight:700;color:${NAVY};letter-spacing:0.01em">${B.schoolName}</div>
+          <div style="font-size:12px;color:${MUTED};margin-top:2px">${B.address} &nbsp;·&nbsp; ${B.phone}</div>
+          ${B.motto ? `<div style="font-size:11.5px;color:${NAVY};font-style:italic;margin-top:2px">${B.motto}</div>` : ''}
         </div>
-        <div style="text-align:right;font-size:12px;color:#6b7280">
-          <p style="margin:0;font-weight:600;color:#374151">${B.bankName}</p>
-          <p style="margin:1px 0">${B.bankBranch}</p>
-          <p style="margin:1px 0">Acc: ${B.bankAccountNumber}</p>
-          <p style="margin:4px 0 0;color:#374151">${B.phone}</p>
-        </div>
+        ${docLabel ? `<div style="text-align:right">
+          <div style="font-size:12px;font-weight:700;color:${NAVY};letter-spacing:0.08em;text-transform:uppercase">${docLabel}</div>
+        </div>` : ''}
       </div>`;
   }
 
@@ -61,14 +65,27 @@ export function DocumentTemplates() {
     const win = window.open('', '_blank');
     if (!win) return;
     win.document.write(`<!DOCTYPE html><html><head><title>${title}</title>
+      <link rel="preconnect" href="https://fonts.googleapis.com">
+      <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,600;0,700;1,600&display=swap" rel="stylesheet">
       <style>
         * { box-sizing: border-box; }
-        body { font-family: Arial, sans-serif; margin: 24px; color: #111; }
+        body { font-family: Inter, Arial, sans-serif; margin: 24px; color: #1a2332; background: #fff; }
+        .gha-doc { position: relative; z-index: 0; border: 2px solid ${NAVY}; border-radius: 10px; padding: 26px 30px; }
+        .gha-watermark { position: absolute; top: 50%; left: 50%; width: 85%; max-width: 520px; transform: translate(-50%, -50%); opacity: 0.14; z-index: -1; pointer-events: none; }
+        .gha-panel { border: 1px solid ${BORDER}; border-radius: 8px; padding: 16px 18px; margin-bottom: 18px; }
+        .gha-section-bar { background: ${PANEL}; color: ${NAVY}; font-weight: 700; font-size: 13px; letter-spacing: 0.04em; padding: 7px 14px; border-radius: 3px; margin-bottom: 14px; }
         table { width: 100%; border-collapse: collapse; }
-        th { background: #1d4ed8; color: #fff; padding: 8px 10px; text-align: left; font-size: 12px; }
-        td { padding: 6px 10px; border-bottom: 1px solid #e5e7eb; font-size: 12px; }
+        th { background: ${NAVY}; color: #fff; padding: 8px 10px; text-align: left; font-size: 12px; font-weight: 600; }
+        td { padding: 7px 10px; border-bottom: 1px solid #dde4ef; font-size: 12px; }
+        tbody tr:nth-child(odd) td { background: ${PANEL}; }
+        .gha-motto { text-align: center; font-family: 'Playfair Display', Georgia, serif; font-style: italic; color: ${NAVY}; font-size: 13px; margin-top: 24px; }
         @media print { button { display: none; } }
-      </style></head><body>${html}<script>window.print();</script></body></html>`);
+      </style></head><body>
+      <div class="gha-doc">
+        ${B.logoUrl ? `<img src="${B.logoUrl}" class="gha-watermark" alt="" />` : ''}
+        ${html}
+      </div>
+      <script>window.onload = function(){ setTimeout(function(){ window.print(); }, 300); };</script></body></html>`);
     win.document.close();
   }
 
@@ -80,12 +97,7 @@ export function DocumentTemplates() {
     if (studentPayments.length === 0) { alert('No paid payments for this student.'); return; }
     const latest = studentPayments.sort((a, b) => new Date(b.paidDate || b.createdDate).getTime() - new Date(a.paidDate || a.createdDate).getTime())[0];
     const html = `
-      ${schoolHeader('#166534')}
-      <div style="text-align:center;margin:16px 0">
-        <div style="display:inline-block;background:#dcfce7;border:2px solid #16a34a;border-radius:8px;padding:6px 24px">
-          <span style="color:#166534;font-weight:bold;font-size:15px;letter-spacing:1px">OFFICIAL RECEIPT</span>
-        </div>
-      </div>
+      ${schoolHeader('Official Receipt')}
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:16px 0">
         <div style="background:#f9fafb;border-radius:6px;padding:12px">
           <p style="margin:0 0 6px;font-size:11px;color:#6b7280;text-transform:uppercase">Student Details</p>
@@ -139,8 +151,7 @@ export function DocumentTemplates() {
       <td>${p.paidDate ? new Date(p.paidDate).toLocaleDateString() : '—'}</td>
     </tr>`).join('');
     const html = `
-      ${schoolHeader()}
-      <h2 style="color:#374151;margin:0 0 4px">Account Statement</h2>
+      ${schoolHeader('Statement of Account')}
       <p style="color:#6b7280;margin:0 0 12px;font-size:13px">Generated: ${new Date().toLocaleDateString('en-GB', { day:'numeric', month:'long', year:'numeric' })}</p>
       <div style="background:#f9fafb;border-radius:6px;padding:12px;margin-bottom:16px">
         <p style="margin:0 0 4px;font-weight:600;font-size:14px">${student.name}</p>
@@ -164,10 +175,9 @@ export function DocumentTemplates() {
     const student = students.find(s => s.id === studentId);
     if (!student) return;
     const html = `
-      ${schoolHeader('#7c3aed')}
-      <div style="text-align:center;margin:20px 0">
-        <h2 style="color:#7c3aed;font-size:18px;text-transform:uppercase;letter-spacing:2px;margin:0">Letter of Admission</h2>
-        <p style="color:#6b7280;font-size:12px;margin:4px 0">Academic Year 2026</p>
+      ${schoolHeader('Letter of Admission')}
+      <div style="text-align:center;margin:8px 0 20px">
+        <p style="color:${MUTED};font-size:12px;margin:0">Academic Year 2026</p>
       </div>
       <p style="font-size:13px;line-height:1.8">Date: <strong>${new Date().toLocaleDateString('en-GB', { day:'numeric', month:'long', year:'numeric' })}</strong></p>
       <p style="font-size:13px;line-height:1.8">Dear <strong>${student.guardianName}</strong>,</p>
@@ -175,8 +185,8 @@ export function DocumentTemplates() {
         We are pleased to inform you that <strong>${student.name}</strong> has been successfully admitted to
         <strong>${B.schoolName}</strong> for the academic year 2026.
       </p>
-      <div style="background:#f5f3ff;border-left:4px solid #7c3aed;padding:14px;margin:16px 0;border-radius:0 6px 6px 0">
-        <p style="margin:0 0 6px;font-weight:600;color:#7c3aed">Student Details</p>
+      <div style="background:${PANEL};border-left:4px solid ${NAVY};padding:14px;margin:16px 0;border-radius:0 6px 6px 0">
+        <p style="margin:0 0 6px;font-weight:600;color:${NAVY}">Student Details</p>
         <table style="width:auto">
           <tr><td style="padding:2px 16px 2px 0;color:#6b7280;font-size:12px">Full Name:</td><td style="font-size:12px;font-weight:600">${student.name}</td></tr>
           <tr><td style="padding:2px 16px 2px 0;color:#6b7280;font-size:12px">Admission No.:</td><td style="font-size:12px;font-weight:600">${student.admissionNumber || 'To be assigned'}</td></tr>
@@ -299,7 +309,7 @@ export function DocumentTemplates() {
         <tbody>${rows}</tbody></table>`;
     }).join('');
 
-    printDoc(`${schoolHeader()}<h2 style="color:#374151">Attendance Report — All Classes</h2>
+    printDoc(`${schoolHeader('Attendance Report')}<h2 style="color:#12274a;font-size:16px;margin:0 0 4px">All Classes</h2>
       <p style="color:#6b7280;font-size:12px">Generated: ${new Date().toLocaleDateString('en-GB', { day:'numeric', month:'long', year:'numeric' })}</p>
       ${html}`, 'Attendance Report');
   }
@@ -320,8 +330,8 @@ export function DocumentTemplates() {
       termExp.reduce((acc, e) => { acc[e.category] = (acc[e.category] || 0) + e.amount; return acc; }, {} as Record<string, number>)
     );
 
-    const html = `${schoolHeader()}
-      <h2 style="color:#374151">Financial Report — ${termFilter || 'All Terms'}</h2>
+    const html = `${schoolHeader('Financial Report')}
+      <h2 style="color:#12274a;font-size:16px;margin:0 0 4px">${termFilter || 'All Terms'}</h2>
       <p style="color:#6b7280;font-size:12px;margin-top:0">Generated: ${new Date().toLocaleDateString('en-GB', { day:'numeric', month:'long', year:'numeric' })}</p>
       <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:16px 0">
         <div style="background:#dcfce7;border-radius:6px;padding:12px;text-align:center"><div style="font-size:11px;color:#166534">Revenue Collected</div><div style="font-size:20px;font-weight:bold;color:#166534">K${revenue.toLocaleString()}</div></div>
@@ -388,9 +398,8 @@ export function DocumentTemplates() {
     ].map(g => `<td style="border:1px solid #e5e7eb;padding:4px 8px;text-align:center;font-size:11px"><strong>${g.l}</strong> ${g.r}</td>`).join('');
 
     const html = `
-      ${schoolHeader()}
-      <div style="text-align:center;margin:16px 0 20px">
-        <h2 style="margin:0;font-size:17px;text-transform:uppercase;letter-spacing:1px;color:#374151">Academic Report Card</h2>
+      ${schoolHeader('Academic Report Card')}
+      <div style="text-align:center;margin:8px 0 20px">
         <p style="margin:4px 0 0;color:#6b7280;font-size:12px">${termFilter}</p>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">
@@ -444,11 +453,97 @@ export function DocumentTemplates() {
     printDoc(html, `Report Card — ${student.name} — ${termFilter}`);
   }
 
+  function printQuotation() {
+    // Layout modelled on the school's paper quotation pad:
+    // contact block left, quotation number / bill-to right, dotted date line,
+    // Qty | Description | Unit Price | Amount grid, TOTAL box, bank footer.
+    const quoteNo = `${Date.now().toString().slice(-5)}`;
+    const dotted = `border-bottom:1.5px dotted #7d8db0;`;
+    const blankRows = Array.from({ length: 16 }).map(() => `
+      <tr>
+        <td style="border:1px solid ${LINE};height:26px;background:#fff !important"></td>
+        <td style="border:1px solid ${LINE};background:#fff !important"></td>
+        <td style="border:1px solid ${LINE};background:#fff !important"></td>
+        <td style="border:1px solid ${LINE};background:#fff !important"></td>
+      </tr>`).join('');
+
+    const html = `
+      <div style="display:flex;align-items:center;gap:18px;border-bottom:3px solid ${NAVY};padding-bottom:14px;margin-bottom:16px">
+        ${B.logoUrl ? `<img src="${B.logoUrl}" style="width:64px;height:64px;object-fit:contain;flex-shrink:0" />` : `<div style="width:64px;height:64px;background:${NAVY};border-radius:50%;display:flex;align-items:center;justify-content:center;color:white;font-size:24px;font-weight:bold;flex-shrink:0">${B.schoolName.charAt(0)}</div>`}
+        <div style="flex:1">
+          <div style="font-family:'Playfair Display',Georgia,serif;font-size:26px;font-weight:700;color:${NAVY}">${B.schoolName}</div>
+          ${B.motto ? `<div style="font-size:12px;color:${NAVY};font-style:italic;margin-top:2px">${B.motto}</div>` : ''}
+        </div>
+        <div style="text-align:right">
+          <div style="font-family:'Playfair Display',Georgia,serif;font-size:24px;font-weight:700;color:${NAVY};letter-spacing:0.06em">QUOTATION</div>
+        </div>
+      </div>
+
+      <div style="display:flex;justify-content:space-between;gap:24px;margin-bottom:18px">
+        <div style="font-size:12.5px;color:#33425e;line-height:2">
+          <div>${B.address}</div>
+          <div><strong style="color:${NAVY}">Phone:</strong> ${B.phone}</div>
+          <div><strong style="color:${NAVY}">Email:</strong> ${B.email}</div>
+          <div style="font-weight:600;color:${NAVY}">Lusaka, Zambia</div>
+        </div>
+        <div style="min-width:280px;border:1px solid ${BORDER};border-radius:8px;padding:12px 16px;font-size:12.5px;color:#33425e;align-self:flex-start">
+          <div style="display:flex;justify-content:space-between;margin-bottom:10px">
+            <strong style="color:${NAVY}">Quotation #:</strong><span>${quoteNo}</span>
+          </div>
+          <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:10px">
+            <strong style="color:${NAVY};white-space:nowrap">Bill to:</strong><span style="flex:1;${dotted}height:16px"></span>
+          </div>
+          <div style="display:flex;align-items:baseline;gap:8px">
+            <strong style="color:${NAVY};white-space:nowrap">Address:</strong><span style="flex:1;${dotted}height:16px"></span>
+          </div>
+        </div>
+      </div>
+
+      <div style="display:flex;justify-content:space-between;align-items:flex-end;gap:40px;margin-bottom:14px;font-size:12.5px;color:#33425e">
+        <div style="flex:1">
+          <div style="${dotted}height:20px;margin-bottom:8px"></div>
+          <div style="${dotted}height:20px"></div>
+        </div>
+        <div style="display:flex;align-items:baseline;gap:8px;min-width:220px">
+          <strong style="color:${NAVY}">Date:</strong><span style="flex:1;${dotted}height:16px"></span>
+        </div>
+      </div>
+
+      <table style="margin-bottom:0">
+        <thead>
+          <tr>
+            <th style="width:56px;text-align:center;border:1px solid ${NAVY}">Qty</th>
+            <th style="border:1px solid ${NAVY}">Description of Item</th>
+            <th style="width:110px;text-align:right;border:1px solid ${NAVY}">Unit Price</th>
+            <th style="width:110px;text-align:right;border:1px solid ${NAVY}">Amount</th>
+          </tr>
+        </thead>
+        <tbody>${blankRows}</tbody>
+        <tfoot>
+          <tr>
+            <td colspan="2" style="border:none;background:#fff !important"></td>
+            <td style="border:1px solid ${NAVY};background:${PANEL} !important;font-weight:700;color:${NAVY};text-align:right">TOTAL K</td>
+            <td style="border:2px solid ${NAVY};background:#fff !important;height:30px"></td>
+          </tr>
+        </tfoot>
+      </table>
+
+      <div style="text-align:center;margin-top:22px;font-size:12px;color:#33425e;line-height:1.9">
+        <div>Please make all payments payable to</div>
+        <div style="font-weight:700;color:${NAVY}">Bank Name: ${B.bankName}, Account Name: ${B.schoolName},</div>
+        <div style="font-weight:700;color:${NAVY}">Account No: ${B.bankAccountNumber}, Branch: ${B.bankBranch}</div>
+        <div style="margin-top:6px;color:${MUTED}">${B.email} &nbsp;|&nbsp; ${B.phone}</div>
+      </div>
+      <div class="gha-motto">"${B.motto}"</div>`;
+
+    printDoc(html, `Quotation — ${B.schoolName}`);
+  }
+
   const ACTION_MAP: Record<TemplateType, () => void> = {
     receipt: printReceipt, statement: printStatement, admission: printAdmission,
     idcard: printIDCard, certificate: printCertificate,
     'attendance-report': printAttendanceReport, 'financial-report': printFinancialReport,
-    'report-card': printReportCard,
+    'report-card': printReportCard, quotation: printQuotation,
   };
 
   const needsStudent = (id: TemplateType) => ['receipt', 'statement', 'admission', 'idcard', 'certificate', 'report-card'].includes(id);
