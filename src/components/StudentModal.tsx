@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { X, AlertCircle } from 'lucide-react';
-import { Student } from '../context/AppContext';
+import { Student, useAppContext } from '../context/AppContext';
 import { useThemeClasses } from '../hooks/useThemeClasses';
 
 interface StudentModalProps {
@@ -23,6 +23,7 @@ function fieldClass(error?: string) {
 
 export function StudentModal({ student, onSave, onClose }: StudentModalProps) {
   const tc = useThemeClasses();
+  const { transportRoutes } = useAppContext();
   const [admissionNumber] = useState<string>(() =>
     student?.admissionNumber || generateAdmissionNumber()
   );
@@ -38,6 +39,7 @@ export function StudentModal({ student, onSave, onClose }: StudentModalProps) {
     dateOfBirth: '',
     enrollmentDate: new Date().toISOString().split('T')[0],
     status: 'active' as Student['status'],
+    transportRouteId: '',
   });
 
   const [errors, setErrors] = useState<Partial<Record<keyof typeof formData, string>>>({});
@@ -58,6 +60,7 @@ export function StudentModal({ student, onSave, onClose }: StudentModalProps) {
           ? new Date(student.enrollmentDate).toISOString().split('T')[0]
           : new Date().toISOString().split('T')[0],
         status: student.status || 'active',
+        transportRouteId: student.transportRouteId || '',
       });
     }
   }, [student]);
@@ -95,6 +98,7 @@ export function StudentModal({ student, onSave, onClose }: StudentModalProps) {
       id: student?.id || `student-${Date.now()}`,
       admissionNumber,
       enrollmentDate: new Date(formData.enrollmentDate).toISOString(),
+      transportRouteId: formData.transportRouteId || undefined,
     });
   };
 
@@ -212,6 +216,22 @@ export function StudentModal({ student, onSave, onClose }: StudentModalProps) {
             <textarea value={formData.address} rows={2} placeholder="e.g. 123 Kabulonga Road, Lusaka"
               onChange={e => handleChange('address', e.target.value)}
               className={fieldClass()} />
+          </div>
+
+          {/* Transport */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">School Transport</label>
+            <select value={formData.transportRouteId}
+              onChange={e => handleChange('transportRouteId', e.target.value)}
+              className={fieldClass()}>
+              <option value="">Not using school transport</option>
+              {transportRoutes.map(r => (
+                <option key={r.id} value={r.id}>{r.name} — {r.destination} (K{r.monthlyFee}/month)</option>
+              ))}
+            </select>
+            {transportRoutes.length === 0 && (
+              <p className="text-xs text-gray-400 mt-1">No routes defined yet — add them in the Transport section.</p>
+            )}
           </div>
 
           {/* Status (edit only) */}

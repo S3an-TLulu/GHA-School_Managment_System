@@ -10,14 +10,11 @@ export function Login() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    
-    // Simple authentication - in a real app, this would be more secure
-    if (credentials.username === 'admin' && credentials.password === 'admin123') {
-      login();
-    } else {
-      alert('Invalid credentials. Use admin/admin123 for this demo.');
+
+    if (!login(credentials.username, credentials.password)) {
+      alert('Invalid username or password.');
     }
-    
+
     setIsLoading(false);
   };
 

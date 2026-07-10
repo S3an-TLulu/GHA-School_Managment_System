@@ -13,6 +13,7 @@ export interface Student {
   dateOfBirth?: string;
   status?: 'active' | 'inactive' | 'transferred';
   admissionNumber?: string;
+  transportRouteId?: string;
 }
 
 export type PaymentMethod = 'Cash' | 'Mobile Money' | 'Bank Transfer' | 'Cheque' | 'Other';
@@ -108,6 +109,47 @@ export interface FundraiserParticipant {
   studentId: string;
   amountPaid: number;
   paidDate: string;
+}
+
+export interface ExternalFundraiserPayment {
+  id: string;
+  eventId: string;
+  name: string;
+  phone?: string;
+  amountPaid: number;
+  paidDate: string;
+  notes?: string;
+}
+
+export interface UniformCatalogItem {
+  id: string;
+  name: string;
+  price: number;
+  category: 'Girls' | 'Boys' | 'Both';
+  stock: number;
+}
+
+export interface Debtor {
+  id: string;
+  name: string;
+  phone?: string;
+  studentId?: string;
+  description: string;
+  amount: number;
+  amountPaid: number;
+  dateIncurred: string;
+  dueDate?: string;
+  notes?: string;
+}
+
+export interface TransportRoute {
+  id: string;
+  name: string;
+  destination: string;
+  monthlyFee: number;
+  driverName?: string;
+  driverPhone?: string;
+  capacity?: number;
 }
 
 export interface FeeStructureItem {
@@ -222,6 +264,25 @@ interface AppContextType {
   deleteEvent: (id: string) => void;
   fundraiserParticipants: FundraiserParticipant[];
   toggleFundraiserParticipant: (eventId: string, studentId: string, fee: number) => void;
+  externalFundraiserPayments: ExternalFundraiserPayment[];
+  addExternalFundraiserPayment: (p: ExternalFundraiserPayment) => void;
+  deleteExternalFundraiserPayment: (id: string) => void;
+  uniformCatalog: UniformCatalogItem[];
+  addUniformCatalogItem: (item: UniformCatalogItem) => void;
+  updateUniformCatalogItem: (id: string, item: Partial<UniformCatalogItem>) => void;
+  deleteUniformCatalogItem: (id: string) => void;
+  sellUniform: (catalogItemId: string, studentId: string) => boolean;
+  debtors: Debtor[];
+  addDebtor: (d: Debtor) => void;
+  updateDebtor: (id: string, d: Partial<Debtor>) => void;
+  deleteDebtor: (id: string) => void;
+  transportRoutes: TransportRoute[];
+  addTransportRoute: (r: TransportRoute) => void;
+  updateTransportRoute: (id: string, r: Partial<TransportRoute>) => void;
+  deleteTransportRoute: (id: string) => void;
+  exportAllData: () => string;
+  importAllData: (json: string) => boolean;
+  wipeData: (sections: string[] | 'all') => void;
   addFeeStructureItem: (item: FeeStructureItem) => void;
   updateFeeStructureItem: (id: string, item: Partial<FeeStructureItem>) => void;
   deleteFeeStructureItem: (id: string) => void;
@@ -572,6 +633,22 @@ const INITIAL_ANNOUNCEMENTS: Announcement[] = [
   }
 ];
 
+const INITIAL_UNIFORM_CATALOG: UniformCatalogItem[] = [
+  { id: 'uc-1',  name: 'Girl Dress',                  price: 250, category: 'Girls', stock: 20 },
+  { id: 'uc-2',  name: 'Girl Skirt',                  price: 200, category: 'Girls', stock: 20 },
+  { id: 'uc-3',  name: 'Long Sleeved Shirt',          price: 180, category: 'Both',  stock: 30 },
+  { id: 'uc-4',  name: 'Short Sleeved Shirt',         price: 180, category: 'Both',  stock: 30 },
+  { id: 'uc-5',  name: 'Shorts',                      price: 150, category: 'Boys',  stock: 25 },
+  { id: 'uc-6',  name: 'Trousers',                    price: 200, category: 'Boys',  stock: 25 },
+  { id: 'uc-7',  name: 'Tracksuit (Premium)',         price: 600, category: 'Both',  stock: 10 },
+  { id: 'uc-8',  name: 'Tracksuit (Standard)',        price: 400, category: 'Both',  stock: 15 },
+  { id: 'uc-9',  name: 'Boys & Girls Jersey',         price: 350, category: 'Both',  stock: 20 },
+  { id: 'uc-10', name: 'Physical Education Shirts',   price: 150, category: 'Both',  stock: 25 },
+  { id: 'uc-11', name: 'Physical Education Shorts',   price: 200, category: 'Both',  stock: 25 },
+  { id: 'uc-12', name: 'Physical Education Skirts',   price: 200, category: 'Girls', stock: 20 },
+  { id: 'uc-13', name: '2 Pairs of Socks',            price: 100, category: 'Both',  stock: 50 },
+];
+
 const DEFAULT_BRANDING: SchoolBranding = {
   schoolName: 'Great Highway Academy',
   motto: 'Excellence in Education',
@@ -595,6 +672,10 @@ const DEFAULT_THEME: AppTheme = {
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const [attendance, setAttendance] = useState<AttendanceRecord[]>(() => loadFromStorage('gha_attendance', []));
   const [fundraiserParticipants, setFundraiserParticipants] = useState<FundraiserParticipant[]>(() => loadFromStorage('gha_fundraiser_participants', []));
+  const [externalFundraiserPayments, setExternalFundraiserPayments] = useState<ExternalFundraiserPayment[]>(() => loadFromStorage('gha_external_fundraiser', []));
+  const [uniformCatalog, setUniformCatalog] = useState<UniformCatalogItem[]>(() => loadFromStorage('gha_uniform_catalog', INITIAL_UNIFORM_CATALOG));
+  const [debtors, setDebtors] = useState<Debtor[]>(() => loadFromStorage('gha_debtors', []));
+  const [transportRoutes, setTransportRoutes] = useState<TransportRoute[]>(() => loadFromStorage('gha_transport_routes', []));
   const [results, setResults] = useState<StudentResult[]>(() => loadFromStorage('gha_results', []));
   const [timetables, setTimetables] = useState<Timetable[]>(() => loadFromStorage('gha_timetables', []));
   const [branding, setBranding] = useState<SchoolBranding>(() => loadFromStorage('gha_branding', DEFAULT_BRANDING));
@@ -614,6 +695,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => { localStorage.setItem('gha_attendance', JSON.stringify(attendance)); }, [attendance]);
   useEffect(() => { localStorage.setItem('gha_fundraiser_participants', JSON.stringify(fundraiserParticipants)); }, [fundraiserParticipants]);
+  useEffect(() => { localStorage.setItem('gha_external_fundraiser', JSON.stringify(externalFundraiserPayments)); }, [externalFundraiserPayments]);
+  useEffect(() => { localStorage.setItem('gha_uniform_catalog', JSON.stringify(uniformCatalog)); }, [uniformCatalog]);
+  useEffect(() => { localStorage.setItem('gha_debtors', JSON.stringify(debtors)); }, [debtors]);
+  useEffect(() => { localStorage.setItem('gha_transport_routes', JSON.stringify(transportRoutes)); }, [transportRoutes]);
   useEffect(() => { localStorage.setItem('gha_results', JSON.stringify(results)); }, [results]);
   useEffect(() => { localStorage.setItem('gha_timetables', JSON.stringify(timetables)); }, [timetables]);
   useEffect(() => { localStorage.setItem('gha_branding', JSON.stringify(branding)); }, [branding]);
@@ -684,6 +769,101 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     });
   };
 
+  const addExternalFundraiserPayment = (p: ExternalFundraiserPayment) => setExternalFundraiserPayments(prev => [...prev, p]);
+  const deleteExternalFundraiserPayment = (id: string) => setExternalFundraiserPayments(prev => prev.filter(p => p.id !== id));
+
+  const addUniformCatalogItem = (item: UniformCatalogItem) => setUniformCatalog(prev => [...prev, item]);
+  const updateUniformCatalogItem = (id: string, updated: Partial<UniformCatalogItem>) =>
+    setUniformCatalog(prev => prev.map(i => i.id === id ? { ...i, ...updated } : i));
+  const deleteUniformCatalogItem = (id: string) => setUniformCatalog(prev => prev.filter(i => i.id !== id));
+
+  const sellUniform = (catalogItemId: string, studentId: string): boolean => {
+    const item = uniformCatalog.find(i => i.id === catalogItemId);
+    if (!item || item.stock <= 0) return false;
+    setUniformCatalog(prev => prev.map(i => i.id === catalogItemId ? { ...i, stock: i.stock - 1 } : i));
+    setUniforms(prev => [...prev, {
+      id: `uniform-${Date.now()}`,
+      studentId,
+      item: item.name,
+      price: item.price,
+      purchaseDate: new Date().toISOString(),
+      status: 'purchased',
+    }]);
+    return true;
+  };
+
+  const addDebtor = (d: Debtor) => setDebtors(prev => [...prev, d]);
+  const updateDebtor = (id: string, updated: Partial<Debtor>) =>
+    setDebtors(prev => prev.map(d => d.id === id ? { ...d, ...updated } : d));
+  const deleteDebtor = (id: string) => setDebtors(prev => prev.filter(d => d.id !== id));
+
+  const addTransportRoute = (r: TransportRoute) => setTransportRoutes(prev => [...prev, r]);
+  const updateTransportRoute = (id: string, updated: Partial<TransportRoute>) =>
+    setTransportRoutes(prev => prev.map(r => r.id === id ? { ...r, ...updated } : r));
+  const deleteTransportRoute = (id: string) => {
+    setTransportRoutes(prev => prev.filter(r => r.id !== id));
+    setStudents(prev => prev.map(s => s.transportRouteId === id ? { ...s, transportRouteId: undefined } : s));
+  };
+
+  // ---- Backup / Restore / Cleanup ----
+  const GHA_KEYS = [
+    'gha_students', 'gha_payments', 'gha_uniforms', 'gha_requirements', 'gha_teachers',
+    'gha_expenses', 'gha_inventory', 'gha_events', 'gha_feestructure', 'gha_othercharges',
+    'gha_announcements', 'gha_attendance', 'gha_results', 'gha_timetables', 'gha_branding',
+    'gha_theme', 'gha_currentTerm', 'gha_fundraiser_participants', 'gha_external_fundraiser',
+    'gha_uniform_catalog', 'gha_debtors', 'gha_transport_routes', 'gha_users',
+  ];
+
+  const exportAllData = (): string => {
+    const data: Record<string, unknown> = { _meta: { app: 'GHA-SMS', exportedAt: new Date().toISOString(), version: 1 } };
+    GHA_KEYS.forEach(k => {
+      const v = localStorage.getItem(k);
+      if (v !== null) { try { data[k] = JSON.parse(v); } catch { data[k] = v; } }
+    });
+    return JSON.stringify(data, null, 2);
+  };
+
+  const importAllData = (json: string): boolean => {
+    try {
+      const data = JSON.parse(json);
+      if (!data || typeof data !== 'object' || !data._meta || data._meta.app !== 'GHA-SMS') return false;
+      GHA_KEYS.forEach(k => {
+        if (k in data) localStorage.setItem(k, JSON.stringify(data[k]));
+      });
+      window.location.reload();
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  // Section keys map for selective wipe
+  const SECTION_KEYS: Record<string, string[]> = {
+    students: ['gha_students'],
+    payments: ['gha_payments'],
+    uniforms: ['gha_uniforms', 'gha_uniform_catalog'],
+    requirements: ['gha_requirements'],
+    teachers: ['gha_teachers'],
+    expenses: ['gha_expenses'],
+    inventory: ['gha_inventory'],
+    events: ['gha_events', 'gha_fundraiser_participants', 'gha_external_fundraiser'],
+    attendance: ['gha_attendance'],
+    results: ['gha_results'],
+    timetables: ['gha_timetables'],
+    announcements: ['gha_announcements'],
+    debtors: ['gha_debtors'],
+    transport: ['gha_transport_routes'],
+  };
+
+  const wipeData = (sections: string[] | 'all') => {
+    if (sections === 'all') {
+      GHA_KEYS.forEach(k => localStorage.removeItem(k));
+    } else {
+      sections.forEach(s => (SECTION_KEYS[s] || []).forEach(k => localStorage.removeItem(k)));
+    }
+    window.location.reload();
+  };
+
   const addFeeStructureItem = (item: FeeStructureItem) => setFeeStructure(prev => [...prev, item]);
   const updateFeeStructureItem = (id: string, updated: Partial<FeeStructureItem>) =>
     setFeeStructure(prev => prev.map(f => f.id === id ? { ...f, ...updated } : f));
@@ -743,6 +923,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       addInventoryItem, updateInventoryItem, deleteInventoryItem,
       addEvent, updateEvent, deleteEvent,
       fundraiserParticipants, toggleFundraiserParticipant,
+      externalFundraiserPayments, addExternalFundraiserPayment, deleteExternalFundraiserPayment,
+      uniformCatalog, addUniformCatalogItem, updateUniformCatalogItem, deleteUniformCatalogItem, sellUniform,
+      debtors, addDebtor, updateDebtor, deleteDebtor,
+      transportRoutes, addTransportRoute, updateTransportRoute, deleteTransportRoute,
+      exportAllData, importAllData, wipeData,
       addFeeStructureItem, updateFeeStructureItem, deleteFeeStructureItem,
       addOtherCharge, updateOtherCharge, deleteOtherCharge,
       addAnnouncement, updateAnnouncement, deleteAnnouncement,
