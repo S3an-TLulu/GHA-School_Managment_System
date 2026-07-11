@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
+import { getCloudConfig, pushToCloud } from '../lib/supabase';
 
 export interface Student {
   id: string;
@@ -854,6 +855,23 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     debtors: ['gha_debtors'],
     transport: ['gha_transport_routes'],
   };
+
+  // Auto cloud sync: when enabled in Settings → Cloud Sync, push the whole
+  // dataset to Supabase 10 seconds after the last change (debounced).
+  const syncTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const firstRender = useRef(true);
+  useEffect(() => {
+    if (firstRender.current) { firstRender.current = false; return; }
+    const { key, autoSync } = getCloudConfig();
+    if (!autoSync || !key) return;
+    if (syncTimer.current) clearTimeout(syncTimer.current);
+    syncTimer.current = setTimeout(() => { pushToCloud(exportAllData()); }, 10000);
+    return () => { if (syncTimer.current) clearTimeout(syncTimer.current); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [students, payments, uniforms, requirements, teachers, expenses, inventory, events,
+      feeStructure, otherCharges, announcements, attendance, results, timetables, branding,
+      currentTerm, fundraiserParticipants, externalFundraiserPayments, uniformCatalog,
+      debtors, transportRoutes]);
 
   const wipeData = (sections: string[] | 'all') => {
     if (sections === 'all') {
