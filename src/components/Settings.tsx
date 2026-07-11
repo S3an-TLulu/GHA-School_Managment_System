@@ -1,9 +1,10 @@
 import { useState, useRef } from 'react';
-import { Users, Database, Trash2, Shield, Download, Upload, AlertTriangle, Plus, Pencil, X, Check } from 'lucide-react';
+import { Users, Database, Trash2, Shield, Download, Upload, AlertTriangle, Plus, Pencil, X, Check, Cloud, RefreshCw, UploadCloud, DownloadCloud } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 import { useAuth, AppUser, UserRole, ROLE_PERMISSIONS } from '../context/AuthContext';
 import { useToast } from './ToastProvider';
 import { useThemeClasses } from '../hooks/useThemeClasses';
+import { getCloudConfig, saveCloudConfig, pushToCloud, pullFromCloud, testConnection, SETUP_SQL } from '../lib/supabase';
 
 const ROLES: UserRole[] = ['Admin', 'Cashier', 'Teacher', 'Viewer'];
 
@@ -82,7 +83,10 @@ export function Settings() {
   const { users, currentUser, addUser, updateUser, deleteUser } = useAuth();
   const { toast } = useToast();
   const tc = useThemeClasses();
-  const [tab, setTab] = useState<'users' | 'backup' | 'cleanup'>('users');
+  const [tab, setTab] = useState<'users' | 'backup' | 'cloud' | 'cleanup'>('users');
+  const [cloudCfg, setCloudCfg] = useState(getCloudConfig);
+  const [cloudBusy, setCloudBusy] = useState(false);
+  const [showSql, setShowSql] = useState(false);
   const [editingUser, setEditingUser] = useState<AppUser | null>(null);
   const [userModalOpen, setUserModalOpen] = useState(false);
   const [wipeSelection, setWipeSelection] = useState<Set<string>>(new Set());
@@ -141,6 +145,7 @@ export function Settings() {
           {[
             { id: 'users' as const, label: 'Users & Roles', icon: Users },
             { id: 'backup' as const, label: 'Backup & Restore', icon: Database },
+            { id: 'cloud' as const, label: 'Cloud Sync', icon: Cloud },
             { id: 'cleanup' as const, label: 'Data Cleanup', icon: Trash2 },
           ].map(t => (
             <button key={t.id} onClick={() => setTab(t.id)}
@@ -259,6 +264,112 @@ export function Settings() {
                     </button>
                   </div>
                 </div>
+              </div>
+            </div>
+          )}
+
+          {/* ---------------- CLOUD SYNC ---------------- */}
+          {tab === 'cloud' && (
+            <div className="space-y-5 max-w-2xl">
+              <div className="border border-gray-200 rounded-lg p-5">
+                <div className="flex items-start space-x-3 mb-4">
+                  <Cloud className={`h-6 w-6 ${tc.text} flex-shrink-0 mt-0.5`} />
+                  <div>
+                    <p className="font-semibold text-gray-900">Supabase Cloud Sync</p>
+                    <p className="text-sm text-gray-500 mt-1">
+                      Stores the whole school database in your Supabase project so you can move
+                      between computers and always have an off-site copy.
+                      {cloudCfg.lastSync && <> Last sync: <strong>{new Date(cloudCfg.lastSync).toLocaleString()}</strong>.</>}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Project URL</label>
+                    <input className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      value={cloudCfg.url} onChange={e => setCloudCfg({ ...cloudCfg, url: e.target.value })} />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Anon (public) API Key</label>
+                    <input className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      placeholder="eyJhbGciOi… — Supabase → Project Settings → API → anon public"
+                      value={cloudCfg.key} onChange={e => setCloudCfg({ ...cloudCfg, key: e.target.value })} />
+                  </div>
+                  <label className="flex items-center space-x-2 text-sm text-gray-700">
+                    <input type="checkbox" checked={cloudCfg.autoSync}
+                      onChange={e => setCloudCfg({ ...cloudCfg, autoSync: e.target.checked })}
+                      className="h-4 w-4 rounded border-gray-300" />
+                    <span>Auto-sync — push to the cloud 10 seconds after every change</span>
+                  </label>
+                  <div className="flex flex-wrap gap-2 pt-1">
+                    <button onClick={() => {
+                        saveCloudConfig(cloudCfg);
+                        toast('Cloud settings saved.', 'success');
+                      }}
+                      className={`px-4 py-2 ${tc.btn} text-white rounded-lg text-sm font-medium`}>
+                      Save Settings
+                    </button>
+                    <button disabled={cloudBusy} onClick={async () => {
+                        saveCloudConfig(cloudCfg); setCloudBusy(true);
+                        const r = await testConnection();
+                        setCloudBusy(false);
+                        toast(r.ok ? 'Connected to Supabase successfully!' : `Connection failed: ${r.error}`, r.ok ? 'success' : 'error');
+                      }}
+                      className="flex items-center gap-1.5 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 disabled:opacity-50">
+                      <RefreshCw className={`h-4 w-4 ${cloudBusy ? 'animate-spin' : ''}`} />Test Connection
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="border border-green-200 bg-green-50 rounded-lg p-4">
+                  <p className="font-semibold text-green-900 flex items-center gap-2"><UploadCloud className="h-4 w-4" />Push to Cloud</p>
+                  <p className="text-xs text-green-700 mt-1 mb-3">Uploads this computer's data, replacing what's in the cloud.</p>
+                  <button disabled={cloudBusy} onClick={async () => {
+                      saveCloudConfig(cloudCfg); setCloudBusy(true);
+                      const r = await pushToCloud(exportAllData());
+                      setCloudBusy(false);
+                      if (r.ok) setCloudCfg(getCloudConfig());
+                      toast(r.ok ? 'Data pushed to the cloud.' : `Push failed: ${r.error}`, r.ok ? 'success' : 'error');
+                    }}
+                    className="w-full bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-medium disabled:opacity-50">
+                    Push Now
+                  </button>
+                </div>
+                <div className="border border-blue-200 bg-blue-50 rounded-lg p-4">
+                  <p className="font-semibold text-blue-900 flex items-center gap-2"><DownloadCloud className="h-4 w-4" />Pull from Cloud</p>
+                  <p className="text-xs text-blue-700 mt-1 mb-3">Replaces this computer's data with the cloud copy, then reloads.</p>
+                  <button disabled={cloudBusy} onClick={async () => {
+                      saveCloudConfig(cloudCfg);
+                      if (!window.confirm('This replaces ALL data on this computer with the cloud copy. Continue?')) return;
+                      setCloudBusy(true);
+                      const r = await pullFromCloud();
+                      setCloudBusy(false);
+                      if (r.ok && r.json) {
+                        importAllData(r.json); // reloads on success
+                      } else {
+                        toast(`Pull failed: ${r.error}`, 'error');
+                      }
+                    }}
+                    className="w-full bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium disabled:opacity-50">
+                    Pull Now
+                  </button>
+                </div>
+              </div>
+
+              <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                <button onClick={() => setShowSql(!showSql)} className="text-sm font-medium text-gray-700 hover:text-gray-900">
+                  {showSql ? '▾' : '▸'} One-time setup — run this SQL in Supabase (SQL Editor → New query)
+                </button>
+                {showSql && (
+                  <>
+                    <pre className="mt-3 bg-gray-900 text-green-300 text-xs rounded-lg p-4 overflow-x-auto whitespace-pre-wrap">{SETUP_SQL}</pre>
+                    <button onClick={() => { navigator.clipboard.writeText(SETUP_SQL); toast('SQL copied to clipboard.', 'success'); }}
+                      className="mt-2 text-xs text-blue-600 hover:underline">Copy SQL</button>
+                  </>
+                )}
               </div>
             </div>
           )}
