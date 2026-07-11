@@ -5,6 +5,9 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js';
 // localStorage so it survives reloads and is included in local backups.
 
 export const DEFAULT_SUPABASE_URL = 'https://tlcehbvzniujzjxiyokl.supabase.co';
+// Anon/publishable key — safe to ship in the client; data access is governed
+// by Row Level Security policies on the Supabase project.
+export const DEFAULT_SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRsY2VoYnZ6bml1anpqeGl5b2tsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM3MjYyNjksImV4cCI6MjA5OTMwMjI2OX0.uul0JYS7sJiuZb3jk5BN4fQtcHe_NvAzY6Yg539b0LU';
 const URL_KEY = 'gha_supabase_url';
 const ANON_KEY = 'gha_supabase_key';
 const AUTO_KEY = 'gha_supabase_auto';
@@ -26,7 +29,7 @@ create policy "gha anon access" on public.gha_backups
 export function getCloudConfig() {
   return {
     url: localStorage.getItem(URL_KEY) || DEFAULT_SUPABASE_URL,
-    key: localStorage.getItem(ANON_KEY) || '',
+    key: localStorage.getItem(ANON_KEY) || DEFAULT_SUPABASE_KEY,
     autoSync: localStorage.getItem(AUTO_KEY) === '1',
     lastSync: localStorage.getItem(LAST_SYNC_KEY) || '',
   };
