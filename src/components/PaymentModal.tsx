@@ -8,7 +8,6 @@ interface PaymentModalProps {
 }
 
 const PAYMENT_TYPES = ['Tuition Fee', 'Enrollment Form', 'Lunch', 'Transport', 'Water', 'Assessment Tests', 'Uniform', 'Other'];
-const TERMS = ['Term 1 2026', 'Term 2 2026', 'Term 3 2026', 'Term 1 2025', 'Term 2 2025', 'Term 3 2025'];
 
 const METHODS: { value: PaymentMethod; label: string; icon: React.ReactNode; color: string }[] = [
   { value: 'Cash',          label: 'Cash',          icon: <Banknote    className="h-4 w-4" />, color: 'text-green-600  bg-green-50  border-green-200'  },
@@ -43,7 +42,8 @@ function buildPayment(formData: {
 }
 
 export function PaymentModal({ onSave, onClose }: PaymentModalProps) {
-  const { students, currentTerm } = useAppContext();
+  const { students, currentTerm, terms } = useAppContext();
+  const TERMS = terms;
   const [formData, setFormData] = useState({
     studentId: '',
     type: 'Tuition Fee',

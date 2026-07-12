@@ -34,7 +34,9 @@ const EMPTY_FORM: EventFormData = {
 };
 
 export function SchoolCalendar() {
-  const { events, addEvent, updateEvent, deleteEvent } = useAppContext();
+  const { events, addEvent, updateEvent, deleteEvent, todos, addTodo, updateTodo, deleteTodo } = useAppContext();
+  const [newTodoText, setNewTodoText] = useState('');
+  const [newTodoDue, setNewTodoDue] = useState('');
   const { toast } = useToast();
   const tc = useThemeClasses();
 
@@ -271,6 +273,62 @@ export function SchoolCalendar() {
               )}
             </div>
           )}
+
+          {/* To-Do list */}
+          <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
+            <div className="p-4 border-b border-gray-100 flex items-center justify-between">
+              <p className="font-semibold text-gray-900">To-Do List</p>
+              <span className="text-xs text-gray-400">
+                {todos.filter(t => !t.done).length} open
+              </span>
+            </div>
+            <form className="p-3 border-b border-gray-100 space-y-2" onSubmit={e => {
+              e.preventDefault();
+              const text = newTodoText.trim();
+              if (!text) return;
+              addTodo({ id: `todo-${Date.now()}`, text, dueDate: newTodoDue || undefined, done: false, createdAt: new Date().toISOString() });
+              setNewTodoText(''); setNewTodoDue('');
+            }}>
+              <input value={newTodoText} onChange={e => setNewTodoText(e.target.value)}
+                placeholder="Add a task… e.g. Order Sports Day medals"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+              <div className="flex gap-2">
+                <input type="date" value={newTodoDue} onChange={e => setNewTodoDue(e.target.value)}
+                  className="flex-1 px-3 py-1.5 border border-gray-300 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+                <button type="submit" className={`px-4 py-1.5 ${tc.btn} text-white rounded-lg text-xs font-medium`}>Add</button>
+              </div>
+            </form>
+            {todos.length === 0 ? (
+              <div className="p-5 text-sm text-gray-400 text-center">Nothing to do — enjoy the quiet!</div>
+            ) : (
+              <div className="divide-y divide-gray-100 max-h-80 overflow-y-auto">
+                {[...todos].sort((a, b) => Number(a.done) - Number(b.done) || (a.dueDate || '9999').localeCompare(b.dueDate || '9999')).map(t => {
+                  const overdue = !t.done && t.dueDate && t.dueDate < todayStr;
+                  return (
+                    <div key={t.id} className="p-3 flex items-start gap-2.5 group">
+                      <button onClick={() => updateTodo(t.id, { done: !t.done })}
+                        className={`mt-0.5 w-4.5 h-4.5 w-5 h-5 rounded-full flex-shrink-0 flex items-center justify-center border-2 transition-colors ${
+                          t.done ? 'bg-green-500 border-green-500' : 'border-gray-300 hover:border-green-400'
+                        }`}>
+                        {t.done && <span className="text-white text-xs leading-none">✓</span>}
+                      </button>
+                      <div className="flex-1 min-w-0">
+                        <p className={`text-sm ${t.done ? 'text-gray-400 line-through' : 'text-gray-900'}`}>{t.text}</p>
+                        {t.dueDate && (
+                          <p className={`text-xs mt-0.5 ${overdue ? 'text-red-600 font-semibold' : 'text-gray-400'}`}>
+                            Due {new Date(t.dueDate + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
+                            {overdue ? ' — overdue' : ''}
+                          </p>
+                        )}
+                      </div>
+                      <button onClick={() => deleteTodo(t.id)}
+                        className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-500 transition-opacity text-sm flex-shrink-0">✕</button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
 
           {/* Upcoming events */}
           <div className="bg-white rounded-xl border border-gray-200 shadow-sm">

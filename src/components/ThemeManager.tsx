@@ -59,6 +59,16 @@ function applyTheme(theme: AppTheme) {
     }
     input::placeholder, textarea::placeholder { color: #64748b !important; }
     option { background-color: #1e293b !important; color: #f1f5f9 !important; }
+    /* Hover/selection highlights: light-tint classes flip to a dark tint so
+       text stays readable when hovering or selecting rows in dark mode */
+    .hover\\:bg-gray-50:hover, .hover\\:bg-gray-100:hover,
+    .hover\\:bg-blue-50:hover, .hover\\:bg-amber-50:hover,
+    .hover\\:bg-green-100:hover, .hover\\:bg-white:hover {
+      background-color: #334155 !important;
+    }
+    .bg-gray-50\\/40, .bg-green-50\\/40, .bg-blue-50\\/50 { background-color: #1e293b !important; }
+    ::selection { background-color: #2563eb !important; color: #ffffff !important; }
+    thead.bg-gray-50 th, tr.bg-gray-50 th, .bg-gray-50 th { background-color: #1e293b !important; color: #cbd5e1 !important; }
     ` : ''}
   `;
 

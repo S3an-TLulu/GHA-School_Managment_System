@@ -14,7 +14,7 @@ export interface AppUser {
 export const ROLE_PERMISSIONS: Record<UserRole, string[] | 'all'> = {
   Admin: 'all',
   Cashier: ['dashboard', 'students', 'cashier', 'payments', 'bulkfees', 'expenses', 'statements', 'uniforms', 'debtors', 'transport', 'fundraisers', 'feestructure', 'reports', 'templates'],
-  Teacher: ['dashboard', 'students', 'attendance', 'results', 'timetable', 'calendar', 'events', 'announcements', 'requirements', 'reports'],
+  Teacher: ['dashboard', 'students', 'classes', 'attendance', 'results', 'timetable', 'calendar', 'events', 'announcements', 'requirements', 'reports'],
   Viewer: ['dashboard', 'calendar', 'events', 'announcements'],
 };
 

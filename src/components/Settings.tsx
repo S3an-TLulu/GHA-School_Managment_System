@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react';
-import { Users, Database, Trash2, Shield, Download, Upload, AlertTriangle, Plus, Pencil, X, Check, Cloud, RefreshCw, UploadCloud, DownloadCloud } from 'lucide-react';
+import { Users, Database, Trash2, Shield, Download, Upload, AlertTriangle, Plus, Pencil, X, Check, Cloud, RefreshCw, UploadCloud, DownloadCloud, CalendarRange } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 import { useAuth, AppUser, UserRole, ROLE_PERMISSIONS } from '../context/AuthContext';
 import { useToast } from './ToastProvider';
@@ -79,11 +79,12 @@ function UserModal({ user, onSave, onClose }: { user: AppUser | null; onSave: (u
 }
 
 export function Settings() {
-  const { exportAllData, importAllData, wipeData } = useAppContext();
+  const { exportAllData, importAllData, wipeData, terms, addTerm, deleteTerm, currentTerm, setCurrentTerm, payments, expenses } = useAppContext();
   const { users, currentUser, addUser, updateUser, deleteUser } = useAuth();
   const { toast } = useToast();
   const tc = useThemeClasses();
-  const [tab, setTab] = useState<'users' | 'backup' | 'cloud' | 'cleanup'>('users');
+  const [tab, setTab] = useState<'users' | 'terms' | 'backup' | 'cloud' | 'cleanup'>('users');
+  const [newTerm, setNewTerm] = useState('');
   const [cloudCfg, setCloudCfg] = useState(getCloudConfig);
   const [cloudBusy, setCloudBusy] = useState(false);
   const [showSql, setShowSql] = useState(false);
@@ -144,6 +145,7 @@ export function Settings() {
         <div className="px-6 py-4 border-b border-gray-200 flex space-x-1">
           {[
             { id: 'users' as const, label: 'Users & Roles', icon: Users },
+            { id: 'terms' as const, label: 'School Terms', icon: CalendarRange },
             { id: 'backup' as const, label: 'Backup & Restore', icon: Database },
             { id: 'cloud' as const, label: 'Cloud Sync', icon: Cloud },
             { id: 'cleanup' as const, label: 'Data Cleanup', icon: Trash2 },
@@ -222,6 +224,70 @@ export function Settings() {
                   <div><strong className="text-green-700">Cashier</strong> — finances: payments, cashier, debtors, uniforms, transport, fundraisers, reports</div>
                   <div><strong className="text-blue-700">Teacher</strong> — academics: attendance, results, timetable, calendar, events, announcements</div>
                   <div><strong className="text-gray-700">Viewer</strong> — read-only overview: dashboard, calendar, events, announcements</div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ---------------- SCHOOL TERMS ---------------- */}
+          {tab === 'terms' && (
+            <div className="space-y-5 max-w-2xl">
+              <div className="border border-gray-200 rounded-lg p-5">
+                <p className="font-semibold text-gray-900 mb-1">Add a school term</p>
+                <p className="text-sm text-gray-500 mb-3">New terms appear in every term dropdown across the system (payments, expenses, results, reports…).</p>
+                <form className="flex gap-2" onSubmit={e => {
+                  e.preventDefault();
+                  const t = newTerm.trim();
+                  if (!t) return;
+                  if (terms.includes(t)) { toast('That term already exists.', 'warning'); return; }
+                  addTerm(t);
+                  setNewTerm('');
+                  toast(`"${t}" added.`, 'success');
+                }}>
+                  <input value={newTerm} onChange={e => setNewTerm(e.target.value)}
+                    placeholder="e.g. Term 1 2027"
+                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+                  <button type="submit" className={`flex items-center gap-1.5 px-4 py-2 ${tc.btn} text-white rounded-lg text-sm font-medium`}>
+                    <Plus className="h-4 w-4" />Add Term
+                  </button>
+                </form>
+              </div>
+
+              <div className="border border-gray-200 rounded-lg overflow-hidden">
+                <div className="px-5 py-3 bg-gray-50 border-b border-gray-200">
+                  <p className="text-sm font-semibold text-gray-700">Existing terms</p>
+                </div>
+                <div className="divide-y divide-gray-100">
+                  {terms.map(t => {
+                    const inUse = payments.some(p => p.term === t) || expenses.some(e => e.term === t);
+                    const isCurrent = t === currentTerm;
+                    return (
+                      <div key={t} className="flex items-center justify-between px-5 py-3">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-medium text-gray-900">{t}</span>
+                          {isCurrent && <span className="text-xs bg-green-100 text-green-800 px-2 py-0.5 rounded-full font-medium">current term</span>}
+                          {inUse && <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">has records</span>}
+                        </div>
+                        <div className="flex items-center gap-1">
+                          {!isCurrent && (
+                            <button onClick={() => { setCurrentTerm(t); toast(`Current term set to ${t}.`, 'success'); }}
+                              className="text-xs text-blue-600 hover:underline px-2 py-1">Make current</button>
+                          )}
+                          <button
+                            disabled={isCurrent}
+                            onClick={() => {
+                              if (inUse && !window.confirm(`"${t}" has payments or expenses recorded against it. Removing it only hides it from dropdowns — existing records keep their term. Remove?`)) return;
+                              deleteTerm(t);
+                              toast(`"${t}" removed from dropdowns.`, 'info');
+                            }}
+                            className="p-1.5 text-red-600 hover:bg-red-50 rounded disabled:opacity-30" title={isCurrent ? 'Cannot remove the current term' : 'Remove term'}>
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {terms.length === 0 && <p className="px-5 py-6 text-sm text-gray-400 text-center">No terms defined — add one above.</p>}
                 </div>
               </div>
             </div>
