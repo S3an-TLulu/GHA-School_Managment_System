@@ -26,6 +26,7 @@ import { Debtors } from './components/Debtors';
 import { Transport } from './components/Transport';
 import { Fundraisers } from './components/Fundraisers';
 import { Settings } from './components/Settings';
+import { ClassManager } from './components/ClassManager';
 import { Results } from './components/Results';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { useAppContext } from './context/AppContext';
@@ -36,6 +37,7 @@ import { ToastProvider } from './components/ToastProvider';
 
 function AppContent() {
   const [activeSection, setActiveSection] = useState('dashboard');
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const { isAuthenticated } = useAuth();
   const { theme } = useAppContext();
 
@@ -50,7 +52,7 @@ function AppContent() {
       case 'dashboard':    return <Dashboard />;
       case 'students':     return <Students />;
       case 'teachers':     return <Teachers />;
-      case 'classes':      return <FeeStructure />;
+      case 'classes':      return <ClassManager />;
       case 'feestructure': return <FeeStructure />;
       case 'announcements': return <Announcements />;
       case 'payments':     return <Payments />;
@@ -80,10 +82,25 @@ function AppContent() {
 
   return (
     <div className="min-h-screen bg-gray-50 flex">
-      <Sidebar activeSection={activeSection} setActiveSection={setActiveSection} />
+      {/* Desktop sidebar */}
+      <div className="hidden lg:flex h-screen sticky top-0">
+        <Sidebar activeSection={activeSection} setActiveSection={setActiveSection} />
+      </div>
+
+      {/* Mobile drawer */}
+      {mobileNavOpen && (
+        <div className="fixed inset-0 z-50 lg:hidden">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setMobileNavOpen(false)} />
+          <div className="absolute left-0 top-0 h-full shadow-xl">
+            <Sidebar activeSection={activeSection} setActiveSection={setActiveSection}
+              onNavigate={() => setMobileNavOpen(false)} />
+          </div>
+        </div>
+      )}
+
       <div className="flex-1 flex flex-col min-w-0">
-        <Header />
-        <main className="flex-1 p-6 overflow-y-auto">
+        <Header onMenuClick={() => setMobileNavOpen(true)} />
+        <main className="flex-1 p-4 sm:p-6 overflow-y-auto">
           {renderContent()}
         </main>
       </div>

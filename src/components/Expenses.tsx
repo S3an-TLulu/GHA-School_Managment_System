@@ -5,7 +5,6 @@ import { useToast } from './ToastProvider';
 import { useThemeClasses } from '../hooks/useThemeClasses';
 
 const CATEGORIES = ['Utilities', 'Salaries', 'Supplies', 'Maintenance', 'Food', 'Transport', 'Other'] as const;
-const TERMS = ['Term 1 2026', 'Term 2 2026', 'Term 3 2026', 'Term 1 2025', 'Term 2 2025', 'Term 3 2025'];
 
 const categoryColors: Record<string, string> = {
   Utilities: 'bg-yellow-100 text-yellow-800',
@@ -22,7 +21,8 @@ function ExpenseModal({ expense, onSave, onClose }: {
   onSave: (data: Expense) => void;
   onClose: () => void;
 }) {
-  const { currentTerm } = useAppContext();
+  const { currentTerm, terms } = useAppContext();
+  const TERMS = terms;
   const [form, setForm] = useState<Omit<Expense, 'id'>>({
     description: expense?.description || '',
     category: expense?.category || 'Supplies',
@@ -104,7 +104,8 @@ function ExpenseModal({ expense, onSave, onClose }: {
 }
 
 export function Expenses() {
-  const { expenses, addExpense, updateExpense, deleteExpense, currentTerm } = useAppContext();
+  const { expenses, addExpense, updateExpense, deleteExpense, currentTerm, terms } = useAppContext();
+  const TERMS = terms;
   const { toast } = useToast();
   const tc = useThemeClasses();
   const [isModalOpen, setIsModalOpen] = useState(false);

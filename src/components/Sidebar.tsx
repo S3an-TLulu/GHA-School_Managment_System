@@ -13,6 +13,7 @@ import { useThemeClasses } from '../hooks/useThemeClasses';
 interface SidebarProps {
   activeSection: string;
   setActiveSection: (section: string) => void;
+  onNavigate?: () => void;
 }
 
 const menuGroups = [
@@ -23,42 +24,53 @@ const menuGroups = [
     ]
   },
   {
-    label: 'People',
+    label: 'People & Classes',
     items: [
       { id: 'students', label: 'Students', icon: Users },
+      { id: 'classes',  label: 'Class Manager', icon: GraduationCap },
       { id: 'teachers', label: 'Staff & Teachers', icon: UserCheck },
     ]
   },
   {
-    label: 'Finances',
+    label: 'Money',
     items: [
-      { id: 'cashier',   label: 'Office Cashier',     icon: MonitorCheck },
-      { id: 'payments',  label: 'Fees & Payments',    icon: CreditCard },
-      { id: 'bulkfees',  label: 'Bulk Fee Collection', icon: Layers },
-      { id: 'debtors',   label: 'Debtors',             icon: UserX },
-      { id: 'expenses',  label: 'Expenses',            icon: TrendingDown },
-      { id: 'statements',label: 'Family Statements',  icon: FileText },
-      { id: 'fundraisers', label: 'Fundraisers',      icon: Heart },
+      { id: 'cashier',     label: 'Office Cashier',      icon: MonitorCheck },
+      { id: 'payments',    label: 'Fees & Payments',     icon: CreditCard },
+      { id: 'bulkfees',    label: 'Bulk Fee Collection', icon: Layers },
+      { id: 'feestructure',label: 'Fee Structure',       icon: DollarSign },
+      { id: 'debtors',     label: 'Debtors',             icon: UserX },
+      { id: 'expenses',    label: 'Expenses',            icon: TrendingDown },
+      { id: 'statements',  label: 'Family Statements',   icon: FileText },
+      { id: 'fundraisers', label: 'Fundraisers',         icon: Heart },
     ]
   },
   {
-    label: 'School',
+    label: 'Academics',
     items: [
-      { id: 'attendance',   label: 'Attendance',      icon: ClipboardCheck },
-      { id: 'results',      label: 'Academic Results',icon: GraduationCap },
-      { id: 'timetable',    label: 'Class Timetable', icon: Clock },
-      { id: 'calendar',     label: 'School Calendar', icon: CalendarDays },
-      { id: 'transport',    label: 'Transport',       icon: Bus },
-      { id: 'feestructure', label: 'Fee Structure',   icon: DollarSign },
-      { id: 'uniforms',     label: 'Uniforms',        icon: ShoppingBag },
-      { id: 'requirements', label: 'Requirements',    icon: ClipboardList },
-      { id: 'inventory',    label: 'Inventory',       icon: Package },
-      { id: 'events',       label: 'Events',          icon: Calendar },
-      { id: 'announcements',label: 'Announcements',   icon: Bell },
+      { id: 'attendance', label: 'Attendance',       icon: ClipboardCheck },
+      { id: 'results',    label: 'Academic Results', icon: GraduationCap },
+      { id: 'timetable',  label: 'Class Timetable',  icon: Clock },
     ]
   },
   {
-    label: 'Reports',
+    label: 'Planning',
+    items: [
+      { id: 'calendar',      label: 'Calendar & To-Dos', icon: CalendarDays },
+      { id: 'events',        label: 'Events',            icon: Calendar },
+      { id: 'announcements', label: 'Announcements',     icon: Bell },
+      { id: 'transport',     label: 'Transport',         icon: Bus },
+    ]
+  },
+  {
+    label: 'Store & Supplies',
+    items: [
+      { id: 'uniforms',     label: 'Uniforms',     icon: ShoppingBag },
+      { id: 'requirements', label: 'Requirements', icon: ClipboardList },
+      { id: 'inventory',    label: 'Inventory',    icon: Package },
+    ]
+  },
+  {
+    label: 'Reports & Documents',
     items: [
       { id: 'reports',   label: 'Reports Centre',     icon: BarChart3 },
       { id: 'templates', label: 'Document Templates', icon: LayoutTemplate },
@@ -83,7 +95,7 @@ function loadCollapsedGroups(): string[] {
   try { return JSON.parse(localStorage.getItem('gha_sidebar_groups') || '[]'); } catch { return []; }
 }
 
-export function Sidebar({ activeSection, setActiveSection }: SidebarProps) {
+export function Sidebar({ activeSection, setActiveSection, onNavigate }: SidebarProps) {
   const { branding } = useAppContext();
   const { canAccess } = useAuth();
   const tc = useThemeClasses();
@@ -130,7 +142,7 @@ export function Sidebar({ activeSection, setActiveSection }: SidebarProps) {
                     return (
                       <button
                         key={item.id}
-                        onClick={() => setActiveSection(item.id)}
+                        onClick={() => { setActiveSection(item.id); onNavigate?.(); }}
                         title={collapsed ? item.label : undefined}
                         className={`w-full flex items-center ${collapsed ? 'justify-center px-0 py-2.5' : 'space-x-3 px-3 py-2.5'} rounded-lg transition-colors text-left text-sm font-medium ${
                           isActive

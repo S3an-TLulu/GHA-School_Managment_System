@@ -5,7 +5,6 @@ import { useThemeClasses } from '../hooks/useThemeClasses';
 import { useToast } from './ToastProvider';
 
 const CLASSES = ['Baby Class', 'Middle Class', 'Reception', 'Grade 1', 'Grade 2', 'Grade 3', 'Grade 4', 'Grade 5', 'Grade 6', 'Grade 7'];
-const TERMS = ['Term 1 2026', 'Term 2 2026', 'Term 3 2026', 'Term 1 2025', 'Term 2 2025', 'Term 3 2025'];
 const DEFAULT_SUBJECTS = ['English', 'Mathematics', 'Science', 'Social Studies', 'Religious Education', 'Creative Arts', 'Physical Education'];
 
 function getGrade(mark: number): { letter: string; color: string } {
@@ -23,7 +22,8 @@ function calcAverage(subjects: Record<string, number>): number {
 }
 
 export function Results() {
-  const { students, results, saveClassResults, deleteResult } = useAppContext();
+  const { students, results, saveClassResults, deleteResult, terms } = useAppContext();
+  const TERMS = terms;
   const tc = useThemeClasses();
   const toast = useToast();
 

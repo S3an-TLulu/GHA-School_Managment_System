@@ -153,6 +153,14 @@ export interface TransportRoute {
   capacity?: number;
 }
 
+export interface TodoItem {
+  id: string;
+  text: string;
+  dueDate?: string;
+  done: boolean;
+  createdAt: string;
+}
+
 export interface FeeStructureItem {
   id: string;
   className: string;
@@ -284,6 +292,13 @@ interface AppContextType {
   exportAllData: () => string;
   importAllData: (json: string) => boolean;
   wipeData: (sections: string[] | 'all') => void;
+  terms: string[];
+  addTerm: (term: string) => void;
+  deleteTerm: (term: string) => void;
+  todos: TodoItem[];
+  addTodo: (t: TodoItem) => void;
+  updateTodo: (id: string, t: Partial<TodoItem>) => void;
+  deleteTodo: (id: string) => void;
   addFeeStructureItem: (item: FeeStructureItem) => void;
   updateFeeStructureItem: (id: string, item: Partial<FeeStructureItem>) => void;
   deleteFeeStructureItem: (id: string) => void;
@@ -677,6 +692,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [uniformCatalog, setUniformCatalog] = useState<UniformCatalogItem[]>(() => loadFromStorage('gha_uniform_catalog', INITIAL_UNIFORM_CATALOG));
   const [debtors, setDebtors] = useState<Debtor[]>(() => loadFromStorage('gha_debtors', []));
   const [transportRoutes, setTransportRoutes] = useState<TransportRoute[]>(() => loadFromStorage('gha_transport_routes', []));
+  const [terms, setTerms] = useState<string[]>(() => loadFromStorage('gha_terms', ['Term 1 2026', 'Term 2 2026', 'Term 3 2026', 'Term 1 2025', 'Term 2 2025', 'Term 3 2025']));
+  const [todos, setTodos] = useState<TodoItem[]>(() => loadFromStorage('gha_todos', []));
   const [results, setResults] = useState<StudentResult[]>(() => loadFromStorage('gha_results', []));
   const [timetables, setTimetables] = useState<Timetable[]>(() => loadFromStorage('gha_timetables', []));
   const [branding, setBranding] = useState<SchoolBranding>(() => loadFromStorage('gha_branding', DEFAULT_BRANDING));
@@ -700,6 +717,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => { localStorage.setItem('gha_uniform_catalog', JSON.stringify(uniformCatalog)); }, [uniformCatalog]);
   useEffect(() => { localStorage.setItem('gha_debtors', JSON.stringify(debtors)); }, [debtors]);
   useEffect(() => { localStorage.setItem('gha_transport_routes', JSON.stringify(transportRoutes)); }, [transportRoutes]);
+  useEffect(() => { localStorage.setItem('gha_terms', JSON.stringify(terms)); }, [terms]);
+  useEffect(() => { localStorage.setItem('gha_todos', JSON.stringify(todos)); }, [todos]);
   useEffect(() => { localStorage.setItem('gha_results', JSON.stringify(results)); }, [results]);
   useEffect(() => { localStorage.setItem('gha_timetables', JSON.stringify(timetables)); }, [timetables]);
   useEffect(() => { localStorage.setItem('gha_branding', JSON.stringify(branding)); }, [branding]);
@@ -798,6 +817,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setDebtors(prev => prev.map(d => d.id === id ? { ...d, ...updated } : d));
   const deleteDebtor = (id: string) => setDebtors(prev => prev.filter(d => d.id !== id));
 
+  const addTerm = (term: string) => setTerms(prev => prev.includes(term) ? prev : [term, ...prev]);
+  const deleteTerm = (term: string) => setTerms(prev => prev.filter(t => t !== term));
+
+  const addTodo = (t: TodoItem) => setTodos(prev => [...prev, t]);
+  const updateTodo = (id: string, updated: Partial<TodoItem>) =>
+    setTodos(prev => prev.map(t => t.id === id ? { ...t, ...updated } : t));
+  const deleteTodo = (id: string) => setTodos(prev => prev.filter(t => t.id !== id));
+
   const addTransportRoute = (r: TransportRoute) => setTransportRoutes(prev => [...prev, r]);
   const updateTransportRoute = (id: string, updated: Partial<TransportRoute>) =>
     setTransportRoutes(prev => prev.map(r => r.id === id ? { ...r, ...updated } : r));
@@ -813,6 +840,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     'gha_announcements', 'gha_attendance', 'gha_results', 'gha_timetables', 'gha_branding',
     'gha_theme', 'gha_currentTerm', 'gha_fundraiser_participants', 'gha_external_fundraiser',
     'gha_uniform_catalog', 'gha_debtors', 'gha_transport_routes', 'gha_users',
+    'gha_terms', 'gha_todos',
   ];
 
   const exportAllData = (): string => {
@@ -946,6 +974,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       debtors, addDebtor, updateDebtor, deleteDebtor,
       transportRoutes, addTransportRoute, updateTransportRoute, deleteTransportRoute,
       exportAllData, importAllData, wipeData,
+      terms, addTerm, deleteTerm,
+      todos, addTodo, updateTodo, deleteTodo,
       addFeeStructureItem, updateFeeStructureItem, deleteFeeStructureItem,
       addOtherCharge, updateOtherCharge, deleteOtherCharge,
       addAnnouncement, updateAnnouncement, deleteAnnouncement,

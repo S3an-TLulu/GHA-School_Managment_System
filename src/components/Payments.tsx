@@ -24,7 +24,6 @@ function MethodBadge({ method, network }: { method?: PaymentMethod; network?: st
   );
 }
 
-const TERMS = ['Term 1 2026', 'Term 2 2026', 'Term 3 2026', 'Term 1 2025', 'Term 2 2025', 'Term 3 2025'];
 
 function printReceipt(payment: Payment, student: Student | undefined) {
   const printContent = `
@@ -131,7 +130,8 @@ function printReceipt(payment: Payment, student: Student | undefined) {
 }
 
 export function Payments() {
-  const { payments, students, addPayment, updatePayment, deletePayment, currentTerm } = useAppContext();
+  const { payments, students, addPayment, updatePayment, deletePayment, currentTerm, terms } = useAppContext();
+  const TERMS = terms;
   const { toast } = useToast();
   const tc = useThemeClasses();
   const [isModalOpen, setIsModalOpen] = useState(false);
