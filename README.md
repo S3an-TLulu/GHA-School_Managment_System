@@ -6,6 +6,13 @@ one place, with cloud backup via Supabase.
 
 > **Motto:** *The future starts today — a reader today, a leader tomorrow.*
 
+
+## Screenshots
+
+| Login | Dashboard |
+|---|---|
+| ![Login](docs/screenshots/login.png) | ![Dashboard](docs/screenshots/dashboard.png) |
+
 ---
 
 ## Quick Start
@@ -18,10 +25,13 @@ npm run dev     # starts the app — open the printed localhost address
 **Default login:** username `admin`, password `admin123`
 ⚠️ Change this password after first login: *Settings → Users & Roles → edit Administrator*.
 
-To build for production:
+**Scripts**
 
 ```bash
-npm run build   # output goes to dist/
+npm run dev        # start the Vite dev server
+npm run build      # production build (output in dist/)
+npm run lint       # run ESLint
+npm run typecheck  # TypeScript compiler with no emit
 ```
 
 ---
