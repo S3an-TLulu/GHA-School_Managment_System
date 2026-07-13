@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { FileText, Printer, Receipt, CreditCard, Award, ClipboardList, Users, X, GraduationCap } from 'lucide-react';
+import { useState, useRef } from 'react';
+import { FileText, Printer, Receipt, CreditCard, Award, ClipboardList, Users, X, GraduationCap, Pencil } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 import { useThemeClasses } from '../hooks/useThemeClasses';
 
@@ -61,10 +61,8 @@ export function DocumentTemplates() {
       </div>`;
   }
 
-  function printDoc(html: string, title: string) {
-    const win = window.open('', '_blank');
-    if (!win) return;
-    win.document.write(`<!DOCTYPE html><html><head><title>${title}</title>
+  function buildDocHTML(html: string, title: string, editable: boolean) {
+    return `<!DOCTYPE html><html><head><title>${title}</title>
       <link rel="preconnect" href="https://fonts.googleapis.com">
       <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,600;0,700;1,600&display=swap" rel="stylesheet">
       <style>
@@ -79,14 +77,28 @@ export function DocumentTemplates() {
         td { padding: 7px 10px; border-bottom: 1px solid #dde4ef; font-size: 12px; }
         tbody tr:nth-child(odd) td { background: ${PANEL}; }
         .gha-motto { text-align: center; font-family: 'Playfair Display', Georgia, serif; font-style: italic; color: ${NAVY}; font-size: 13px; margin-top: 24px; }
-        @media print { button { display: none; } }
+        ${editable ? `
+        [contenteditable]:focus { outline: 2px dashed #f59e0b; outline-offset: 2px; }
+        .gha-doc:hover { cursor: text; }
+        ` : ''}
+        @media print { button { display: none; } body { margin: 0; } }
       </style></head><body>
-      <div class="gha-doc">
+      <div class="gha-doc"${editable ? ' contenteditable="true" spellcheck="false"' : ''}>
         ${B.logoUrl ? `<img src="${B.logoUrl}" class="gha-watermark" alt="" />` : ''}
         ${html}
-      </div>
-      <script>window.onload = function(){ setTimeout(function(){ window.print(); }, 300); };</script></body></html>`);
-    win.document.close();
+      </div></body></html>`;
+  }
+
+  // Opens the preview & edit modal instead of printing straight away
+  const [preview, setPreview] = useState<{ html: string; title: string } | null>(null);
+  const previewFrame = useRef<HTMLIFrameElement>(null);
+
+  function printDoc(html: string, title: string) {
+    setPreview({ html: buildDocHTML(html, title, true), title });
+  }
+
+  function printPreviewFrame() {
+    previewFrame.current?.contentWindow?.print();
   }
 
   function printReceipt() {
@@ -618,10 +630,10 @@ export function DocumentTemplates() {
                 onClick={ACTION_MAP[selected]}
                 disabled={(needsStudent(selected) && !studentId) || (selected === 'report-card' && !termFilter)}
                 className={`flex items-center space-x-2 ${tc.btn} text-white px-5 py-2.5 rounded-lg transition-colors font-medium disabled:opacity-40 disabled:cursor-not-allowed`}>
-                <Printer className="h-4 w-4" />
-                <span>Print Preview</span>
+                <Pencil className="h-4 w-4" />
+                <span>Preview &amp; Edit</span>
               </button>
-              <p className="text-xs text-gray-400">Opens a print-ready preview in a new tab</p>
+              <p className="text-xs text-gray-400">Opens an editable preview — adjust any text, then print</p>
             </div>
 
             <div className="bg-gray-50 rounded-lg p-3 text-xs text-gray-600">
@@ -630,6 +642,33 @@ export function DocumentTemplates() {
                 — Edit in Branding Manager
               </span>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Preview & Edit modal */}
+      {preview && (
+        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-2 sm:p-6">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl h-[92vh] flex flex-col overflow-hidden">
+            <div className="flex items-center justify-between px-4 sm:px-6 py-3 border-b border-gray-200 flex-shrink-0">
+              <div className="min-w-0">
+                <p className="font-semibold text-gray-900 truncate">{preview.title}</p>
+                <p className="text-xs text-amber-600">✏️ Click any text in the document to edit it before printing</p>
+              </div>
+              <div className="flex items-center space-x-2 flex-shrink-0 ml-3">
+                <button onClick={printPreviewFrame}
+                  className={`flex items-center space-x-1.5 ${tc.btn} text-white px-4 py-2 rounded-lg text-sm font-medium`}>
+                  <Printer className="h-4 w-4" />
+                  <span>Print</span>
+                </button>
+                <button onClick={() => setPreview(null)}
+                  className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg">
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+            </div>
+            <iframe ref={previewFrame} srcDoc={preview.html} title="Document preview"
+              className="flex-1 w-full bg-gray-100" />
           </div>
         </div>
       )}

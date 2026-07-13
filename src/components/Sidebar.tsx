@@ -4,7 +4,7 @@ import {
   BarChart3, UserCheck, TrendingDown, Package, Calendar, FileText,
   DollarSign, Bell, MonitorCheck, ClipboardCheck, CalendarDays,
   Palette, Building2, LayoutTemplate, Clock, Layers, GraduationCap,
-  ChevronDown, ChevronsLeft, ChevronsRight, Heart, Bus, UserX, Settings as SettingsIcon
+  ChevronDown, ChevronsLeft, ChevronsRight, Heart, Bus, UserX, Settings as SettingsIcon, Briefcase
 } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
@@ -42,6 +42,7 @@ const menuGroups = [
       { id: 'expenses',    label: 'Expenses',            icon: TrendingDown },
       { id: 'statements',  label: 'Family Statements',   icon: FileText },
       { id: 'fundraisers', label: 'Fundraisers',         icon: Heart },
+      { id: 'hr',          label: 'HR & Payroll',        icon: Briefcase },
     ]
   },
   {
