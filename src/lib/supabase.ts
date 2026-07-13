@@ -1,4 +1,4 @@
-import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import { createClient, SupabaseClient, RealtimeChannel } from '@supabase/supabase-js';
 
 // Cloud sync stores the whole school dataset as one JSON document in the
 // gha_backups table of the school's Supabase project. Config lives in
@@ -84,4 +84,86 @@ export async function testConnection(): Promise<{ ok: boolean; error?: string }>
   const { error } = await client.from('gha_backups').select('id').limit(1);
   if (error) return { ok: false, error: error.message };
   return { ok: true };
+}
+
+
+// ---------------- Live sync (Phase 7) ----------------
+// One row per storage key in gha_kv. Changes broadcast via Supabase Realtime,
+// so edits on one computer appear on the others within seconds. Conflicts are
+// per-section (last write wins for that section only), not whole-database.
+
+const LIVE_KEY = 'gha_supabase_live';
+const DEVICE_KEY = 'gha_device_id';
+
+export const SETUP_SQL_LIVE = `create table if not exists public.gha_kv (
+  key text primary key,
+  data jsonb,
+  updated_at timestamptz default now(),
+  device text
+);
+alter table public.gha_kv enable row level security;
+drop policy if exists "gha kv anon access" on public.gha_kv;
+create policy "gha kv anon access" on public.gha_kv
+  for all using (true) with check (true);
+alter publication supabase_realtime add table public.gha_kv;`;
+
+export function getDeviceId(): string {
+  let id = localStorage.getItem(DEVICE_KEY);
+  if (!id) {
+    id = `dev-${Math.random().toString(36).slice(2, 10)}`;
+    localStorage.setItem(DEVICE_KEY, id);
+  }
+  return id;
+}
+
+export function isLiveSyncEnabled(): boolean {
+  return localStorage.getItem(LIVE_KEY) === '1';
+}
+
+export function setLiveSyncEnabled(on: boolean) {
+  localStorage.setItem(LIVE_KEY, on ? '1' : '0');
+}
+
+let sharedClient: SupabaseClient | null = null;
+function liveClient(): SupabaseClient | null {
+  if (!sharedClient) sharedClient = getClient();
+  return sharedClient;
+}
+
+export async function pushKeyLive(key: string): Promise<boolean> {
+  const client = liveClient();
+  if (!client) return false;
+  const raw = localStorage.getItem(key);
+  let data: unknown = null;
+  try { data = raw ? JSON.parse(raw) : null; } catch { data = raw; }
+  const { error } = await client.from('gha_kv').upsert({
+    key, data, updated_at: new Date().toISOString(), device: getDeviceId(),
+  });
+  return !error;
+}
+
+export async function pullAllLive(): Promise<Record<string, unknown> | null> {
+  const client = liveClient();
+  if (!client) return null;
+  const { data, error } = await client.from('gha_kv').select('key, data');
+  if (error || !data) return null;
+  const out: Record<string, unknown> = {};
+  data.forEach(row => { out[row.key] = row.data; });
+  return out;
+}
+
+let channel: RealtimeChannel | null = null;
+export function subscribeLive(onRemoteChange: (key: string, data: unknown) => void): () => void {
+  const client = liveClient();
+  if (!client) return () => {};
+  const myDevice = getDeviceId();
+  channel = client
+    .channel('gha-kv-live')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'gha_kv' }, payload => {
+      const row = payload.new as { key?: string; data?: unknown; device?: string } | null;
+      if (!row?.key || row.device === myDevice) return;
+      onRemoteChange(row.key, row.data);
+    })
+    .subscribe();
+  return () => { channel?.unsubscribe(); channel = null; };
 }

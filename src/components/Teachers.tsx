@@ -3,6 +3,7 @@ import { Plus, Search, Pencil, Trash2, UserCheck, X, GraduationCap } from 'lucid
 import { useAppContext, Teacher } from '../context/AppContext';
 import { useToast } from './ToastProvider';
 import { useThemeClasses } from '../hooks/useThemeClasses';
+import { PhotoUpload, PersonDocuments } from './PersonDocs';
 
 const ROLES = ['Teacher', 'Deputy Head', 'Head Teacher', 'Support Staff'] as const;
 const CLASSES = ['Baby Class', 'Middle Class', 'Reception', 'Grade 1', 'Grade 2', 'Grade 3', 'Grade 4', 'Grade 5', 'Grade 6', 'Grade 7'];
@@ -21,7 +22,8 @@ function TeacherModal({ teacher, onSave, onClose }: {
     joinDate: teacher?.joinDate || new Date().toISOString().split('T')[0],
     role: teacher?.role || 'Teacher',
     assignedClass: teacher?.assignedClass || '',
-    status: teacher?.status || 'active'
+    status: teacher?.status || 'active',
+    photoUrl: teacher?.photoUrl,
   });
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -42,6 +44,13 @@ function TeacherModal({ teacher, onSave, onClose }: {
           </button>
         </div>
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          <PhotoUpload photoUrl={form.photoUrl} name={form.name}
+            onChange={url => setForm(prev => ({ ...prev, photoUrl: url }))} />
+
+          {teacher && (
+            <PersonDocuments ownerType="teacher" ownerId={teacher.id} title="Staff Documents" />
+          )}
+
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Full Name *</label>
             <input required className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -285,8 +294,10 @@ export function Teachers() {
                     <tr key={teacher.id} className="hover:bg-gray-50">
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center">
-                          <div className={`w-10 h-10 ${tc.light} rounded-full flex items-center justify-center`}>
-                            <UserCheck className={`h-5 w-5 ${tc.text}`} />
+                          <div className={`w-10 h-10 ${tc.light} rounded-full flex items-center justify-center overflow-hidden`}>
+                            {teacher.photoUrl
+                              ? <img src={teacher.photoUrl} alt={teacher.name} className="w-full h-full object-cover" />
+                              : <UserCheck className={`h-5 w-5 ${tc.text}`} />}
                           </div>
                           <div className="ml-3">
                             <p className="text-sm font-medium text-gray-900">{teacher.name}</p>

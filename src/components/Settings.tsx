@@ -4,7 +4,7 @@ import { useAppContext } from '../context/AppContext';
 import { useAuth, AppUser, UserRole, ROLE_PERMISSIONS } from '../context/AuthContext';
 import { useToast } from './ToastProvider';
 import { useThemeClasses } from '../hooks/useThemeClasses';
-import { getCloudConfig, saveCloudConfig, pushToCloud, pullFromCloud, testConnection, SETUP_SQL } from '../lib/supabase';
+import { getCloudConfig, saveCloudConfig, pushToCloud, pullFromCloud, testConnection, SETUP_SQL, SETUP_SQL_LIVE, isLiveSyncEnabled, setLiveSyncEnabled, pullAllLive } from '../lib/supabase';
 
 const ROLES: UserRole[] = ['Admin', 'Cashier', 'Teacher', 'Viewer'];
 
@@ -90,6 +90,7 @@ export function Settings() {
   const [cloudCfg, setCloudCfg] = useState(getCloudConfig);
   const [cloudBusy, setCloudBusy] = useState(false);
   const [showSql, setShowSql] = useState(false);
+  const [liveOn, setLiveOn] = useState(isLiveSyncEnabled);
   const [editingUser, setEditingUser] = useState<AppUser | null>(null);
   const [userModalOpen, setUserModalOpen] = useState(false);
   const [wipeSelection, setWipeSelection] = useState<Set<string>>(new Set());
@@ -427,15 +428,56 @@ export function Settings() {
                 </div>
               </div>
 
+              <div className={`border rounded-lg p-5 ${liveOn ? 'border-green-300 bg-green-50' : 'border-purple-200 bg-purple-50'}`}>
+                <div className="flex items-start justify-between gap-3 flex-wrap">
+                  <div>
+                    <p className={`font-semibold ${liveOn ? 'text-green-900' : 'text-purple-900'}`}>
+                      ⚡ Live Sync {liveOn && <span className="text-xs bg-green-200 text-green-800 px-2 py-0.5 rounded-full ml-1">ON</span>}
+                    </p>
+                    <p className={`text-sm mt-1 ${liveOn ? 'text-green-700' : 'text-purple-700'}`}>
+                      Changes sync between computers automatically within seconds — each section
+                      syncs on its own, so two people can work in different sections at the same time.
+                      Run the Live Sync SQL below once before enabling.
+                    </p>
+                  </div>
+                  <label className="flex items-center gap-2 text-sm font-medium cursor-pointer">
+                    <input type="checkbox" checked={liveOn}
+                      onChange={e => {
+                        setLiveSyncEnabled(e.target.checked);
+                        setLiveOn(e.target.checked);
+                        toast(e.target.checked ? 'Live sync ON — reloading to connect…' : 'Live sync turned off.', 'success');
+                        if (e.target.checked) setTimeout(() => window.location.reload(), 800);
+                      }}
+                      className="h-5 w-5 rounded border-gray-300" />
+                    Enable
+                  </label>
+                </div>
+                <button disabled={cloudBusy} onClick={async () => {
+                    setCloudBusy(true);
+                    const data = await pullAllLive();
+                    setCloudBusy(false);
+                    if (!data || Object.keys(data).length === 0) { toast('No live data found yet — enable live sync on the main computer first.', 'warning'); return; }
+                    if (!window.confirm('Load the latest live data onto this computer? Local changes to synced sections will be replaced.')) return;
+                    Object.entries(data).forEach(([k, v]) => { if (v !== null) localStorage.setItem(k, JSON.stringify(v)); });
+                    window.location.reload();
+                  }}
+                  className="mt-3 text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 rounded-lg px-4 py-2 disabled:opacity-50">
+                  Pull Latest Live Data Now
+                </button>
+              </div>
+
               <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
                 <button onClick={() => setShowSql(!showSql)} className="text-sm font-medium text-gray-700 hover:text-gray-900">
                   {showSql ? '▾' : '▸'} One-time setup — run this SQL in Supabase (SQL Editor → New query)
                 </button>
                 {showSql && (
                   <>
-                    <pre className="mt-3 bg-gray-900 text-green-300 text-xs rounded-lg p-4 overflow-x-auto whitespace-pre-wrap">{SETUP_SQL}</pre>
-                    <button onClick={() => { navigator.clipboard.writeText(SETUP_SQL); toast('SQL copied to clipboard.', 'success'); }}
-                      className="mt-2 text-xs text-blue-600 hover:underline">Copy SQL</button>
+                    <p className="mt-3 text-xs font-semibold text-gray-500">1) Backup table (already done if push/pull works):</p>
+                    <pre className="mt-1 bg-gray-900 text-green-300 text-xs rounded-lg p-4 overflow-x-auto whitespace-pre-wrap">{SETUP_SQL}</pre>
+                    <p className="mt-3 text-xs font-semibold text-gray-500">2) Live Sync table (run before enabling Live Sync):</p>
+                    <pre className="mt-1 bg-gray-900 text-purple-300 text-xs rounded-lg p-4 overflow-x-auto whitespace-pre-wrap">{SETUP_SQL_LIVE}</pre>
+                    <button onClick={() => { navigator.clipboard.writeText(SETUP_SQL + '\n\n' + SETUP_SQL_LIVE); toast('Both SQL blocks copied.', 'success'); }}
+                      className="mt-2 text-xs text-blue-600 hover:underline">Copy All SQL</button>
                   </>
                 )}
               </div>

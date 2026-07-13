@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
-import { getCloudConfig, pushToCloud } from '../lib/supabase';
+import { getCloudConfig, pushToCloud, isLiveSyncEnabled, pushKeyLive, subscribeLive } from '../lib/supabase';
 
 export interface Student {
   id: string;
@@ -16,6 +16,7 @@ export interface Student {
   admissionNumber?: string;
   transportRouteId?: string;
   teacherParentId?: string;
+  photoUrl?: string;
 }
 
 export type PaymentMethod = 'Cash' | 'Mobile Money' | 'Bank Transfer' | 'Cheque' | 'Other';
@@ -66,6 +67,7 @@ export interface Teacher {
   assignedClass?: string;
   status: 'active' | 'inactive';
   baseSalary?: number;
+  photoUrl?: string;
 }
 
 export interface SalaryAdvance {
@@ -176,6 +178,20 @@ export interface TransportRoute {
   driverName?: string;
   driverPhone?: string;
   capacity?: number;
+}
+
+export type DocFolder = 'Photos' | 'Statements' | 'Reports' | 'Other';
+
+export interface PersonDocument {
+  id: string;
+  ownerType: 'student' | 'teacher' | 'family';
+  ownerId: string; // student/teacher id, or guardian phone for families
+  folder: DocFolder;
+  name: string;
+  mimeType: string;
+  size: number;
+  dataUrl: string;
+  uploadedAt: string;
 }
 
 export interface GroceryItem {
@@ -350,6 +366,9 @@ interface AppContextType {
   markGroceryBought: (id: string, actualCost: number) => void;
   budgets: Record<string, number>;
   setBudget: (key: string, amount: number) => void;
+  documents: PersonDocument[];
+  addDocument: (d: PersonDocument) => void;
+  deleteDocument: (id: string) => void;
   addFeeStructureItem: (item: FeeStructureItem) => void;
   updateFeeStructureItem: (id: string, item: Partial<FeeStructureItem>) => void;
   deleteFeeStructureItem: (id: string) => void;
@@ -749,6 +768,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [payrollRecords, setPayrollRecords] = useState<PayrollRecord[]>(() => loadFromStorage('gha_payroll', []));
   const [groceries, setGroceries] = useState<GroceryItem[]>(() => loadFromStorage('gha_groceries', []));
   const [budgets, setBudgets] = useState<Record<string, number>>(() => loadFromStorage('gha_budgets', {}));
+  const [documents, setDocuments] = useState<PersonDocument[]>(() => loadFromStorage('gha_documents', []));
   const [results, setResults] = useState<StudentResult[]>(() => loadFromStorage('gha_results', []));
   const [timetables, setTimetables] = useState<Timetable[]>(() => loadFromStorage('gha_timetables', []));
   const [branding, setBranding] = useState<SchoolBranding>(() => loadFromStorage('gha_branding', DEFAULT_BRANDING));
@@ -766,34 +786,53 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [announcements, setAnnouncements] = useState<Announcement[]>(() => loadFromStorage('gha_announcements', INITIAL_ANNOUNCEMENTS));
   const [currentTerm, setCurrentTerm] = useState<string>(() => loadFromStorage('gha_currentTerm', 'Term 1 2026'));
 
-  useEffect(() => { localStorage.setItem('gha_attendance', JSON.stringify(attendance)); }, [attendance]);
-  useEffect(() => { localStorage.setItem('gha_fundraiser_participants', JSON.stringify(fundraiserParticipants)); }, [fundraiserParticipants]);
-  useEffect(() => { localStorage.setItem('gha_external_fundraiser', JSON.stringify(externalFundraiserPayments)); }, [externalFundraiserPayments]);
-  useEffect(() => { localStorage.setItem('gha_uniform_catalog', JSON.stringify(uniformCatalog)); }, [uniformCatalog]);
-  useEffect(() => { localStorage.setItem('gha_debtors', JSON.stringify(debtors)); }, [debtors]);
-  useEffect(() => { localStorage.setItem('gha_transport_routes', JSON.stringify(transportRoutes)); }, [transportRoutes]);
-  useEffect(() => { localStorage.setItem('gha_terms', JSON.stringify(terms)); }, [terms]);
-  useEffect(() => { localStorage.setItem('gha_todos', JSON.stringify(todos)); }, [todos]);
-  useEffect(() => { localStorage.setItem('gha_salary_advances', JSON.stringify(salaryAdvances)); }, [salaryAdvances]);
-  useEffect(() => { localStorage.setItem('gha_payroll', JSON.stringify(payrollRecords)); }, [payrollRecords]);
-  useEffect(() => { localStorage.setItem('gha_groceries', JSON.stringify(groceries)); }, [groceries]);
-  useEffect(() => { localStorage.setItem('gha_budgets', JSON.stringify(budgets)); }, [budgets]);
-  useEffect(() => { localStorage.setItem('gha_results', JSON.stringify(results)); }, [results]);
-  useEffect(() => { localStorage.setItem('gha_timetables', JSON.stringify(timetables)); }, [timetables]);
-  useEffect(() => { localStorage.setItem('gha_branding', JSON.stringify(branding)); }, [branding]);
-  useEffect(() => { localStorage.setItem('gha_theme', JSON.stringify(theme)); }, [theme]);
-  useEffect(() => { localStorage.setItem('gha_students', JSON.stringify(students)); }, [students]);
-  useEffect(() => { localStorage.setItem('gha_payments', JSON.stringify(payments)); }, [payments]);
-  useEffect(() => { localStorage.setItem('gha_uniforms', JSON.stringify(uniforms)); }, [uniforms]);
-  useEffect(() => { localStorage.setItem('gha_requirements', JSON.stringify(requirements)); }, [requirements]);
-  useEffect(() => { localStorage.setItem('gha_teachers', JSON.stringify(teachers)); }, [teachers]);
-  useEffect(() => { localStorage.setItem('gha_expenses', JSON.stringify(expenses)); }, [expenses]);
-  useEffect(() => { localStorage.setItem('gha_inventory', JSON.stringify(inventory)); }, [inventory]);
-  useEffect(() => { localStorage.setItem('gha_events', JSON.stringify(events)); }, [events]);
-  useEffect(() => { localStorage.setItem('gha_feestructure', JSON.stringify(feeStructure)); }, [feeStructure]);
-  useEffect(() => { localStorage.setItem('gha_othercharges', JSON.stringify(otherCharges)); }, [otherCharges]);
-  useEffect(() => { localStorage.setItem('gha_announcements', JSON.stringify(announcements)); }, [announcements]);
-  useEffect(() => { localStorage.setItem('gha_currentTerm', JSON.stringify(currentTerm)); }, [currentTerm]);
+  // ---- Live sync machinery (Phase 7) ----
+  // Debounced per-key push; suppress set stops remote-applied changes from
+  // echoing straight back to the cloud (which would ping-pong between devices).
+  const liveSuppress = useRef<Set<string>>(new Set());
+  const liveDirty = useRef<Set<string>>(new Set());
+  const liveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const queueLiveSync = (key: string) => {
+    if (liveSuppress.current.has(key)) { liveSuppress.current.delete(key); return; }
+    if (!isLiveSyncEnabled()) return;
+    liveDirty.current.add(key);
+    if (liveTimer.current) clearTimeout(liveTimer.current);
+    liveTimer.current = setTimeout(() => {
+      const keys = [...liveDirty.current];
+      liveDirty.current.clear();
+      keys.forEach(k => { pushKeyLive(k); });
+    }, 2500);
+  };
+
+  useEffect(() => { localStorage.setItem('gha_attendance', JSON.stringify(attendance)); queueLiveSync('gha_attendance'); }, [attendance]);
+  useEffect(() => { localStorage.setItem('gha_fundraiser_participants', JSON.stringify(fundraiserParticipants)); queueLiveSync('gha_fundraiser_participants'); }, [fundraiserParticipants]);
+  useEffect(() => { localStorage.setItem('gha_external_fundraiser', JSON.stringify(externalFundraiserPayments)); queueLiveSync('gha_external_fundraiser'); }, [externalFundraiserPayments]);
+  useEffect(() => { localStorage.setItem('gha_uniform_catalog', JSON.stringify(uniformCatalog)); queueLiveSync('gha_uniform_catalog'); }, [uniformCatalog]);
+  useEffect(() => { localStorage.setItem('gha_debtors', JSON.stringify(debtors)); queueLiveSync('gha_debtors'); }, [debtors]);
+  useEffect(() => { localStorage.setItem('gha_transport_routes', JSON.stringify(transportRoutes)); queueLiveSync('gha_transport_routes'); }, [transportRoutes]);
+  useEffect(() => { localStorage.setItem('gha_terms', JSON.stringify(terms)); queueLiveSync('gha_terms'); }, [terms]);
+  useEffect(() => { localStorage.setItem('gha_todos', JSON.stringify(todos)); queueLiveSync('gha_todos'); }, [todos]);
+  useEffect(() => { localStorage.setItem('gha_salary_advances', JSON.stringify(salaryAdvances)); queueLiveSync('gha_salary_advances'); }, [salaryAdvances]);
+  useEffect(() => { localStorage.setItem('gha_payroll', JSON.stringify(payrollRecords)); queueLiveSync('gha_payroll'); }, [payrollRecords]);
+  useEffect(() => { localStorage.setItem('gha_groceries', JSON.stringify(groceries)); queueLiveSync('gha_groceries'); }, [groceries]);
+  useEffect(() => { localStorage.setItem('gha_budgets', JSON.stringify(budgets)); queueLiveSync('gha_budgets'); }, [budgets]);
+  useEffect(() => { localStorage.setItem('gha_documents', JSON.stringify(documents)); queueLiveSync('gha_documents'); }, [documents]);
+  useEffect(() => { localStorage.setItem('gha_results', JSON.stringify(results)); queueLiveSync('gha_results'); }, [results]);
+  useEffect(() => { localStorage.setItem('gha_timetables', JSON.stringify(timetables)); queueLiveSync('gha_timetables'); }, [timetables]);
+  useEffect(() => { localStorage.setItem('gha_branding', JSON.stringify(branding)); queueLiveSync('gha_branding'); }, [branding]);
+  useEffect(() => { localStorage.setItem('gha_theme', JSON.stringify(theme)); queueLiveSync('gha_theme'); }, [theme]);
+  useEffect(() => { localStorage.setItem('gha_students', JSON.stringify(students)); queueLiveSync('gha_students'); }, [students]);
+  useEffect(() => { localStorage.setItem('gha_payments', JSON.stringify(payments)); queueLiveSync('gha_payments'); }, [payments]);
+  useEffect(() => { localStorage.setItem('gha_uniforms', JSON.stringify(uniforms)); queueLiveSync('gha_uniforms'); }, [uniforms]);
+  useEffect(() => { localStorage.setItem('gha_requirements', JSON.stringify(requirements)); queueLiveSync('gha_requirements'); }, [requirements]);
+  useEffect(() => { localStorage.setItem('gha_teachers', JSON.stringify(teachers)); queueLiveSync('gha_teachers'); }, [teachers]);
+  useEffect(() => { localStorage.setItem('gha_expenses', JSON.stringify(expenses)); queueLiveSync('gha_expenses'); }, [expenses]);
+  useEffect(() => { localStorage.setItem('gha_inventory', JSON.stringify(inventory)); queueLiveSync('gha_inventory'); }, [inventory]);
+  useEffect(() => { localStorage.setItem('gha_events', JSON.stringify(events)); queueLiveSync('gha_events'); }, [events]);
+  useEffect(() => { localStorage.setItem('gha_feestructure', JSON.stringify(feeStructure)); queueLiveSync('gha_feestructure'); }, [feeStructure]);
+  useEffect(() => { localStorage.setItem('gha_othercharges', JSON.stringify(otherCharges)); queueLiveSync('gha_othercharges'); }, [otherCharges]);
+  useEffect(() => { localStorage.setItem('gha_announcements', JSON.stringify(announcements)); queueLiveSync('gha_announcements'); }, [announcements]);
+  useEffect(() => { localStorage.setItem('gha_currentTerm', JSON.stringify(currentTerm)); queueLiveSync('gha_currentTerm'); }, [currentTerm]);
 
   const addStudent = (student: Student) => setStudents(prev => [...prev, student]);
   const updateStudent = (id: string, updated: Partial<Student>) =>
@@ -916,6 +955,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }]);
   };
 
+  const addDocument = (d: PersonDocument) => setDocuments(prev => [...prev, d]);
+  const deleteDocument = (id: string) => setDocuments(prev => prev.filter(d => d.id !== id));
+
   const setBudget = (key: string, amount: number) =>
     setBudgets(prev => ({ ...prev, [key]: amount }));
 
@@ -934,7 +976,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     'gha_announcements', 'gha_attendance', 'gha_results', 'gha_timetables', 'gha_branding',
     'gha_theme', 'gha_currentTerm', 'gha_fundraiser_participants', 'gha_external_fundraiser',
     'gha_uniform_catalog', 'gha_debtors', 'gha_transport_routes', 'gha_users',
-    'gha_terms', 'gha_todos', 'gha_salary_advances', 'gha_payroll', 'gha_groceries', 'gha_budgets',
+    'gha_terms', 'gha_todos', 'gha_salary_advances', 'gha_payroll', 'gha_groceries', 'gha_budgets', 'gha_documents',
   ];
 
   const exportAllData = (): string => {
@@ -978,6 +1020,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     transport: ['gha_transport_routes'],
     hr: ['gha_salary_advances', 'gha_payroll'],
     kitchen: ['gha_groceries'],
+    documents: ['gha_documents'],
   };
 
   // Auto cloud sync: when enabled in Settings → Cloud Sync, push the whole
@@ -995,7 +1038,35 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, [students, payments, uniforms, requirements, teachers, expenses, inventory, events,
       feeStructure, otherCharges, announcements, attendance, results, timetables, branding,
       currentTerm, fundraiserParticipants, externalFundraiserPayments, uniformCatalog,
-      debtors, transportRoutes, salaryAdvances, payrollRecords, terms, todos, groceries, budgets]);
+      debtors, transportRoutes, salaryAdvances, payrollRecords, terms, todos, groceries, budgets, documents]);
+
+  // Apply changes arriving from other devices in real time
+  useEffect(() => {
+    if (!isLiveSyncEnabled()) return;
+    const SETTERS: Record<string, (v: never) => void> = {
+      gha_students: setStudents, gha_payments: setPayments, gha_uniforms: setUniforms,
+      gha_requirements: setRequirements, gha_teachers: setTeachers, gha_expenses: setExpenses,
+      gha_inventory: setInventory, gha_events: setEvents, gha_feestructure: setFeeStructure,
+      gha_othercharges: setOtherCharges, gha_announcements: setAnnouncements,
+      gha_attendance: setAttendance, gha_results: setResults, gha_timetables: setTimetables,
+      gha_branding: setBranding, gha_theme: setTheme, gha_currentTerm: setCurrentTerm,
+      gha_fundraiser_participants: setFundraiserParticipants,
+      gha_external_fundraiser: setExternalFundraiserPayments,
+      gha_uniform_catalog: setUniformCatalog, gha_debtors: setDebtors,
+      gha_transport_routes: setTransportRoutes, gha_terms: setTerms, gha_todos: setTodos,
+      gha_salary_advances: setSalaryAdvances, gha_payroll: setPayrollRecords,
+      gha_groceries: setGroceries, gha_budgets: setBudgets, gha_documents: setDocuments,
+    } as Record<string, (v: never) => void>;
+
+    const unsubscribe = subscribeLive((key, data) => {
+      const setter = SETTERS[key];
+      if (!setter || data === null || data === undefined) return;
+      liveSuppress.current.add(key);
+      setter(data as never);
+    });
+    return unsubscribe;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const wipeData = (sections: string[] | 'all') => {
     if (sections === 'all') {
@@ -1077,6 +1148,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       addStudentsBulk,
       groceries, addGrocery, updateGrocery, deleteGrocery, markGroceryBought,
       budgets, setBudget,
+      documents, addDocument, deleteDocument,
       addFeeStructureItem, updateFeeStructureItem, deleteFeeStructureItem,
       addOtherCharge, updateOtherCharge, deleteOtherCharge,
       addAnnouncement, updateAnnouncement, deleteAnnouncement,

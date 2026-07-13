@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Search, Printer, Users, ChevronDown, ChevronRight } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 import { useThemeClasses } from '../hooks/useThemeClasses';
+import { PersonDocuments } from './PersonDocs';
 
 interface FamilyGroup {
   guardianName: string;
@@ -251,6 +252,10 @@ export function FamilyStatements() {
                         <p className="text-xs text-red-600">Overdue</p>
                         <p className="font-bold text-red-800">K{family.totalOverdue.toLocaleString()}</p>
                       </div>
+                    </div>
+
+                    <div className="mb-4">
+                      <PersonDocuments ownerType="family" ownerId={family.guardianPhone} title={`${family.guardianName} — Family Documents`} />
                     </div>
 
                     <div className="space-y-3">
