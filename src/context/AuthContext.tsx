@@ -13,7 +13,7 @@ export interface AppUser {
 // Which sidebar sections each role can access. Admin sees everything.
 export const ROLE_PERMISSIONS: Record<UserRole, string[] | 'all'> = {
   Admin: 'all',
-  Cashier: ['dashboard', 'students', 'cashier', 'payments', 'bulkfees', 'expenses', 'statements', 'uniforms', 'debtors', 'transport', 'fundraisers', 'feestructure', 'reports', 'templates'],
+  Cashier: ['dashboard', 'students', 'cashier', 'payments', 'bulkfees', 'expenses', 'statements', 'uniforms', 'debtors', 'transport', 'fundraisers', 'kitchen', 'feestructure', 'reports', 'templates'],
   Teacher: ['dashboard', 'students', 'classes', 'attendance', 'results', 'timetable', 'calendar', 'events', 'announcements', 'requirements', 'reports'],
   Viewer: ['dashboard', 'calendar', 'events', 'announcements'],
 };
