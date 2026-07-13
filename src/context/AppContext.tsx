@@ -15,6 +15,7 @@ export interface Student {
   status?: 'active' | 'inactive' | 'transferred';
   admissionNumber?: string;
   transportRouteId?: string;
+  teacherParentId?: string;
 }
 
 export type PaymentMethod = 'Cash' | 'Mobile Money' | 'Bank Transfer' | 'Cheque' | 'Other';
@@ -64,6 +65,30 @@ export interface Teacher {
   role: 'Teacher' | 'Deputy Head' | 'Head Teacher' | 'Support Staff';
   assignedClass?: string;
   status: 'active' | 'inactive';
+  baseSalary?: number;
+}
+
+export interface SalaryAdvance {
+  id: string;
+  teacherId: string;
+  amount: number;
+  date: string;
+  month: string; // YYYY-MM the advance is deducted from
+  notes?: string;
+}
+
+export interface PayrollRecord {
+  id: string;
+  teacherId: string;
+  month: string; // YYYY-MM
+  baseSalary: number;
+  allowances: number;
+  advancesDeducted: number;
+  feeDeduction: number; // school fees for teacher's own children
+  otherDeductions: number;
+  notes?: string;
+  status: 'pending' | 'paid';
+  paidDate?: string;
 }
 
 export interface Expense {
@@ -299,6 +324,13 @@ interface AppContextType {
   addTodo: (t: TodoItem) => void;
   updateTodo: (id: string, t: Partial<TodoItem>) => void;
   deleteTodo: (id: string) => void;
+  salaryAdvances: SalaryAdvance[];
+  addSalaryAdvance: (a: SalaryAdvance) => void;
+  deleteSalaryAdvance: (id: string) => void;
+  payrollRecords: PayrollRecord[];
+  savePayrollRecord: (r: PayrollRecord) => void;
+  deletePayrollRecord: (id: string) => void;
+  addStudentsBulk: (list: Student[]) => void;
   addFeeStructureItem: (item: FeeStructureItem) => void;
   updateFeeStructureItem: (id: string, item: Partial<FeeStructureItem>) => void;
   deleteFeeStructureItem: (id: string) => void;
@@ -694,6 +726,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [transportRoutes, setTransportRoutes] = useState<TransportRoute[]>(() => loadFromStorage('gha_transport_routes', []));
   const [terms, setTerms] = useState<string[]>(() => loadFromStorage('gha_terms', ['Term 1 2026', 'Term 2 2026', 'Term 3 2026', 'Term 1 2025', 'Term 2 2025', 'Term 3 2025']));
   const [todos, setTodos] = useState<TodoItem[]>(() => loadFromStorage('gha_todos', []));
+  const [salaryAdvances, setSalaryAdvances] = useState<SalaryAdvance[]>(() => loadFromStorage('gha_salary_advances', []));
+  const [payrollRecords, setPayrollRecords] = useState<PayrollRecord[]>(() => loadFromStorage('gha_payroll', []));
   const [results, setResults] = useState<StudentResult[]>(() => loadFromStorage('gha_results', []));
   const [timetables, setTimetables] = useState<Timetable[]>(() => loadFromStorage('gha_timetables', []));
   const [branding, setBranding] = useState<SchoolBranding>(() => loadFromStorage('gha_branding', DEFAULT_BRANDING));
@@ -719,6 +753,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => { localStorage.setItem('gha_transport_routes', JSON.stringify(transportRoutes)); }, [transportRoutes]);
   useEffect(() => { localStorage.setItem('gha_terms', JSON.stringify(terms)); }, [terms]);
   useEffect(() => { localStorage.setItem('gha_todos', JSON.stringify(todos)); }, [todos]);
+  useEffect(() => { localStorage.setItem('gha_salary_advances', JSON.stringify(salaryAdvances)); }, [salaryAdvances]);
+  useEffect(() => { localStorage.setItem('gha_payroll', JSON.stringify(payrollRecords)); }, [payrollRecords]);
   useEffect(() => { localStorage.setItem('gha_results', JSON.stringify(results)); }, [results]);
   useEffect(() => { localStorage.setItem('gha_timetables', JSON.stringify(timetables)); }, [timetables]);
   useEffect(() => { localStorage.setItem('gha_branding', JSON.stringify(branding)); }, [branding]);
@@ -825,6 +861,18 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setTodos(prev => prev.map(t => t.id === id ? { ...t, ...updated } : t));
   const deleteTodo = (id: string) => setTodos(prev => prev.filter(t => t.id !== id));
 
+  const addSalaryAdvance = (a: SalaryAdvance) => setSalaryAdvances(prev => [...prev, a]);
+  const deleteSalaryAdvance = (id: string) => setSalaryAdvances(prev => prev.filter(a => a.id !== id));
+
+  const savePayrollRecord = (r: PayrollRecord) =>
+    setPayrollRecords(prev => {
+      const exists = prev.find(p => p.teacherId === r.teacherId && p.month === r.month);
+      return exists ? prev.map(p => (p.teacherId === r.teacherId && p.month === r.month) ? { ...r, id: p.id } : p) : [...prev, r];
+    });
+  const deletePayrollRecord = (id: string) => setPayrollRecords(prev => prev.filter(p => p.id !== id));
+
+  const addStudentsBulk = (list: Student[]) => setStudents(prev => [...prev, ...list]);
+
   const addTransportRoute = (r: TransportRoute) => setTransportRoutes(prev => [...prev, r]);
   const updateTransportRoute = (id: string, updated: Partial<TransportRoute>) =>
     setTransportRoutes(prev => prev.map(r => r.id === id ? { ...r, ...updated } : r));
@@ -840,7 +888,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     'gha_announcements', 'gha_attendance', 'gha_results', 'gha_timetables', 'gha_branding',
     'gha_theme', 'gha_currentTerm', 'gha_fundraiser_participants', 'gha_external_fundraiser',
     'gha_uniform_catalog', 'gha_debtors', 'gha_transport_routes', 'gha_users',
-    'gha_terms', 'gha_todos',
+    'gha_terms', 'gha_todos', 'gha_salary_advances', 'gha_payroll',
   ];
 
   const exportAllData = (): string => {
@@ -882,6 +930,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     announcements: ['gha_announcements'],
     debtors: ['gha_debtors'],
     transport: ['gha_transport_routes'],
+    hr: ['gha_salary_advances', 'gha_payroll'],
   };
 
   // Auto cloud sync: when enabled in Settings → Cloud Sync, push the whole
@@ -899,7 +948,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, [students, payments, uniforms, requirements, teachers, expenses, inventory, events,
       feeStructure, otherCharges, announcements, attendance, results, timetables, branding,
       currentTerm, fundraiserParticipants, externalFundraiserPayments, uniformCatalog,
-      debtors, transportRoutes]);
+      debtors, transportRoutes, salaryAdvances, payrollRecords, terms, todos]);
 
   const wipeData = (sections: string[] | 'all') => {
     if (sections === 'all') {
@@ -976,6 +1025,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       exportAllData, importAllData, wipeData,
       terms, addTerm, deleteTerm,
       todos, addTodo, updateTodo, deleteTodo,
+      salaryAdvances, addSalaryAdvance, deleteSalaryAdvance,
+      payrollRecords, savePayrollRecord, deletePayrollRecord,
+      addStudentsBulk,
       addFeeStructureItem, updateFeeStructureItem, deleteFeeStructureItem,
       addOtherCharge, updateOtherCharge, deleteOtherCharge,
       addAnnouncement, updateAnnouncement, deleteAnnouncement,

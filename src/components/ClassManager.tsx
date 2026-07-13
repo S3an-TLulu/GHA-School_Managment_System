@@ -1,18 +1,48 @@
 import { useState } from 'react';
-import { GraduationCap, Users, UserCheck, ArrowRight, Check, Search } from 'lucide-react';
-import { useAppContext } from '../context/AppContext';
+import { GraduationCap, Users, UserCheck, ArrowRight, Check, Search, UserPlus, Plus, Trash2 } from 'lucide-react';
+import { useAppContext, Student } from '../context/AppContext';
 import { useToast } from './ToastProvider';
 import { useThemeClasses } from '../hooks/useThemeClasses';
 
 const GRADES = ['Baby Class', 'Middle Class', 'Reception', 'Grade 1', 'Grade 2', 'Grade 3', 'Grade 4', 'Grade 5', 'Grade 6', 'Grade 7'];
 
+interface BulkRow { name: string; gender: 'Male' | 'Female'; guardianName: string; guardianPhone: string; }
+const EMPTY_ROW: BulkRow = { name: '', gender: 'Female', guardianName: '', guardianPhone: '' };
+
 export function ClassManager() {
-  const { students, teachers, updateStudent, updateTeacher } = useAppContext();
+  const { students, teachers, updateStudent, updateTeacher, addStudentsBulk } = useAppContext();
   const { toast } = useToast();
   const tc = useThemeClasses();
   const [selectedClass, setSelectedClass] = useState(GRADES[0]);
   const [search, setSearch] = useState('');
   const [picked, setPicked] = useState<Set<string>>(new Set());
+  const [bulkOpen, setBulkOpen] = useState(false);
+  const [bulkRows, setBulkRows] = useState<BulkRow[]>([{ ...EMPTY_ROW }, { ...EMPTY_ROW }, { ...EMPTY_ROW }]);
+
+  const setBulkRow = (i: number, field: keyof BulkRow, value: string) =>
+    setBulkRows(prev => prev.map((r, idx) => idx === i ? { ...r, [field]: value } : r));
+
+  const saveBulk = () => {
+    const valid = bulkRows.filter(r => r.name.trim());
+    if (valid.length === 0) { toast('Enter at least one student name.', 'warning'); return; }
+    const year = new Date().getFullYear();
+    const now = Date.now();
+    const newStudents: Student[] = valid.map((r, i) => ({
+      id: `student-${now + i}`,
+      name: r.name.trim(),
+      grade: selectedClass,
+      gender: r.gender,
+      guardianName: r.guardianName.trim() || '—',
+      guardianPhone: r.guardianPhone.trim() || '—',
+      enrollmentDate: new Date().toISOString(),
+      status: 'active',
+      admissionNumber: `GHA-${year}-${String(now + i).slice(-4)}`,
+    }));
+    addStudentsBulk(newStudents);
+    setBulkRows([{ ...EMPTY_ROW }, { ...EMPTY_ROW }, { ...EMPTY_ROW }]);
+    setBulkOpen(false);
+    toast(`${newStudents.length} student${newStudents.length !== 1 ? 's' : ''} enrolled into ${selectedClass}. Guardian details can be completed later in Students.`, 'success');
+  };
 
   const activeStudents = students.filter(s => !s.status || s.status === 'active');
   const classStudents = activeStudents.filter(s => s.grade === selectedClass);
@@ -94,6 +124,70 @@ export function ClassManager() {
             </option>
           ))}
         </select>
+      </div>
+
+      {/* Bulk enrol new students */}
+      <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
+        <button onClick={() => setBulkOpen(!bulkOpen)}
+          className="w-full px-5 py-4 flex items-center justify-between text-left">
+          <div className="flex items-center space-x-3">
+            <div className="w-10 h-10 bg-green-50 rounded-lg flex items-center justify-center">
+              <UserPlus className="h-5 w-5 text-green-600" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-gray-900">Bulk Enrol New Students into {selectedClass}</p>
+              <p className="text-xs text-gray-500">Type names row by row — no need to enrol one by one</p>
+            </div>
+          </div>
+          <span className="text-xs text-gray-400">{bulkOpen ? 'Hide ▲' : 'Open ▼'}</span>
+        </button>
+        {bulkOpen && (
+          <div className="px-5 pb-5 border-t border-gray-100">
+            <div className="hidden sm:grid grid-cols-12 gap-2 text-xs font-medium text-gray-400 uppercase tracking-wide pt-4 pb-1 px-1">
+              <span className="col-span-4">Student name *</span>
+              <span className="col-span-2">Gender</span>
+              <span className="col-span-3">Guardian name</span>
+              <span className="col-span-2">Guardian phone</span>
+              <span></span>
+            </div>
+            <div className="space-y-2 pt-2 sm:pt-0">
+              {bulkRows.map((row, i) => (
+                <div key={i} className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center">
+                  <input value={row.name} onChange={e => setBulkRow(i, 'name', e.target.value)}
+                    placeholder={`Student ${i + 1} full name`}
+                    className="sm:col-span-4 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-green-400 focus:border-transparent" />
+                  <select value={row.gender} onChange={e => setBulkRow(i, 'gender', e.target.value)}
+                    className="sm:col-span-2 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-green-400 focus:border-transparent">
+                    <option value="Female">Female</option>
+                    <option value="Male">Male</option>
+                  </select>
+                  <input value={row.guardianName} onChange={e => setBulkRow(i, 'guardianName', e.target.value)}
+                    placeholder="Guardian (optional)"
+                    className="sm:col-span-3 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-green-400 focus:border-transparent" />
+                  <input value={row.guardianPhone} onChange={e => setBulkRow(i, 'guardianPhone', e.target.value)}
+                    placeholder="Phone (optional)"
+                    className="sm:col-span-2 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-green-400 focus:border-transparent" />
+                  <button onClick={() => setBulkRows(prev => prev.length > 1 ? prev.filter((_, idx) => idx !== i) : prev)}
+                    className="sm:col-span-1 p-2 text-gray-300 hover:text-red-500 justify-self-start sm:justify-self-center"
+                    title="Remove row">
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
+              ))}
+            </div>
+            <div className="flex items-center justify-between mt-4">
+              <button onClick={() => setBulkRows(prev => [...prev, { ...EMPTY_ROW }])}
+                className="flex items-center gap-1.5 text-sm text-gray-600 border border-gray-300 hover:bg-gray-50 rounded-lg px-3 py-2">
+                <Plus className="h-4 w-4" />Add Row
+              </button>
+              <button onClick={saveBulk}
+                className="flex items-center gap-1.5 bg-green-600 hover:bg-green-700 text-white rounded-lg px-4 py-2 text-sm font-medium">
+                <UserPlus className="h-4 w-4" />
+                Enrol {bulkRows.filter(r => r.name.trim()).length || ''} Student{bulkRows.filter(r => r.name.trim()).length !== 1 ? 's' : ''}
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
