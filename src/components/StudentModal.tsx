@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X, AlertCircle } from 'lucide-react';
 import { Student, useAppContext } from '../context/AppContext';
 import { useThemeClasses } from '../hooks/useThemeClasses';
+import { PhotoUpload } from './PersonDocs';
 
 interface StudentModalProps {
   student?: Student | null;
@@ -40,6 +41,7 @@ export function StudentModal({ student, onSave, onClose }: StudentModalProps) {
     enrollmentDate: new Date().toISOString().split('T')[0],
     status: 'active' as Student['status'],
     transportRouteId: '',
+    photoUrl: '' as string | undefined,
   });
 
   const [errors, setErrors] = useState<Partial<Record<keyof typeof formData, string>>>({});
@@ -61,6 +63,7 @@ export function StudentModal({ student, onSave, onClose }: StudentModalProps) {
           : new Date().toISOString().split('T')[0],
         status: student.status || 'active',
         transportRouteId: student.transportRouteId || '',
+        photoUrl: student.photoUrl,
       });
     }
   }, [student]);
@@ -99,6 +102,7 @@ export function StudentModal({ student, onSave, onClose }: StudentModalProps) {
       admissionNumber,
       enrollmentDate: new Date(formData.enrollmentDate).toISOString(),
       transportRouteId: formData.transportRouteId || undefined,
+      photoUrl: formData.photoUrl || undefined,
     });
   };
 
@@ -123,6 +127,9 @@ export function StudentModal({ student, onSave, onClose }: StudentModalProps) {
         </div>
 
         <form onSubmit={handleSubmit} className="p-5 space-y-4" noValidate>
+          <PhotoUpload photoUrl={formData.photoUrl} name={formData.name}
+            onChange={url => setFormData(prev => ({ ...prev, photoUrl: url }))} />
+
           {/* Admission Number */}
           <div>
             <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Admission Number</label>

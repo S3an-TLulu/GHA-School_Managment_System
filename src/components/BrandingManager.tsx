@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Save, Building2, CreditCard, User, Globe } from 'lucide-react';
+import { compressImage } from '../lib/images';
 import { useAppContext } from '../context/AppContext';
 
 export function BrandingManager() {
@@ -106,16 +107,39 @@ export function BrandingManager() {
           <div className="space-y-3">
             <Field label="Principal / Head Teacher Name" name="principalName" placeholder="Mrs. Tembo" />
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">School Logo URL</label>
-              <input type="url" value={form.logoUrl} placeholder="https://... (paste image URL)"
+              <label className="block text-sm font-medium text-gray-700 mb-1">School Logo</label>
+              <div className="flex items-center gap-3 mb-2">
+                <label className="flex items-center gap-1.5 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg cursor-pointer">
+                  Upload Logo Image
+                  <input type="file" accept="image/*" className="hidden"
+                    onChange={async e => {
+                      const f = e.target.files?.[0];
+                      e.target.value = '';
+                      if (!f) return;
+                      try {
+                        const dataUrl = await compressImage(f, 400, 0.9);
+                        setForm(prev => ({ ...prev, logoUrl: dataUrl }));
+                      } catch { alert('Could not read that image — try a PNG or JPG.'); }
+                    }} />
+                </label>
+                {form.logoUrl && (
+                  <button type="button" onClick={() => setForm(prev => ({ ...prev, logoUrl: '' }))}
+                    className="text-sm text-red-500 hover:underline">Remove logo</button>
+                )}
+              </div>
+              <p className="text-xs text-gray-400 mb-1">Or paste an image URL:</p>
+              <input type="text" value={form.logoUrl.startsWith('data:') ? '' : form.logoUrl} placeholder="https://... (optional)"
                 onChange={e => setForm(prev => ({ ...prev, logoUrl: e.target.value }))}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm" />
               <p className="text-xs text-gray-400 mt-1">Paste a public image URL — appears on printed documents.</p>
             </div>
             {form.logoUrl && (
               <div className="border border-gray-200 rounded-lg p-3 flex items-center space-x-3">
-                <img src={form.logoUrl} alt="Logo preview" className="h-12 w-12 object-contain" onError={e => (e.currentTarget.style.display = 'none')} />
-                <span className="text-xs text-gray-500">Logo preview</span>
+                <img src={form.logoUrl} alt="Logo preview" className="h-20 w-20 object-contain bg-white border border-gray-200 rounded-lg p-1" onError={e => (e.currentTarget.style.display = 'none')} />
+                <div className="text-xs text-gray-500">
+                  <p className="font-medium text-gray-700">Logo preview</p>
+                  <p>Used in the header, sidebar, watermarks and every printed document.</p>
+                </div>
               </div>
             )}
           </div>

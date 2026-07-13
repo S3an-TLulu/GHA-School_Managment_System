@@ -1,6 +1,7 @@
 import { Student, useAppContext } from '../context/AppContext';
 import { X, User, Printer, GraduationCap } from 'lucide-react';
 import { useThemeClasses } from '../hooks/useThemeClasses';
+import { PersonDocuments } from './PersonDocs';
 
 function getGrade(mark: number): { letter: string; color: string } {
   if (mark >= 80) return { letter: 'A', color: 'text-green-600' };
@@ -162,7 +163,9 @@ export function StudentProfile({ student, onClose }: StudentProfileProps) {
         <div className="flex items-center justify-between p-6 border-b border-gray-200">
           <div className="flex items-center space-x-4">
             <div className={`w-12 h-12 ${tc.light} rounded-full flex items-center justify-center`}>
-              <span className={`text-xl font-bold ${tc.text}`}>{student.name.charAt(0)}</span>
+              {student.photoUrl
+                ? <img src={student.photoUrl} alt={student.name} className="w-full h-full rounded-full object-cover" />
+                : <span className={`text-xl font-bold ${tc.text}`}>{student.name.charAt(0)}</span>}
             </div>
             <div>
               <h2 className="text-xl font-bold text-gray-900">{student.name}</h2>
@@ -338,6 +341,11 @@ export function StudentProfile({ student, onClose }: StudentProfileProps) {
                 })}
               </div>
             )}
+          </div>
+
+          {/* Documents — dedicated folders for this student */}
+          <div className="mt-6">
+            <PersonDocuments ownerType="student" ownerId={student.id} title={`${student.name} — Documents`} />
           </div>
         </div>
       </div>
