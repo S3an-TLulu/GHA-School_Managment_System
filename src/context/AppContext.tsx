@@ -178,6 +178,18 @@ export interface TransportRoute {
   capacity?: number;
 }
 
+export interface GroceryItem {
+  id: string;
+  name: string;
+  quantity: number;
+  unit: string;
+  estimatedCost: number;
+  status: 'needed' | 'bought';
+  dateAdded: string;
+  boughtDate?: string;
+  actualCost?: number;
+}
+
 export interface TodoItem {
   id: string;
   text: string;
@@ -331,6 +343,13 @@ interface AppContextType {
   savePayrollRecord: (r: PayrollRecord) => void;
   deletePayrollRecord: (id: string) => void;
   addStudentsBulk: (list: Student[]) => void;
+  groceries: GroceryItem[];
+  addGrocery: (g: GroceryItem) => void;
+  updateGrocery: (id: string, g: Partial<GroceryItem>) => void;
+  deleteGrocery: (id: string) => void;
+  markGroceryBought: (id: string, actualCost: number) => void;
+  budgets: Record<string, number>;
+  setBudget: (key: string, amount: number) => void;
   addFeeStructureItem: (item: FeeStructureItem) => void;
   updateFeeStructureItem: (id: string, item: Partial<FeeStructureItem>) => void;
   deleteFeeStructureItem: (id: string) => void;
@@ -728,6 +747,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [todos, setTodos] = useState<TodoItem[]>(() => loadFromStorage('gha_todos', []));
   const [salaryAdvances, setSalaryAdvances] = useState<SalaryAdvance[]>(() => loadFromStorage('gha_salary_advances', []));
   const [payrollRecords, setPayrollRecords] = useState<PayrollRecord[]>(() => loadFromStorage('gha_payroll', []));
+  const [groceries, setGroceries] = useState<GroceryItem[]>(() => loadFromStorage('gha_groceries', []));
+  const [budgets, setBudgets] = useState<Record<string, number>>(() => loadFromStorage('gha_budgets', {}));
   const [results, setResults] = useState<StudentResult[]>(() => loadFromStorage('gha_results', []));
   const [timetables, setTimetables] = useState<Timetable[]>(() => loadFromStorage('gha_timetables', []));
   const [branding, setBranding] = useState<SchoolBranding>(() => loadFromStorage('gha_branding', DEFAULT_BRANDING));
@@ -755,6 +776,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => { localStorage.setItem('gha_todos', JSON.stringify(todos)); }, [todos]);
   useEffect(() => { localStorage.setItem('gha_salary_advances', JSON.stringify(salaryAdvances)); }, [salaryAdvances]);
   useEffect(() => { localStorage.setItem('gha_payroll', JSON.stringify(payrollRecords)); }, [payrollRecords]);
+  useEffect(() => { localStorage.setItem('gha_groceries', JSON.stringify(groceries)); }, [groceries]);
+  useEffect(() => { localStorage.setItem('gha_budgets', JSON.stringify(budgets)); }, [budgets]);
   useEffect(() => { localStorage.setItem('gha_results', JSON.stringify(results)); }, [results]);
   useEffect(() => { localStorage.setItem('gha_timetables', JSON.stringify(timetables)); }, [timetables]);
   useEffect(() => { localStorage.setItem('gha_branding', JSON.stringify(branding)); }, [branding]);
@@ -873,6 +896,29 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const addStudentsBulk = (list: Student[]) => setStudents(prev => [...prev, ...list]);
 
+  const addGrocery = (g: GroceryItem) => setGroceries(prev => [...prev, g]);
+  const updateGrocery = (id: string, updated: Partial<GroceryItem>) =>
+    setGroceries(prev => prev.map(g => g.id === id ? { ...g, ...updated } : g));
+  const deleteGrocery = (id: string) => setGroceries(prev => prev.filter(g => g.id !== id));
+  // Buying a grocery item records it as a Food expense for the current term
+  const markGroceryBought = (id: string, actualCost: number) => {
+    const item = groceries.find(g => g.id === id);
+    if (!item) return;
+    setGroceries(prev => prev.map(g => g.id === id ? { ...g, status: 'bought', boughtDate: new Date().toISOString(), actualCost } : g));
+    setExpenses(prev => [...prev, {
+      id: `expense-${Date.now()}`,
+      description: `Kitchen: ${item.name} (${item.quantity} ${item.unit})`,
+      category: 'Food',
+      amount: actualCost,
+      date: new Date().toISOString(),
+      paidBy: 'Kitchen',
+      term: currentTerm,
+    }]);
+  };
+
+  const setBudget = (key: string, amount: number) =>
+    setBudgets(prev => ({ ...prev, [key]: amount }));
+
   const addTransportRoute = (r: TransportRoute) => setTransportRoutes(prev => [...prev, r]);
   const updateTransportRoute = (id: string, updated: Partial<TransportRoute>) =>
     setTransportRoutes(prev => prev.map(r => r.id === id ? { ...r, ...updated } : r));
@@ -888,7 +934,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     'gha_announcements', 'gha_attendance', 'gha_results', 'gha_timetables', 'gha_branding',
     'gha_theme', 'gha_currentTerm', 'gha_fundraiser_participants', 'gha_external_fundraiser',
     'gha_uniform_catalog', 'gha_debtors', 'gha_transport_routes', 'gha_users',
-    'gha_terms', 'gha_todos', 'gha_salary_advances', 'gha_payroll',
+    'gha_terms', 'gha_todos', 'gha_salary_advances', 'gha_payroll', 'gha_groceries', 'gha_budgets',
   ];
 
   const exportAllData = (): string => {
@@ -931,6 +977,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     debtors: ['gha_debtors'],
     transport: ['gha_transport_routes'],
     hr: ['gha_salary_advances', 'gha_payroll'],
+    kitchen: ['gha_groceries'],
   };
 
   // Auto cloud sync: when enabled in Settings → Cloud Sync, push the whole
@@ -948,7 +995,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, [students, payments, uniforms, requirements, teachers, expenses, inventory, events,
       feeStructure, otherCharges, announcements, attendance, results, timetables, branding,
       currentTerm, fundraiserParticipants, externalFundraiserPayments, uniformCatalog,
-      debtors, transportRoutes, salaryAdvances, payrollRecords, terms, todos]);
+      debtors, transportRoutes, salaryAdvances, payrollRecords, terms, todos, groceries, budgets]);
 
   const wipeData = (sections: string[] | 'all') => {
     if (sections === 'all') {
@@ -1028,6 +1075,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       salaryAdvances, addSalaryAdvance, deleteSalaryAdvance,
       payrollRecords, savePayrollRecord, deletePayrollRecord,
       addStudentsBulk,
+      groceries, addGrocery, updateGrocery, deleteGrocery, markGroceryBought,
+      budgets, setBudget,
       addFeeStructureItem, updateFeeStructureItem, deleteFeeStructureItem,
       addOtherCharge, updateOtherCharge, deleteOtherCharge,
       addAnnouncement, updateAnnouncement, deleteAnnouncement,

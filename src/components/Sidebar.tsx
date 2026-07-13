@@ -4,7 +4,7 @@ import {
   BarChart3, UserCheck, TrendingDown, Package, Calendar, FileText,
   DollarSign, Bell, MonitorCheck, ClipboardCheck, CalendarDays,
   Palette, Building2, LayoutTemplate, Clock, Layers, GraduationCap,
-  ChevronDown, ChevronsLeft, ChevronsRight, Heart, Bus, UserX, Settings as SettingsIcon, Briefcase
+  ChevronDown, ChevronsLeft, ChevronsRight, Heart, Bus, UserX, Settings as SettingsIcon, Briefcase, ChefHat
 } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
@@ -65,6 +65,7 @@ const menuGroups = [
   {
     label: 'Store & Supplies',
     items: [
+      { id: 'kitchen',      label: 'Kitchen',      icon: ChefHat },
       { id: 'uniforms',     label: 'Uniforms',     icon: ShoppingBag },
       { id: 'requirements', label: 'Requirements', icon: ClipboardList },
       { id: 'inventory',    label: 'Inventory',    icon: Package },

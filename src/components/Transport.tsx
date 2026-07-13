@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Plus, Pencil, Trash2, X, Bus, MapPin, Users, Phone } from 'lucide-react';
+import { Plus, Pencil, Trash2, X, Bus, MapPin, Users, Phone, Wallet, Fuel } from 'lucide-react';
 import { useAppContext, TransportRoute } from '../context/AppContext';
 import { useToast } from './ToastProvider';
 import { useThemeClasses } from '../hooks/useThemeClasses';
@@ -84,7 +84,14 @@ function RouteModal({ route, onSave, onClose }: {
 }
 
 export function Transport() {
-  const { transportRoutes, students, updateStudent, addTransportRoute, updateTransportRoute, deleteTransportRoute } = useAppContext();
+  const { transportRoutes, students, updateStudent, addTransportRoute, updateTransportRoute, deleteTransportRoute, payments, expenses, addExpense, budgets, setBudget, currentTerm } = useAppContext();
+  const month = new Date().toISOString().slice(0, 7);
+  const budgetKey = `transport-${month}`;
+  const budget = budgets[budgetKey] ?? 0;
+  const inMonth = (iso?: string) => !!iso && iso.slice(0, 7) === month;
+  const transportRevenue = payments.filter(p => p.type === 'Transport' && p.status === 'paid' && inMonth(p.paidDate)).reduce((s, p) => s + p.amount, 0);
+  const transportSpend = expenses.filter(e => e.category === 'Transport' && inMonth(e.date)).reduce((s, e) => s + e.amount, 0);
+  const [costForm, setCostForm] = useState({ description: '', amount: '' });
   const { toast } = useToast();
   const tc = useThemeClasses();
   const [modalOpen, setModalOpen] = useState(false);
@@ -137,6 +144,72 @@ export function Transport() {
             </div>
           </div>
         </div>
+      </div>
+
+
+      {/* Transport money — this month */}
+      <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-5 space-y-4">
+        <div className="flex items-center justify-between flex-wrap gap-3">
+          <div className="flex items-center gap-2">
+            <Wallet className={`h-5 w-5 ${tc.text}`} />
+            <p className="font-semibold text-gray-900">Transport Money — {new Date().toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })}</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <label className="text-sm text-gray-600">Monthly budget:</label>
+            <div className="flex items-center">
+              <span className="px-2 py-1.5 bg-gray-100 border border-r-0 border-gray-300 rounded-l-lg text-sm text-gray-500">K</span>
+              <input type="number" min="0" value={budget || ''}
+                onChange={e => setBudget(budgetKey, parseFloat(e.target.value) || 0)}
+                placeholder="0"
+                className="w-28 px-3 py-1.5 border border-gray-300 rounded-r-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+            </div>
+          </div>
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+            <p className="text-xs text-green-700">Transport fees in</p>
+            <p className="text-xl font-bold text-green-900">K{transportRevenue.toLocaleString()}</p>
+          </div>
+          <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+            <p className="text-xs text-red-700">Running costs (fuel etc.)</p>
+            <p className="text-xl font-bold text-red-900">K{transportSpend.toLocaleString()}</p>
+          </div>
+          <div className={`border rounded-lg p-3 ${budget > 0 && transportSpend > budget ? 'bg-amber-50 border-amber-300' : 'bg-gray-50 border-gray-200'}`}>
+            <p className="text-xs text-gray-500">Budget</p>
+            <p className="text-xl font-bold text-gray-900">{budget > 0 ? `K${budget.toLocaleString()}` : '—'}</p>
+            {budget > 0 && <p className={`text-xs ${transportSpend > budget ? 'text-amber-700 font-semibold' : 'text-gray-500'}`}>{transportSpend > budget ? `over by K${(transportSpend - budget).toLocaleString()}` : `K${(budget - transportSpend).toLocaleString()} left`}</p>}
+          </div>
+          <div className={`border rounded-lg p-3 ${transportRevenue - transportSpend >= 0 ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
+            <p className="text-xs text-gray-500">Fees − Costs</p>
+            <p className={`text-xl font-bold ${transportRevenue - transportSpend >= 0 ? 'text-green-900' : 'text-red-900'}`}>K{(transportRevenue - transportSpend).toLocaleString()}</p>
+          </div>
+        </div>
+        <form className="flex flex-wrap gap-2 items-center" onSubmit={e => {
+          e.preventDefault();
+          const amount = parseFloat(costForm.amount);
+          if (!costForm.description.trim() || isNaN(amount) || amount <= 0) { toast('Enter a description and valid amount.', 'warning'); return; }
+          addExpense({
+            id: `expense-${Date.now()}`,
+            description: `Transport: ${costForm.description.trim()}`,
+            category: 'Transport',
+            amount,
+            date: new Date().toISOString(),
+            paidBy: 'Transport',
+            term: currentTerm,
+          });
+          setCostForm({ description: '', amount: '' });
+          toast(`K${amount.toLocaleString()} transport cost recorded in Expenses.`, 'success');
+        }}>
+          <Fuel className="h-4 w-4 text-gray-400" />
+          <input value={costForm.description} onChange={e => setCostForm({ ...costForm, description: e.target.value })}
+            placeholder="Cost description — e.g. Diesel, tyre repair…"
+            className="flex-1 min-w-[180px] px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+          <input type="number" min="0" step="0.01" value={costForm.amount}
+            onChange={e => setCostForm({ ...costForm, amount: e.target.value })}
+            placeholder="Amount (K)"
+            className="w-32 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+          <button type="submit" className={`${tc.btn} text-white px-4 py-2 rounded-lg text-sm font-medium`}>Record Cost</button>
+        </form>
       </div>
 
       {transportRoutes.length === 0 ? (

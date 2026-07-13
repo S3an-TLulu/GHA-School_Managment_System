@@ -28,6 +28,7 @@ import { Fundraisers } from './components/Fundraisers';
 import { Settings } from './components/Settings';
 import { ClassManager } from './components/ClassManager';
 import { HR } from './components/HR';
+import { Kitchen } from './components/Kitchen';
 import { Results } from './components/Results';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { useAppContext } from './context/AppContext';
@@ -78,6 +79,7 @@ function AppContent() {
       case 'fundraisers':  return <Fundraisers />;
       case 'settings':     return <Settings />;
       case 'hr':           return <HR />;
+      case 'kitchen':      return <Kitchen />;
       default:             return <Dashboard />;
     }
   };

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Briefcase, Wallet, HandCoins, Baby, Trash2, Printer, Check, X, Search } from 'lucide-react';
+import { Wallet, HandCoins, Baby, Trash2, Printer, Check, Search, CalendarClock } from 'lucide-react';
 import { useAppContext, Teacher, PayrollRecord } from '../context/AppContext';
 import { useToast } from './ToastProvider';
 import { useThemeClasses } from '../hooks/useThemeClasses';
@@ -18,7 +18,17 @@ export function HR() {
     teachers, students, payments, updateTeacher, branding,
     salaryAdvances, addSalaryAdvance, deleteSalaryAdvance,
     payrollRecords, savePayrollRecord,
+    budgets, setBudget,
   } = useAppContext();
+
+  // Pay-day of the month (school-wide), stored alongside budgets
+  const payDay = budgets['payday'] ?? 25;
+  const today = new Date();
+  const thisMonthPayday = new Date(today.getFullYear(), today.getMonth(), Math.min(payDay, 28));
+  const nextPayday = today.getDate() <= thisMonthPayday.getDate()
+    ? thisMonthPayday
+    : new Date(today.getFullYear(), today.getMonth() + 1, Math.min(payDay, 28));
+  const daysToPayday = Math.ceil((nextPayday.getTime() - today.getTime()) / 86400000);
   const { toast } = useToast();
   const tc = useThemeClasses();
 
@@ -161,7 +171,18 @@ export function HR() {
               <input type="month" value={month} onChange={e => { setMonth(e.target.value); setDrafts({}); }}
                 className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
             </div>
-            <div className="flex items-center gap-4 text-sm">
+            <div className="flex items-center gap-4 text-sm flex-wrap">
+              <div className="flex items-center gap-2 bg-blue-50 border border-blue-200 rounded-lg px-3 py-1.5">
+                <CalendarClock className="h-4 w-4 text-blue-600" />
+                <span className="text-blue-800 text-xs">Pay-day:</span>
+                <input type="number" min="1" max="28" value={payDay}
+                  onChange={e => setBudget('payday', Math.min(28, Math.max(1, parseInt(e.target.value) || 25)))}
+                  className="w-14 px-2 py-0.5 border border-blue-300 rounded text-xs text-center focus:ring-1 focus:ring-blue-400" />
+                <span className="text-xs text-blue-700 font-medium">
+                  next: {nextPayday.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
+                  {daysToPayday <= 7 ? ` — ${daysToPayday === 0 ? 'TODAY!' : `in ${daysToPayday} day${daysToPayday !== 1 ? 's' : ''}`}` : ''}
+                </span>
+              </div>
               <span className="text-gray-500">{paidCount} / {activeTeachers.length} paid</span>
               <span className="font-semibold text-gray-900">Total net: K{totalNetForMonth.toLocaleString()}</span>
             </div>

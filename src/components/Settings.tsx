@@ -23,6 +23,8 @@ const WIPE_SECTIONS = [
   { id: 'announcements', label: 'Announcements' },
   { id: 'debtors', label: 'Debtors' },
   { id: 'transport', label: 'Transport Routes' },
+  { id: 'hr', label: 'HR (payroll + advances)' },
+  { id: 'kitchen', label: 'Kitchen Groceries' },
 ];
 
 function UserModal({ user, onSave, onClose }: { user: AppUser | null; onSave: (u: AppUser) => void; onClose: () => void }) {
