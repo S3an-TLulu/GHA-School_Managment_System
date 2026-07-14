@@ -3,6 +3,22 @@ import { Save, Building2, CreditCard, User, Globe } from 'lucide-react';
 import { compressImage } from '../lib/images';
 import { useAppContext } from '../context/AppContext';
 
+// Defined at module level so React keeps the same component identity between
+// renders — defining it inside BrandingManager remounted the input on every
+// keystroke, which dropped focus and closed the keyboard on phones.
+function Field({ label, value, type = 'text', placeholder = '', onChange }: {
+  label: string; value: string; type?: string; placeholder?: string; onChange: (v: string) => void;
+}) {
+  return (
+    <div>
+      <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
+      <input type={type} value={value} placeholder={placeholder}
+        onChange={e => onChange(e.target.value)}
+        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm" />
+    </div>
+  );
+}
+
 export function BrandingManager() {
   const { branding, updateBranding } = useAppContext();
   const [form, setForm] = useState({ ...branding });
@@ -14,14 +30,7 @@ export function BrandingManager() {
     setTimeout(() => setSaved(false), 2500);
   };
 
-  const Field = ({ label, name, type = 'text', placeholder = '' }: { label: string; name: keyof typeof form; type?: string; placeholder?: string }) => (
-    <div>
-      <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
-      <input type={type} value={form[name]} placeholder={placeholder}
-        onChange={e => setForm(prev => ({ ...prev, [name]: e.target.value }))}
-        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm" />
-    </div>
-  );
+  const set = (name: keyof typeof form) => (v: string) => setForm(prev => ({ ...prev, [name]: v }));
 
   return (
     <div className="space-y-6">
@@ -65,9 +74,9 @@ export function BrandingManager() {
             <h2 className="font-semibold text-gray-900">School Identity</h2>
           </div>
           <div className="space-y-3">
-            <Field label="School Name" name="schoolName" placeholder="Great Highway Academy" />
-            <Field label="Motto / Tagline" name="motto" placeholder="Excellence in Education" />
-            <Field label="Physical Address" name="address" placeholder="Great East Road, Lusaka" />
+            <Field label="School Name" value={form.schoolName} onChange={set('schoolName')} placeholder="Great Highway Academy" />
+            <Field label="Motto / Tagline" value={form.motto} onChange={set('motto')} placeholder="Excellence in Education" />
+            <Field label="Physical Address" value={form.address} onChange={set('address')} placeholder="Great East Road, Lusaka" />
           </div>
         </div>
 
@@ -78,9 +87,9 @@ export function BrandingManager() {
             <h2 className="font-semibold text-gray-900">Contact Details</h2>
           </div>
           <div className="space-y-3">
-            <Field label="Phone Number" name="phone" placeholder="+260 97X XXX XXX" />
-            <Field label="Email Address" name="email" type="email" placeholder="info@school.edu.zm" />
-            <Field label="Website" name="website" placeholder="www.school.edu.zm" />
+            <Field label="Phone Number" value={form.phone} onChange={set('phone')} placeholder="+260 97X XXX XXX" />
+            <Field label="Email Address" value={form.email} onChange={set('email')} type="email" placeholder="info@school.edu.zm" />
+            <Field label="Website" value={form.website} onChange={set('website')} placeholder="www.school.edu.zm" />
           </div>
         </div>
 
@@ -92,9 +101,9 @@ export function BrandingManager() {
           </div>
           <p className="text-xs text-gray-500 mb-3">These appear on receipts and family statements.</p>
           <div className="space-y-3">
-            <Field label="Bank Name" name="bankName" placeholder="First Alliance Bank" />
-            <Field label="Branch" name="bankBranch" placeholder="East Park Branch" />
-            <Field label="Account Number" name="bankAccountNumber" placeholder="0060700054001" />
+            <Field label="Bank Name" value={form.bankName} onChange={set('bankName')} placeholder="First Alliance Bank" />
+            <Field label="Branch" value={form.bankBranch} onChange={set('bankBranch')} placeholder="East Park Branch" />
+            <Field label="Account Number" value={form.bankAccountNumber} onChange={set('bankAccountNumber')} placeholder="0060700054001" />
           </div>
         </div>
 
@@ -105,7 +114,7 @@ export function BrandingManager() {
             <h2 className="font-semibold text-gray-900">Administration</h2>
           </div>
           <div className="space-y-3">
-            <Field label="Principal / Head Teacher Name" name="principalName" placeholder="Mrs. Tembo" />
+            <Field label="Principal / Head Teacher Name" value={form.principalName} onChange={set('principalName')} placeholder="Mrs. Tembo" />
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">School Logo</label>
               <div className="flex items-center gap-3 mb-2">

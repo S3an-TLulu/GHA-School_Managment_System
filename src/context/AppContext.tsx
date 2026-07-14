@@ -155,6 +155,7 @@ export interface UniformCatalogItem {
   price: number;
   category: 'Girls' | 'Boys' | 'Both';
   stock: number;
+  imageUrl?: string;
 }
 
 export interface Debtor {
@@ -405,278 +406,6 @@ function loadFromStorage<T>(key: string, defaultValue: T): T {
   }
 }
 
-const INITIAL_STUDENTS: Student[] = [
-  {
-    id: 'student-1',
-    name: 'Sarah Mwanza',
-    grade: 'Grade 5',
-    gender: 'Female',
-    guardianName: 'Mary Mwanza',
-    guardianPhone: '0977123456',
-    guardianEmail: 'mary.mwanza@email.com',
-    address: '123 Kabulonga Road, Lusaka',
-    enrollmentDate: '2024-01-15T00:00:00.000Z',
-    status: 'active',
-    admissionNumber: 'GHA-2024-001'
-  },
-  {
-    id: 'student-2',
-    name: 'John Banda',
-    grade: 'Grade 3',
-    gender: 'Male',
-    guardianName: 'Peter Banda',
-    guardianPhone: '0966987654',
-    guardianEmail: 'peter.banda@email.com',
-    address: '456 Roma Road, Lusaka',
-    enrollmentDate: '2024-01-10T00:00:00.000Z',
-    status: 'active',
-    admissionNumber: 'GHA-2024-002'
-  },
-  {
-    id: 'student-3',
-    name: 'Grace Phiri',
-    grade: 'Reception',
-    gender: 'Female',
-    guardianName: 'Janet Phiri',
-    guardianPhone: '0955555555',
-    enrollmentDate: '2024-02-01T00:00:00.000Z',
-    status: 'active',
-    admissionNumber: 'GHA-2024-003'
-  },
-  {
-    id: 'student-4',
-    name: 'Chanda Phiri',
-    grade: 'Grade 2',
-    gender: 'Male',
-    guardianName: 'Janet Phiri',
-    guardianPhone: '0955555555',
-    enrollmentDate: '2024-01-15T00:00:00.000Z',
-    status: 'active',
-    admissionNumber: 'GHA-2024-004'
-  }
-];
-
-const INITIAL_PAYMENTS: Payment[] = [
-  {
-    id: 'payment-1',
-    studentId: 'student-1',
-    type: 'Tuition Fee',
-    amount: 3000,
-    dueDate: '2026-02-01T00:00:00.000Z',
-    status: 'paid',
-    paidDate: '2026-01-28T00:00:00.000Z',
-    createdDate: '2026-01-15T00:00:00.000Z',
-    term: 'Term 1 2026',
-    receiptNumber: 'RCP-001',
-    paymentMethod: 'Cash'
-  },
-  {
-    id: 'payment-2',
-    studentId: 'student-2',
-    type: 'Tuition Fee',
-    amount: 2700,
-    dueDate: '2026-02-01T00:00:00.000Z',
-    status: 'pending',
-    createdDate: '2026-01-10T00:00:00.000Z',
-    term: 'Term 1 2026'
-  },
-  {
-    id: 'payment-3',
-    studentId: 'student-1',
-    type: 'Lunch',
-    amount: 500,
-    dueDate: '2026-02-15T00:00:00.000Z',
-    status: 'paid',
-    paidDate: '2026-02-01T00:00:00.000Z',
-    createdDate: '2026-01-15T00:00:00.000Z',
-    term: 'Term 1 2026',
-    paymentMethod: 'Mobile Money'
-  },
-  {
-    id: 'payment-4',
-    studentId: 'student-3',
-    type: 'Tuition Fee',
-    amount: 2700,
-    dueDate: '2026-02-01T00:00:00.000Z',
-    status: 'overdue',
-    createdDate: '2026-01-20T00:00:00.000Z',
-    term: 'Term 1 2026'
-  },
-  {
-    id: 'payment-5',
-    studentId: 'student-4',
-    type: 'Tuition Fee',
-    amount: 2700,
-    dueDate: '2026-02-01T00:00:00.000Z',
-    status: 'pending',
-    createdDate: '2026-01-15T00:00:00.000Z',
-    term: 'Term 1 2026'
-  }
-];
-
-const INITIAL_TEACHERS: Teacher[] = [
-  {
-    id: 'teacher-1',
-    name: 'Mrs. Tembo',
-    subject: 'English & Mathematics',
-    phone: '0977001122',
-    email: 'tembo@gha.edu.zm',
-    qualification: 'B.Ed Primary Education',
-    joinDate: '2020-01-05T00:00:00.000Z',
-    role: 'Head Teacher',
-    status: 'active'
-  },
-  {
-    id: 'teacher-2',
-    name: 'Mr. Mutale',
-    subject: 'Science & Social Studies',
-    phone: '0966334455',
-    qualification: 'Diploma in Education',
-    joinDate: '2021-09-01T00:00:00.000Z',
-    role: 'Teacher',
-    assignedClass: 'Grade 5',
-    status: 'active'
-  },
-  {
-    id: 'teacher-3',
-    name: 'Mrs. Lungu',
-    subject: 'Baby & Middle Class',
-    phone: '0955667788',
-    qualification: 'Early Childhood Education Certificate',
-    joinDate: '2022-01-10T00:00:00.000Z',
-    role: 'Teacher',
-    assignedClass: 'Baby Class',
-    status: 'active'
-  }
-];
-
-const INITIAL_EXPENSES: Expense[] = [
-  {
-    id: 'expense-1',
-    description: 'Electricity Bill - January',
-    category: 'Utilities',
-    amount: 850,
-    date: '2026-01-31T00:00:00.000Z',
-    paidBy: 'Admin',
-    term: 'Term 1 2026',
-    receiptNumber: 'EXP-001'
-  },
-  {
-    id: 'expense-2',
-    description: 'Cleaning Supplies',
-    category: 'Supplies',
-    amount: 320,
-    date: '2026-02-05T00:00:00.000Z',
-    paidBy: 'Admin',
-    term: 'Term 1 2026'
-  }
-];
-
-const INITIAL_INVENTORY: InventoryItem[] = [
-  {
-    id: 'inv-1',
-    name: 'Student Desks',
-    category: 'Furniture',
-    quantity: 45,
-    unit: 'pieces',
-    condition: 'Good',
-    location: 'Classrooms',
-    lastUpdated: '2026-01-01T00:00:00.000Z'
-  },
-  {
-    id: 'inv-2',
-    name: 'Whiteboard Markers',
-    category: 'Stationery',
-    quantity: 24,
-    unit: 'boxes',
-    condition: 'Good',
-    location: 'Store Room',
-    lastUpdated: '2026-02-01T00:00:00.000Z'
-  },
-  {
-    id: 'inv-3',
-    name: 'Laptop Computer',
-    category: 'Electronics',
-    quantity: 2,
-    unit: 'units',
-    condition: 'Good',
-    location: 'Head Teacher Office',
-    lastUpdated: '2025-09-01T00:00:00.000Z'
-  }
-];
-
-const INITIAL_EVENTS: SchoolEvent[] = [
-  {
-    id: 'event-1',
-    title: 'Term 1 Begins',
-    description: 'Start of Term 1 2026. All students to report by 7:30 AM.',
-    date: '2026-01-12T00:00:00.000Z',
-    type: 'Academic',
-    targetAudience: 'All'
-  },
-  {
-    id: 'event-2',
-    title: 'Sports Day',
-    description: 'Annual inter-class sports competition. Parents welcome.',
-    date: '2026-03-20T00:00:00.000Z',
-    type: 'Sports',
-    targetAudience: 'All'
-  },
-  {
-    id: 'event-3',
-    title: 'Parents Meeting',
-    description: 'End of Term 1 parents meeting and report card collection.',
-    date: '2026-04-03T00:00:00.000Z',
-    type: 'Meeting',
-    targetAudience: 'Parents'
-  },
-  {
-    id: 'event-4',
-    title: 'Aerobics Day',
-    description: 'Annual school aerobics and fitness event.',
-    date: '2026-02-28T00:00:00.000Z',
-    type: 'Sports',
-    targetAudience: 'All'
-  }
-];
-
-const INITIAL_UNIFORMS: Uniform[] = [
-  {
-    id: 'uniform-1',
-    studentId: 'student-1',
-    item: 'Girl Dress',
-    price: 250,
-    purchaseDate: '2026-01-20T00:00:00.000Z',
-    status: 'purchased'
-  },
-  {
-    id: 'uniform-2',
-    studentId: 'student-2',
-    item: 'Short Sleeved Shirt',
-    price: 180,
-    purchaseDate: '2026-01-22T00:00:00.000Z',
-    status: 'purchased'
-  }
-];
-
-const INITIAL_REQUIREMENTS: Requirement[] = [
-  {
-    id: 'req-1',
-    studentId: 'student-1',
-    item: 'Ream of Paper & Tissues',
-    status: 'provided',
-    dateProvided: '2026-01-25T00:00:00.000Z',
-    term: 'Term 1 2026'
-  },
-  {
-    id: 'req-2',
-    studentId: 'student-2',
-    item: 'Ream of Paper + 2 Handy Andy + 2 Handwash',
-    status: 'pending',
-    term: 'Term 1 2026'
-  }
-];
-
 const INITIAL_FEE_STRUCTURE: FeeStructureItem[] = [
   { id: 'fee-1', className: 'Baby Class', cashFee: 3000, installmentFee: 3200, description: 'Early childhood development program' },
   { id: 'fee-2', className: 'Middle Class', cashFee: 2700, installmentFee: 2900, description: 'Pre-primary preparation' },
@@ -696,27 +425,6 @@ const INITIAL_OTHER_CHARGES: OtherCharge[] = [
   { id: 'charge-3', name: 'Transport', amount: '600-1000', per: 'per month' },
   { id: 'charge-4', name: 'Water', amount: '40', per: 'per term' },
   { id: 'charge-5', name: 'Assessment Tests', amount: '200', per: 'per term' }
-];
-
-const INITIAL_ANNOUNCEMENTS: Announcement[] = [
-  {
-    id: 'ann-1',
-    title: 'Term 1 2026 School Fees Due',
-    message: 'This is a reminder that Term 1 2026 school fees are due by 1st February 2026. Please ensure all outstanding balances are cleared. Cash payments receive a K200-K300 discount. Contact the school office for payment arrangements.',
-    date: '2026-01-15T00:00:00.000Z',
-    priority: 'important',
-    targetAudience: 'Parents',
-    createdBy: 'Mrs. Tembo'
-  },
-  {
-    id: 'ann-2',
-    title: 'Sports Day - 20th March 2026',
-    message: 'We are pleased to announce our Annual Sports Day on 20th March 2026. All students are encouraged to participate. Parents and guardians are welcome to attend. Students should come in their house colours. Please ensure children bring water and a packed lunch.',
-    date: '2026-02-10T00:00:00.000Z',
-    priority: 'normal',
-    targetAudience: 'All',
-    createdBy: 'Admin'
-  }
 ];
 
 const INITIAL_UNIFORM_CATALOG: UniformCatalogItem[] = [
@@ -773,17 +481,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [timetables, setTimetables] = useState<Timetable[]>(() => loadFromStorage('gha_timetables', []));
   const [branding, setBranding] = useState<SchoolBranding>(() => loadFromStorage('gha_branding', DEFAULT_BRANDING));
   const [theme, setTheme] = useState<AppTheme>(() => loadFromStorage('gha_theme', DEFAULT_THEME));
-  const [students, setStudents] = useState<Student[]>(() => loadFromStorage('gha_students', INITIAL_STUDENTS));
-  const [payments, setPayments] = useState<Payment[]>(() => loadFromStorage('gha_payments', INITIAL_PAYMENTS));
-  const [uniforms, setUniforms] = useState<Uniform[]>(() => loadFromStorage('gha_uniforms', INITIAL_UNIFORMS));
-  const [requirements, setRequirements] = useState<Requirement[]>(() => loadFromStorage('gha_requirements', INITIAL_REQUIREMENTS));
-  const [teachers, setTeachers] = useState<Teacher[]>(() => loadFromStorage('gha_teachers', INITIAL_TEACHERS));
-  const [expenses, setExpenses] = useState<Expense[]>(() => loadFromStorage('gha_expenses', INITIAL_EXPENSES));
-  const [inventory, setInventory] = useState<InventoryItem[]>(() => loadFromStorage('gha_inventory', INITIAL_INVENTORY));
-  const [events, setEvents] = useState<SchoolEvent[]>(() => loadFromStorage('gha_events', INITIAL_EVENTS));
+  const [students, setStudents] = useState<Student[]>(() => loadFromStorage('gha_students', []));
+  const [payments, setPayments] = useState<Payment[]>(() => loadFromStorage('gha_payments', []));
+  const [uniforms, setUniforms] = useState<Uniform[]>(() => loadFromStorage('gha_uniforms', []));
+  const [requirements, setRequirements] = useState<Requirement[]>(() => loadFromStorage('gha_requirements', []));
+  const [teachers, setTeachers] = useState<Teacher[]>(() => loadFromStorage('gha_teachers', []));
+  const [expenses, setExpenses] = useState<Expense[]>(() => loadFromStorage('gha_expenses', []));
+  const [inventory, setInventory] = useState<InventoryItem[]>(() => loadFromStorage('gha_inventory', []));
+  const [events, setEvents] = useState<SchoolEvent[]>(() => loadFromStorage('gha_events', []));
   const [feeStructure, setFeeStructure] = useState<FeeStructureItem[]>(() => loadFromStorage('gha_feestructure', INITIAL_FEE_STRUCTURE));
   const [otherCharges, setOtherCharges] = useState<OtherCharge[]>(() => loadFromStorage('gha_othercharges', INITIAL_OTHER_CHARGES));
-  const [announcements, setAnnouncements] = useState<Announcement[]>(() => loadFromStorage('gha_announcements', INITIAL_ANNOUNCEMENTS));
+  const [announcements, setAnnouncements] = useState<Announcement[]>(() => loadFromStorage('gha_announcements', []));
   const [currentTerm, setCurrentTerm] = useState<string>(() => loadFromStorage('gha_currentTerm', 'Term 1 2026'));
 
   // ---- Live sync machinery (Phase 7) ----
@@ -1068,11 +776,23 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Wipe writes EMPTY values instead of removing keys — removing them would
+  // bring the built-in sample/mock data back on the next reload, because the
+  // defaults only apply when a key is missing entirely.
+  const EMPTY_VALUES: Record<string, string> = {
+    gha_budgets: '{}',
+    gha_currentTerm: '"Term 1 2026"',
+    gha_terms: JSON.stringify(['Term 1 2026', 'Term 2 2026', 'Term 3 2026']),
+  };
+  const wipeKey = (k: string) => {
+    if (['gha_branding', 'gha_theme', 'gha_users'].includes(k)) { localStorage.removeItem(k); return; }
+    localStorage.setItem(k, EMPTY_VALUES[k] ?? '[]');
+  };
   const wipeData = (sections: string[] | 'all') => {
     if (sections === 'all') {
-      GHA_KEYS.forEach(k => localStorage.removeItem(k));
+      GHA_KEYS.forEach(wipeKey);
     } else {
-      sections.forEach(s => (SECTION_KEYS[s] || []).forEach(k => localStorage.removeItem(k)));
+      sections.forEach(s => (SECTION_KEYS[s] || []).forEach(wipeKey));
     }
     window.location.reload();
   };

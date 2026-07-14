@@ -3,6 +3,7 @@ import { ShoppingBag, Tags, Plus, Pencil, Trash2, X, Package, AlertTriangle } fr
 import { useAppContext, UniformCatalogItem } from '../context/AppContext';
 import { useToast } from './ToastProvider';
 import { useThemeClasses } from '../hooks/useThemeClasses';
+import { compressImage } from '../lib/images';
 
 function CatalogModal({ item, onSave, onClose }: {
   item: UniformCatalogItem | null;
@@ -14,6 +15,7 @@ function CatalogModal({ item, onSave, onClose }: {
     price: item?.price?.toString() || '',
     category: item?.category || 'Both' as UniformCatalogItem['category'],
     stock: item?.stock?.toString() ?? '0',
+    imageUrl: item?.imageUrl as string | undefined,
   });
 
   return (
@@ -31,8 +33,33 @@ function CatalogModal({ item, onSave, onClose }: {
             price: parseFloat(form.price) || 0,
             category: form.category,
             stock: parseInt(form.stock) || 0,
+            imageUrl: form.imageUrl,
           });
         }}>
+          <div className="flex items-center gap-4">
+            {form.imageUrl ? (
+              <img src={form.imageUrl} alt="" className="w-20 h-20 rounded-lg object-cover border border-gray-200" />
+            ) : (
+              <div className="w-20 h-20 rounded-lg bg-gray-100 border-2 border-dashed border-gray-300 flex items-center justify-center text-xs text-gray-400 text-center px-1">No photo</div>
+            )}
+            <div className="space-y-1">
+              <label className="inline-block px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded-lg cursor-pointer">
+                {form.imageUrl ? 'Change Photo' : 'Add Photo'}
+                <input type="file" accept="image/*" className="hidden"
+                  onChange={async e => {
+                    const f = e.target.files?.[0];
+                    e.target.value = '';
+                    if (!f) return;
+                    try { const url = await compressImage(f, 350, 0.82); setForm(prev => ({ ...prev, imageUrl: url })); }
+                    catch { alert('Could not read that image.'); }
+                  }} />
+              </label>
+              {form.imageUrl && (
+                <button type="button" onClick={() => setForm(prev => ({ ...prev, imageUrl: undefined }))}
+                  className="block text-xs text-red-500 hover:underline">Remove photo</button>
+              )}
+            </div>
+          </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Item Name *</label>
             <input required className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -153,8 +180,16 @@ export function Uniforms() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {uniformCatalog.map(item => (
                     <div key={item.id} className={`border rounded-lg p-4 ${item.stock === 0 ? 'border-red-200 bg-red-50/40' : 'border-gray-200'}`}>
-                      <div className="flex items-center justify-between">
-                        <div>
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-3 min-w-0">
+                          {item.imageUrl ? (
+                            <img src={item.imageUrl} alt={item.name} className="w-14 h-14 rounded-lg object-cover border border-gray-200 flex-shrink-0" />
+                          ) : (
+                            <div className="w-14 h-14 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0">
+                              <ShoppingBag className="h-5 w-5 text-gray-300" />
+                            </div>
+                          )}
+                          <div className="min-w-0">
                           <h3 className="font-medium text-gray-900">{item.name}</h3>
                           <p className="text-sm text-gray-500">{item.category}</p>
                           <p className={`text-xs mt-1 font-medium ${
@@ -162,6 +197,7 @@ export function Uniforms() {
                           }`}>
                             {item.stock === 0 ? 'Out of stock' : `${item.stock} in stock`}
                           </p>
+                          </div>
                         </div>
                         <div className="text-right">
                           <p className={`text-lg font-bold ${tc.text}`}>K{item.price}</p>
@@ -260,7 +296,14 @@ export function Uniforms() {
               <tbody className="divide-y divide-gray-100">
                 {uniformCatalog.map(item => (
                   <tr key={item.id} className="hover:bg-gray-50">
-                    <td className="px-5 py-2.5 font-medium text-gray-900">{item.name}</td>
+                    <td className="px-5 py-2.5 font-medium text-gray-900">
+                      <div className="flex items-center gap-2.5">
+                        {item.imageUrl
+                          ? <img src={item.imageUrl} alt="" className="w-9 h-9 rounded object-cover border border-gray-200" />
+                          : <div className="w-9 h-9 rounded bg-gray-100" />}
+                        <span>{item.name}</span>
+                      </div>
+                    </td>
                     <td className="px-5 py-2.5 text-gray-500">{item.category}</td>
                     <td className="px-5 py-2.5 font-semibold text-gray-900">K{item.price.toLocaleString()}</td>
                     <td className="px-5 py-2.5">
