@@ -1,9 +1,10 @@
 import { useState, useRef } from 'react';
-import { Users, Database, Trash2, Shield, Download, Upload, AlertTriangle, Plus, Pencil, X, Check, Cloud, RefreshCw, UploadCloud, DownloadCloud, CalendarRange } from 'lucide-react';
+import { Users, Database, Trash2, Shield, Download, Upload, AlertTriangle, Plus, Pencil, X, Check, Cloud, RefreshCw, UploadCloud, DownloadCloud, CalendarRange, Copy, KeyRound } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 import { useAuth, AppUser, UserRole, ROLE_PERMISSIONS } from '../context/AuthContext';
 import { useToast } from './ToastProvider';
 import { useThemeClasses } from '../hooks/useThemeClasses';
+import { generatePassword } from '../lib/auth';
 import { getCloudConfig, saveCloudConfig, pushToCloud, pullFromCloud, testConnection, SETUP_SQL, SETUP_SQL_LIVE, isLiveSyncEnabled, setLiveSyncEnabled, pullAllLive } from '../lib/supabase';
 
 const ROLES: UserRole[] = ['Admin', 'Cashier', 'Teacher', 'Viewer'];
@@ -27,25 +28,59 @@ const WIPE_SECTIONS = [
   { id: 'kitchen', label: 'Kitchen Groceries' },
 ];
 
-function UserModal({ user, onSave, onClose }: { user: AppUser | null; onSave: (u: AppUser) => void; onClose: () => void }) {
+// Small copy-to-clipboard button used by the password + master-code fields.
+function CopyButton({ value, label = 'Copy' }: { value: string; label?: string }) {
+  const [done, setDone] = useState(false);
+  return (
+    <button type="button"
+      onClick={() => { if (!value) return; navigator.clipboard.writeText(value); setDone(true); setTimeout(() => setDone(false), 1500); }}
+      className="flex items-center gap-1 px-2.5 py-2 border border-gray-300 rounded-lg text-xs text-gray-600 hover:bg-gray-50 whitespace-nowrap">
+      {done ? <Check className="h-3.5 w-3.5 text-green-600" /> : <Copy className="h-3.5 w-3.5" />}
+      {done ? 'Copied' : label}
+    </button>
+  );
+}
+
+function UserModal({ user, onClose }: { user: AppUser | null; onClose: () => void }) {
+  const { addUser, updateUser, setUserPassword, users } = useAuth();
+  const { toast } = useToast();
   const [form, setForm] = useState({
     fullName: user?.fullName || '',
     username: user?.username || '',
-    password: user?.password || '',
+    email: user?.email || '',
     role: user?.role || 'Cashier' as UserRole,
   });
+  // For a new user this holds the plain password; for an existing user it's the
+  // optional "reset to" password (blank = leave unchanged).
+  const [password, setPassword] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setBusy(true);
+    if (user) {
+      updateUser(user.id, { fullName: form.fullName, username: form.username, email: form.email || undefined, role: form.role });
+      if (password.trim()) { await setUserPassword(user.id, password.trim()); toast('User updated and password reset.', 'success'); }
+      else toast('User updated.', 'success');
+      setBusy(false); onClose(); return;
+    }
+    if (!password.trim()) { toast('Set or generate a password for the new user.', 'warning'); setBusy(false); return; }
+    if (users.some(u => u.username.toLowerCase() === form.username.trim().toLowerCase())) {
+      toast('That username is already taken.', 'error'); setBusy(false); return;
+    }
+    await addUser({ id: `user-${Date.now()}`, ...form, email: form.email || undefined, password: password.trim() });
+    toast('User added.', 'success');
+    setBusy(false); onClose();
+  };
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-md">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between p-5 border-b border-gray-200">
           <h2 className="text-lg font-semibold text-gray-900">{user ? 'Edit User' : 'Add User'}</h2>
           <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-lg"><X className="h-5 w-5 text-gray-500" /></button>
         </div>
-        <form className="p-5 space-y-4" onSubmit={e => {
-          e.preventDefault();
-          onSave({ id: user?.id || `user-${Date.now()}`, ...form });
-        }}>
+        <form className="p-5 space-y-4" onSubmit={submit}>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Full Name *</label>
             <input required className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -58,21 +93,40 @@ function UserModal({ user, onSave, onClose }: { user: AppUser | null; onSave: (u
                 value={form.username} onChange={e => setForm({ ...form, username: e.target.value })} />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Password *</label>
-              <input required type="text" className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} />
+              <label className="block text-sm font-medium text-gray-700 mb-1">Role *</label>
+              <select className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                value={form.role} onChange={e => setForm({ ...form, role: e.target.value as UserRole })}>
+                {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
+              </select>
             </div>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Role *</label>
-            <select className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              value={form.role} onChange={e => setForm({ ...form, role: e.target.value as UserRole })}>
-              {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
-            </select>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Email <span className="text-gray-400 font-normal">(for record only — not used to send anything)</span></label>
+            <input type="email" className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} placeholder="name@example.com" />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              {user ? 'Reset Password' : 'Password *'}
+              {user && <span className="text-gray-400 font-normal"> — leave blank to keep current</span>}
+            </label>
+            <div className="flex gap-2">
+              <input type="text" className="flex-1 min-w-0 px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                value={password} onChange={e => setPassword(e.target.value)}
+                placeholder={user ? 'New password…' : 'Type or generate'} />
+              <button type="button" onClick={() => setPassword(generatePassword())}
+                className="flex items-center gap-1 px-2.5 py-2 border border-gray-300 rounded-lg text-xs text-gray-600 hover:bg-gray-50 whitespace-nowrap">
+                <RefreshCw className="h-3.5 w-3.5" />Generate
+              </button>
+              <CopyButton value={password} />
+            </div>
+            {password && (
+              <p className="text-xs text-amber-600 mt-1">Copy and share this with the user now — it's stored encrypted and can't be shown again later.</p>
+            )}
           </div>
           <div className="flex space-x-3 pt-2">
             <button type="button" onClick={onClose} className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50">Cancel</button>
-            <button type="submit" className="flex-1 px-4 py-2 gha-primary-btn text-white rounded-lg">{user ? 'Update' : 'Add User'}</button>
+            <button type="submit" disabled={busy} className="flex-1 px-4 py-2 gha-primary-btn text-white rounded-lg disabled:opacity-50">{busy ? 'Saving…' : user ? 'Update' : 'Add User'}</button>
           </div>
         </form>
       </div>
@@ -82,7 +136,8 @@ function UserModal({ user, onSave, onClose }: { user: AppUser | null; onSave: (u
 
 export function Settings() {
   const { exportAllData, importAllData, wipeData, terms, addTerm, deleteTerm, currentTerm, setCurrentTerm, payments, expenses } = useAppContext();
-  const { users, currentUser, addUser, updateUser, deleteUser } = useAuth();
+  const { users, currentUser, deleteUser, hasMasterCode, setMasterCode, generateMasterCode } = useAuth();
+  const [masterDraft, setMasterDraft] = useState('');
   const { toast } = useToast();
   const tc = useThemeClasses();
   const [tab, setTab] = useState<'users' | 'terms' | 'backup' | 'cloud' | 'cleanup'>('users');
@@ -227,6 +282,35 @@ export function Settings() {
                   <div><strong className="text-green-700">Cashier</strong> — finances: payments, cashier, debtors, uniforms, transport, fundraisers, reports</div>
                   <div><strong className="text-blue-700">Teacher</strong> — academics: attendance, results, timetable, calendar, events, announcements</div>
                   <div><strong className="text-gray-700">Viewer</strong> — read-only overview: dashboard, calendar, events, announcements</div>
+                </div>
+              </div>
+
+              {/* Master access code */}
+              <div className="border border-amber-200 bg-amber-50 rounded-lg p-4">
+                <div className="flex items-center gap-2 mb-1">
+                  <KeyRound className="h-4 w-4 text-amber-700" />
+                  <p className="text-sm font-semibold text-amber-900">Master Access Code</p>
+                  {hasMasterCode && <span className="text-xs bg-green-100 text-green-800 px-2 py-0.5 rounded-full">set</span>}
+                </div>
+                <p className="text-xs text-amber-700 mb-3">
+                  A backup code you can give a staff member to prove it's really you granting access —
+                  or keep as an emergency admin key. Generate it, copy it, and store it somewhere safe.
+                  Setting a new code replaces the old one.
+                </p>
+                <div className="flex gap-2 flex-wrap">
+                  <input type="text" value={masterDraft} onChange={e => setMasterDraft(e.target.value)}
+                    placeholder="Generate or type a code"
+                    className="flex-1 min-w-[160px] px-3 py-2 border border-amber-300 rounded-lg text-sm font-mono focus:ring-2 focus:ring-amber-400 focus:border-transparent" />
+                  <button type="button" onClick={() => setMasterDraft(generateMasterCode())}
+                    className="flex items-center gap-1 px-3 py-2 border border-amber-300 rounded-lg text-xs text-amber-800 hover:bg-amber-100 whitespace-nowrap">
+                    <RefreshCw className="h-3.5 w-3.5" />Generate
+                  </button>
+                  <CopyButton value={masterDraft} />
+                  <button type="button" disabled={!masterDraft.trim()}
+                    onClick={async () => { await setMasterCode(masterDraft.trim()); toast('Master code saved. Keep the copied code safe!', 'success'); }}
+                    className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-sm font-medium disabled:opacity-40">
+                    Save Code
+                  </button>
                 </div>
               </div>
             </div>
@@ -556,14 +640,6 @@ export function Settings() {
         <UserModal
           user={editingUser}
           onClose={() => { setUserModalOpen(false); setEditingUser(null); }}
-          onSave={u => {
-            if (editingUser) { updateUser(editingUser.id, u); toast('User updated.', 'success'); }
-            else if (users.some(x => x.username.toLowerCase() === u.username.toLowerCase())) {
-              toast('That username is already taken.', 'error'); return;
-            }
-            else { addUser(u); toast('User added.', 'success'); }
-            setUserModalOpen(false); setEditingUser(null);
-          }}
         />
       )}
     </div>

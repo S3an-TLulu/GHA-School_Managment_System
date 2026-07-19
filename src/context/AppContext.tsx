@@ -683,7 +683,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     'gha_expenses', 'gha_inventory', 'gha_events', 'gha_feestructure', 'gha_othercharges',
     'gha_announcements', 'gha_attendance', 'gha_results', 'gha_timetables', 'gha_branding',
     'gha_theme', 'gha_currentTerm', 'gha_fundraiser_participants', 'gha_external_fundraiser',
-    'gha_uniform_catalog', 'gha_debtors', 'gha_transport_routes', 'gha_users',
+    'gha_uniform_catalog', 'gha_debtors', 'gha_transport_routes', 'gha_users', 'gha_claims', 'gha_master_code',
     'gha_terms', 'gha_todos', 'gha_salary_advances', 'gha_payroll', 'gha_groceries', 'gha_budgets', 'gha_documents',
   ];
 
@@ -785,7 +785,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     gha_terms: JSON.stringify(['Term 1 2026', 'Term 2 2026', 'Term 3 2026']),
   };
   const wipeKey = (k: string) => {
-    if (['gha_branding', 'gha_theme', 'gha_users'].includes(k)) { localStorage.removeItem(k); return; }
+    if (['gha_branding', 'gha_theme', 'gha_users', 'gha_master_code'].includes(k)) { localStorage.removeItem(k); return; }
     localStorage.setItem(k, EMPTY_VALUES[k] ?? '[]');
   };
   const wipeData = (sections: string[] | 'all') => {
