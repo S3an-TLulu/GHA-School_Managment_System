@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { School, Lock, User, ArrowLeft } from 'lucide-react';
+import { School, Lock, User, ArrowLeft, HelpCircle, X } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 interface LoginProps {
@@ -9,17 +9,29 @@ interface LoginProps {
 export function Login({ onBack }: LoginProps) {
   const [credentials, setCredentials] = useState({ username: '', password: '' });
   const [isLoading, setIsLoading] = useState(false);
-  const { login } = useAuth();
+  const [error, setError] = useState('');
+  const [forgotOpen, setForgotOpen] = useState(false);
+  const [forgotName, setForgotName] = useState('');
+  const [forgotMsg, setForgotMsg] = useState('');
+  const [forgotSent, setForgotSent] = useState(false);
+  const { login, fileClaim } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-
-    if (!login(credentials.username, credentials.password)) {
-      alert('Invalid username or password.');
-    }
-
+    setError('');
+    const ok = await login(credentials.username, credentials.password);
+    if (!ok) setError('Invalid username/email or password.');
     setIsLoading(false);
+  };
+
+  const submitForgot = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!forgotName.trim()) return;
+    fileClaim('forgot-password', forgotName.trim(),
+      forgotMsg.trim() || 'Requested a password reset from the login screen.');
+    setForgotSent(true);
+    setForgotName(''); setForgotMsg('');
   };
 
   return (
@@ -43,7 +55,7 @@ export function Login({ onBack }: LoginProps) {
 
         <form onSubmit={handleSubmit} className="space-y-6">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Username</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Username or Email</label>
             <div className="relative">
               <User className="absolute left-3 top-3 h-5 w-5 text-gray-400" />
               <input
@@ -51,7 +63,7 @@ export function Login({ onBack }: LoginProps) {
                 value={credentials.username}
                 onChange={(e) => setCredentials({ ...credentials, username: e.target.value })}
                 className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="Enter username"
+                placeholder="Enter username or email"
                 required
               />
             </div>
@@ -72,6 +84,8 @@ export function Login({ onBack }: LoginProps) {
             </div>
           </div>
 
+          {error && <p className="text-sm text-red-600 text-center -mt-2">{error}</p>}
+
           <button
             type="submit"
             disabled={isLoading}
@@ -81,14 +95,53 @@ export function Login({ onBack }: LoginProps) {
           </button>
         </form>
 
-        <div className="mt-6 p-4 bg-gray-50 rounded-lg">
-          <p className="text-sm text-gray-600 text-center">
-            <strong>Demo Credentials:</strong><br />
-            Username: admin<br />
-            Password: admin123
-          </p>
+        <div className="mt-4 text-center">
+          <button onClick={() => { setForgotOpen(true); setForgotSent(false); }}
+            className="inline-flex items-center gap-1 text-sm text-blue-600 hover:underline">
+            <HelpCircle className="h-4 w-4" /> Forgot password?
+          </button>
         </div>
       </div>
+
+      {/* Forgot-password claim modal */}
+      {forgotOpen && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md">
+            <div className="flex items-center justify-between p-5 border-b border-gray-200">
+              <h2 className="text-lg font-semibold text-gray-900">Request Password Reset</h2>
+              <button onClick={() => setForgotOpen(false)} className="p-2 hover:bg-gray-100 rounded-lg"><X className="h-5 w-5 text-gray-500" /></button>
+            </div>
+            {forgotSent ? (
+              <div className="p-6 text-center">
+                <p className="text-sm text-gray-700">Your request has been sent to the school administrator.</p>
+                <p className="text-xs text-gray-500 mt-2">They'll see it in their notifications and can reset your password or share a master code.</p>
+                <button onClick={() => setForgotOpen(false)}
+                  className="mt-4 px-4 py-2 gha-primary-btn text-white rounded-lg text-sm font-medium">Done</button>
+              </div>
+            ) : (
+              <form className="p-5 space-y-4" onSubmit={submitForgot}>
+                <p className="text-sm text-gray-500">This sends a request to the administrator — they'll reset your access. No email is sent automatically.</p>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Your Username *</label>
+                  <input required value={forgotName} onChange={e => setForgotName(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="The username you sign in with" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Note (optional)</label>
+                  <input value={forgotMsg} onChange={e => setForgotMsg(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="e.g. Forgot my password after the holidays" />
+                </div>
+                <div className="flex space-x-3 pt-1">
+                  <button type="button" onClick={() => setForgotOpen(false)} className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50">Cancel</button>
+                  <button type="submit" className="flex-1 px-4 py-2 gha-primary-btn text-white rounded-lg">Send Request</button>
+                </div>
+              </form>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

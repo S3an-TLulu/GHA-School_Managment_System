@@ -29,6 +29,7 @@ import { Settings } from './components/Settings';
 import { ClassManager } from './components/ClassManager';
 import { HR } from './components/HR';
 import { Kitchen } from './components/Kitchen';
+import { Profile } from './components/Profile';
 import { Results } from './components/Results';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { useAppContext } from './context/AppContext';
@@ -85,6 +86,7 @@ function AppContent() {
       case 'settings':     return <Settings />;
       case 'hr':           return <HR />;
       case 'kitchen':      return <Kitchen />;
+      case 'profile':      return <Profile />;
       default:             return <Dashboard />;
     }
   };
@@ -108,7 +110,9 @@ function AppContent() {
       )}
 
       <div className="flex-1 flex flex-col min-w-0">
-        <Header onMenuClick={() => setMobileNavOpen(true)} />
+        <Header onMenuClick={() => setMobileNavOpen(true)}
+          onGoToUsers={() => setActiveSection('settings')}
+          onGoToProfile={() => setActiveSection('profile')} />
         <main className="flex-1 p-4 sm:p-6 overflow-y-auto">
           {renderContent()}
         </main>
