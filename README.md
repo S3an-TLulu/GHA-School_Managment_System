@@ -15,6 +15,22 @@ one place, with cloud backup via Supabase.
 
 ---
 
+## Public Website
+
+The project now includes a public-facing school website for Great Highway Academy:
+
+- **In the app:** unauthenticated visitors see a landing page (`src/components/LandingPage.tsx`)
+  with the school's story, classes, fees and contact details; the **Portal Login** button
+  opens the usual sign-in screen.
+- **Standalone copy:** [`website/index.html`](website/index.html) is the same site as a single
+  self-contained HTML file (plus `website/gha-logo.png`) that can be uploaded to any web host —
+  see [`website/DEPLOYMENT.md`](website/DEPLOYMENT.md) for a step-by-step InterServer +
+  custom-domain guide. It is also published with the app at `/website/` for previewing.
+  `website/index.html` is the canonical copy — after editing it, copy it over
+  `public/website/index.html`.
+
+---
+
 ## Quick Start
 
 ```bash

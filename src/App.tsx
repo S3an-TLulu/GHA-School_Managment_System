@@ -34,19 +34,24 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import { useAppContext } from './context/AppContext';
 import { useEffect } from 'react';
 import { Login } from './components/Login';
+import { LandingPage } from './components/LandingPage';
 import { AppProvider } from './context/AppContext';
 import { ToastProvider } from './components/ToastProvider';
 
 function AppContent() {
   const [activeSection, setActiveSection] = useState('dashboard');
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [showLogin, setShowLogin] = useState(false);
   const { isAuthenticated } = useAuth();
   const { theme } = useAppContext();
 
   useEffect(() => { applyTheme(theme); }, [theme]);
 
   if (!isAuthenticated) {
-    return <Login />;
+    if (showLogin) {
+      return <Login onBack={() => setShowLogin(false)} />;
+    }
+    return <LandingPage onLoginClick={() => setShowLogin(true)} />;
   }
 
   const renderContent = () => {
