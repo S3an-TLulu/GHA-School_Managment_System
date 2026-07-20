@@ -37,6 +37,7 @@ import { useEffect } from 'react';
 import { Login } from './components/Login';
 import { AppProvider } from './context/AppContext';
 import { ToastProvider } from './components/ToastProvider';
+import { ErrorBoundary } from './components/ErrorBoundary';
 
 function AppContent() {
   const [activeSection, setActiveSection] = useState('dashboard');
@@ -109,7 +110,11 @@ function AppContent() {
           onGoToUsers={() => setActiveSection('settings')}
           onGoToProfile={() => setActiveSection('profile')} />
         <main className="flex-1 p-4 sm:p-6 overflow-y-auto">
-          {renderContent()}
+          {/* Per-section boundary: a crash in one screen won't take out the
+              whole shell, and navigating away (new key) clears it. */}
+          <ErrorBoundary key={activeSection}>
+            {renderContent()}
+          </ErrorBoundary>
         </main>
       </div>
     </div>
@@ -118,13 +123,15 @@ function AppContent() {
 
 function App() {
   return (
-    <AuthProvider>
-      <AppProvider>
-        <ToastProvider>
-          <AppContent />
-        </ToastProvider>
-      </AppProvider>
-    </AuthProvider>
+    <ErrorBoundary>
+      <AuthProvider>
+        <AppProvider>
+          <ToastProvider>
+            <AppContent />
+          </ToastProvider>
+        </AppProvider>
+      </AuthProvider>
+    </ErrorBoundary>
   );
 }
 

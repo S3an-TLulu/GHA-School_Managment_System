@@ -16,8 +16,8 @@ export function Login() {
     e.preventDefault();
     setIsLoading(true);
     setError('');
-    const ok = await login(credentials.username, credentials.password);
-    if (!ok) setError('Invalid username/email or password.');
+    const res = await login(credentials.username, credentials.password);
+    if (!res.ok) setError(res.error || 'Invalid username/email or password.');
     setIsLoading(false);
   };
 

@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { Plus, Pencil, Trash2, X, UserX, DollarSign, Search, CheckCircle2 } from 'lucide-react';
+import { Plus, Pencil, Trash2, X, UserX, DollarSign, Search, CheckCircle2, MessageCircle } from 'lucide-react';
 import { useAppContext, Debtor } from '../context/AppContext';
 import { useToast } from './ToastProvider';
 import { useThemeClasses } from '../hooks/useThemeClasses';
+import { waLink, buildFeeReminder } from '../lib/notify';
 
 function DebtorModal({ debtor, onSave, onClose }: {
   debtor: Debtor | null;
@@ -110,7 +111,7 @@ function DebtorModal({ debtor, onSave, onClose }: {
 }
 
 export function Debtors() {
-  const { debtors, students, addDebtor, updateDebtor, deleteDebtor } = useAppContext();
+  const { debtors, students, branding, addDebtor, updateDebtor, deleteDebtor } = useAppContext();
   const { toast } = useToast();
   const tc = useThemeClasses();
   const [modalOpen, setModalOpen] = useState(false);
@@ -139,6 +140,22 @@ export function Debtors() {
     if (isNaN(amt) || amt <= 0) { toast('Invalid amount.', 'error'); return; }
     updateDebtor(d.id, { amountPaid: d.amountPaid + amt });
     toast(`K${amt.toLocaleString()} received from ${d.name}.`, 'success');
+  };
+
+  // Open WhatsApp with a pre-filled reminder for this debtor (no message is
+  // sent automatically — the admin reviews and taps send).
+  const sendReminder = (d: Debtor) => {
+    if (!d.phone) { toast('No phone number on this debtor — add one first.', 'warning'); return; }
+    const student = d.studentId ? students.find(s => s.id === d.studentId) : null;
+    const msg = buildFeeReminder({
+      schoolName: branding.schoolName,
+      recipientName: d.name,
+      what: d.description,
+      balance: Math.max(0, withBalance(d)),
+      dueDate: d.dueDate,
+      studentName: student?.name,
+    });
+    window.open(waLink(d.phone, msg), '_blank', 'noopener');
   };
 
   return (
@@ -240,6 +257,10 @@ export function Debtors() {
                       </span>
                     </td>
                     <td className="px-4 py-3 text-right whitespace-nowrap">
+                      {bal > 0 && d.phone && (
+                        <button onClick={() => sendReminder(d)} title="Send WhatsApp reminder"
+                          className="p-1.5 text-green-600 hover:bg-green-50 rounded"><MessageCircle className="h-4 w-4" /></button>
+                      )}
                       {bal > 0 && (
                         <button onClick={() => recordPayment(d)} title="Record payment"
                           className="p-1.5 text-green-600 hover:bg-green-50 rounded"><CheckCircle2 className="h-4 w-4" /></button>

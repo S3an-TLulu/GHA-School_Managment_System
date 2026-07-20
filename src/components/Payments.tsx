@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Plus, Search, Check, X, Clock, Trash2, Printer, Banknote, Smartphone, Building2, FileText, MoreHorizontal } from 'lucide-react';
-import { useAppContext, Payment, Student, PaymentMethod } from '../context/AppContext';
+import { useAppContext, Payment, Student, PaymentMethod, SchoolBranding } from '../context/AppContext';
 import { PaymentModal } from './PaymentModal';
 import { useToast } from './ToastProvider';
 import { useThemeClasses } from '../hooks/useThemeClasses';
@@ -25,7 +25,13 @@ function MethodBadge({ method, network }: { method?: PaymentMethod; network?: st
 }
 
 
-function printReceipt(payment: Payment, student: Student | undefined) {
+// Escape user-entered strings before injecting into the receipt HTML.
+const esc = (s: string) => (s || '').replace(/[&<>"']/g, c =>
+  ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c] as string));
+
+function printReceipt(payment: Payment, student: Student | undefined, branding: SchoolBranding) {
+  const contactBits = [branding.address, branding.phone ? `Tel: ${branding.phone}` : ''].filter(Boolean).join(' | ');
+  const hasBank = branding.bankName || branding.bankAccountNumber;
   const printContent = `
     <!DOCTYPE html>
     <html>
@@ -56,8 +62,9 @@ function printReceipt(payment: Payment, student: Student | undefined) {
     </head>
     <body>
       <div class="header">
-        <div class="school-name">Great Highway Academy</div>
-        <div class="school-sub">Lusaka, Zambia | Tel: +260-XXX-XXXXXX</div>
+        ${branding.logoUrl ? `<img src="${branding.logoUrl}" alt="" style="height:56px;width:56px;object-fit:cover;border-radius:10px;margin-bottom:8px;" />` : ''}
+        <div class="school-name">${esc(branding.schoolName) || 'School'}</div>
+        <div class="school-sub">${esc(contactBits) || ''}</div>
         <div class="receipt-title">Official Payment Receipt</div>
         ${payment.status === 'paid' ? '<div class="paid-badge">✓ PAID</div>' : ''}
       </div>
@@ -103,20 +110,20 @@ function printReceipt(payment: Payment, student: Student | undefined) {
         <div class="amount-value">K${payment.amount.toLocaleString()}</div>
       </div>
 
-      <div class="bank-box">
+      ${hasBank ? `<div class="bank-box">
         <div class="bank-title">Banking Details</div>
-        Bank: First Alliance Bank &nbsp;|&nbsp; Branch: East Park<br>
-        Account Name: Great Highway Academy<br>
-        Account No: 0060700054001 &nbsp;|&nbsp; Currency: ZMW
-      </div>
+        ${branding.bankName ? `Bank: ${esc(branding.bankName)}${branding.bankBranch ? ` &nbsp;|&nbsp; Branch: ${esc(branding.bankBranch)}` : ''}<br>` : ''}
+        Account Name: ${esc(branding.schoolName)}<br>
+        ${branding.bankAccountNumber ? `Account No: ${esc(branding.bankAccountNumber)} &nbsp;|&nbsp; Currency: ZMW` : ''}
+      </div>` : ''}
 
       <div class="sig-section">
-        <div><div class="sig-line">Received By</div></div>
+        <div><div class="sig-line">${esc(branding.principalName) ? `Received By (${esc(branding.principalName)})` : 'Received By'}</div></div>
         <div><div class="sig-line">Date: ${new Date().toLocaleDateString()}</div></div>
       </div>
 
       <div class="footer">
-        This is an official receipt of Great Highway Academy &bull; Thank you for your payment
+        This is an official receipt of ${esc(branding.schoolName) || 'the school'} &bull; Thank you for your payment
       </div>
     </body>
     </html>
@@ -130,7 +137,7 @@ function printReceipt(payment: Payment, student: Student | undefined) {
 }
 
 export function Payments() {
-  const { payments, students, addPayment, updatePayment, deletePayment, currentTerm, terms } = useAppContext();
+  const { payments, students, branding, addPayment, updatePayment, deletePayment, currentTerm, terms } = useAppContext();
   const TERMS = terms;
   const { toast } = useToast();
   const tc = useThemeClasses();
@@ -278,7 +285,7 @@ export function Payments() {
                           </button>
                         )}
                         <button
-                          onClick={() => printReceipt(payment, student)}
+                          onClick={() => printReceipt(payment, student, branding)}
                           className="p-1.5 text-gray-500 hover:bg-gray-100 rounded"
                           title="Print Receipt"
                         >

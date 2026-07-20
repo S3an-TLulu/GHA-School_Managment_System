@@ -1,10 +1,11 @@
-import { useState, useRef } from 'react';
-import { Users, Database, Trash2, Shield, Download, Upload, AlertTriangle, Plus, Pencil, X, Check, Cloud, RefreshCw, UploadCloud, DownloadCloud, CalendarRange, Copy, KeyRound } from 'lucide-react';
+import { useState, useRef, useEffect } from 'react';
+import { Users, Database, Trash2, Shield, Download, Upload, AlertTriangle, Plus, Pencil, X, Check, Cloud, RefreshCw, UploadCloud, DownloadCloud, CalendarRange, Copy, KeyRound, History, Clock } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 import { useAuth, AppUser, UserRole, ROLE_PERMISSIONS } from '../context/AuthContext';
 import { useToast } from './ToastProvider';
 import { useThemeClasses } from '../hooks/useThemeClasses';
 import { generatePassword } from '../lib/auth';
+import { getAudit, clearAudit, logAudit, AUDIT_LABELS, AuditEntry } from '../lib/audit';
 import { getCloudConfig, saveCloudConfig, pushToCloud, pullFromCloud, testConnection, SETUP_SQL, SETUP_SQL_LIVE, isLiveSyncEnabled, setLiveSyncEnabled, pullAllLive } from '../lib/supabase';
 
 const ROLES: UserRole[] = ['Admin', 'Cashier', 'Teacher', 'Viewer'];
@@ -140,7 +141,18 @@ export function Settings() {
   const [masterDraft, setMasterDraft] = useState('');
   const { toast } = useToast();
   const tc = useThemeClasses();
-  const [tab, setTab] = useState<'users' | 'terms' | 'backup' | 'cloud' | 'cleanup'>('users');
+  const [tab, setTab] = useState<'users' | 'terms' | 'backup' | 'cloud' | 'activity' | 'cleanup'>('users');
+  const [lastBackup, setLastBackup] = useState<string | null>(() => localStorage.getItem('gha_last_backup'));
+  const [audit, setAudit] = useState<AuditEntry[]>([]);
+  const [auditFilter, setAuditFilter] = useState('');
+
+  // Keep the activity view live as new entries are logged.
+  useEffect(() => {
+    const refresh = () => setAudit(getAudit());
+    refresh();
+    window.addEventListener('gha-audit', refresh);
+    return () => window.removeEventListener('gha-audit', refresh);
+  }, []);
   const [newTerm, setNewTerm] = useState('');
   const [cloudCfg, setCloudCfg] = useState(getCloudConfig);
   const [cloudBusy, setCloudBusy] = useState(false);
@@ -163,8 +175,18 @@ export function Settings() {
     a.download = `GHA_Backup_${new Date().toISOString().split('T')[0]}.json`;
     document.body.appendChild(a); a.click();
     document.body.removeChild(a); URL.revokeObjectURL(url);
+    const now = new Date().toISOString();
+    localStorage.setItem('gha_last_backup', now);
+    setLastBackup(now);
+    logAudit('data-exported', 'Downloaded a backup file');
     toast('Backup downloaded. Keep it somewhere safe!', 'success');
   };
+
+  // How long since the last downloaded backup, for the reminder banner.
+  const daysSinceBackup = lastBackup
+    ? Math.floor((Date.now() - new Date(lastBackup).getTime()) / 86_400_000)
+    : null;
+  const backupStale = daysSinceBackup === null || daysSinceBackup >= 7;
 
   const handleImport = (file: File) => {
     const reader = new FileReader();
@@ -199,6 +221,25 @@ export function Settings() {
         <p className="text-gray-600">User accounts, permissions, data backup and cleanup</p>
       </div>
 
+      {/* Backup reminder — nudges the admin to download a fresh backup */}
+      <div className={`flex items-center justify-between gap-3 flex-wrap rounded-lg border px-4 py-3 ${
+        backupStale ? 'bg-amber-50 border-amber-200' : 'bg-green-50 border-green-200'
+      }`}>
+        <div className="flex items-center gap-2 text-sm">
+          <Clock className={`h-4 w-4 ${backupStale ? 'text-amber-600' : 'text-green-600'}`} />
+          <span className={backupStale ? 'text-amber-800' : 'text-green-800'}>
+            {lastBackup
+              ? `Last backup downloaded ${daysSinceBackup === 0 ? 'today' : `${daysSinceBackup} day${daysSinceBackup === 1 ? '' : 's'} ago`}.`
+              : 'You have never downloaded a backup.'}
+            {backupStale && ' A fresh backup is recommended.'}
+          </span>
+        </div>
+        <button onClick={handleExport}
+          className={`flex items-center gap-1.5 text-sm font-medium px-3 py-1.5 rounded-lg text-white ${backupStale ? 'bg-amber-600 hover:bg-amber-700' : 'bg-green-600 hover:bg-green-700'}`}>
+          <Download className="h-4 w-4" /> Backup now
+        </button>
+      </div>
+
       <div className="bg-white rounded-lg shadow-sm border border-gray-200">
         <div className="px-6 py-4 border-b border-gray-200 flex space-x-1">
           {[
@@ -206,6 +247,7 @@ export function Settings() {
             { id: 'terms' as const, label: 'School Terms', icon: CalendarRange },
             { id: 'backup' as const, label: 'Backup & Restore', icon: Database },
             { id: 'cloud' as const, label: 'Cloud Sync', icon: Cloud },
+            { id: 'activity' as const, label: 'Activity Log', icon: History },
             { id: 'cleanup' as const, label: 'Data Cleanup', icon: Trash2 },
           ].map(t => (
             <button key={t.id} onClick={() => setTab(t.id)}
@@ -568,6 +610,71 @@ export function Settings() {
             </div>
           )}
 
+          {/* ---------------- ACTIVITY LOG ---------------- */}
+          {tab === 'activity' && (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between gap-3 flex-wrap">
+                <div>
+                  <p className="font-semibold text-gray-900">Account & money activity</p>
+                  <p className="text-sm text-gray-500">Sign-ins, password changes, user management and edits to payments. Newest first.</p>
+                </div>
+                {audit.length > 0 && (
+                  <button
+                    onClick={() => {
+                      if (window.confirm('Clear the entire activity log? This cannot be undone.')) { clearAudit(); }
+                    }}
+                    className="flex items-center gap-1.5 text-sm text-gray-500 border border-gray-200 hover:bg-gray-50 rounded-lg px-3 py-1.5">
+                    <Trash2 className="h-4 w-4" /> Clear log
+                  </button>
+                )}
+              </div>
+
+              <input value={auditFilter} onChange={e => setAuditFilter(e.target.value)}
+                placeholder="Filter by user, action or detail…"
+                className="w-full sm:max-w-sm px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+
+              <div className="border border-gray-200 rounded-lg overflow-hidden">
+                {(() => {
+                  const q = auditFilter.trim().toLowerCase();
+                  const rows = audit.filter(e => {
+                    if (!q) return true;
+                    const label = AUDIT_LABELS[e.action] || e.action;
+                    return `${e.actor} ${label} ${e.detail || ''}`.toLowerCase().includes(q);
+                  });
+                  if (rows.length === 0) {
+                    return <p className="px-4 py-12 text-sm text-gray-400 text-center">
+                      {audit.length === 0 ? 'No activity recorded yet.' : 'Nothing matches that filter.'}
+                    </p>;
+                  }
+                  return (
+                    <div className="max-h-[28rem] overflow-y-auto divide-y divide-gray-50">
+                      {rows.map(e => {
+                        const label = AUDIT_LABELS[e.action] || e.action;
+                        const danger = e.action.includes('deleted') || e.action.includes('wiped') || e.action.includes('failed') || e.action.includes('locked');
+                        return (
+                          <div key={e.id} className="px-4 py-2.5 flex items-start gap-3 text-sm">
+                            <span className={`mt-1.5 w-2 h-2 rounded-full flex-shrink-0 ${danger ? 'bg-red-400' : 'bg-green-400'}`} />
+                            <div className="flex-1 min-w-0">
+                              <p className="text-gray-900">
+                                <span className="font-medium">{e.actor}</span>
+                                <span className="text-gray-500"> — {label}</span>
+                              </p>
+                              {e.detail && <p className="text-xs text-gray-500 truncate">{e.detail}</p>}
+                            </div>
+                            <span className="text-[11px] text-gray-400 flex-shrink-0 whitespace-nowrap">
+                              {new Date(e.at).toLocaleString('en-ZM', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                })()}
+              </div>
+              <p className="text-xs text-gray-400">The log keeps the most recent 500 events and is included in your backups.</p>
+            </div>
+          )}
+
           {/* ---------------- DATA CLEANUP ---------------- */}
           {tab === 'cleanup' && (
             <div className="space-y-6 max-w-2xl">
@@ -600,6 +707,7 @@ export function Settings() {
                   disabled={wipeSelection.size === 0}
                   onClick={() => {
                     if (window.confirm(`Permanently delete data for: ${[...wipeSelection].join(', ')}?\n\nThis cannot be undone.`)) {
+                      logAudit('data-wiped', `Sections: ${[...wipeSelection].join(', ')}`);
                       wipeData([...wipeSelection]);
                     }
                   }}
