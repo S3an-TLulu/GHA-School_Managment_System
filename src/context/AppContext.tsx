@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { getCloudConfig, pushToCloud, isLiveSyncEnabled, pushKeyLive, subscribeLive } from '../lib/supabase';
+import { logAudit } from '../lib/audit';
 
 export interface Student {
   id: string;
@@ -553,10 +554,30 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setResults(prev => prev.filter(r => r.studentId !== id));
   };
 
-  const addPayment = (payment: Payment) => setPayments(prev => [...prev, payment]);
+  const nameForStudent = (sid: string) => {
+    const s = students.find(st => st.id === sid);
+    return s ? s.name : sid;
+  };
+  const addPayment = (payment: Payment) => {
+    setPayments(prev => [...prev, payment]);
+    logAudit('payment-added', `${nameForStudent(payment.studentId)} — ${payment.type} K${payment.amount ?? '?'}`);
+  };
   const updatePayment = (id: string, updated: Partial<Payment>) =>
-    setPayments(prev => prev.map(p => p.id === id ? { ...p, ...updated } : p));
-  const deletePayment = (id: string) => setPayments(prev => prev.filter(p => p.id !== id));
+    setPayments(prev => {
+      const before = prev.find(p => p.id === id);
+      if (before) {
+        const amtChanged = updated.amount !== undefined && updated.amount !== before.amount;
+        logAudit('payment-edited', amtChanged
+          ? `${nameForStudent(before.studentId)}: K${before.amount} → K${updated.amount}`
+          : `${nameForStudent(before.studentId)} — ${before.type}`);
+      }
+      return prev.map(p => p.id === id ? { ...p, ...updated } : p);
+    });
+  const deletePayment = (id: string) => setPayments(prev => {
+    const before = prev.find(p => p.id === id);
+    if (before) logAudit('payment-deleted', `${nameForStudent(before.studentId)} — ${before.type} K${before.amount ?? '?'}`);
+    return prev.filter(p => p.id !== id);
+  });
 
   const addUniformPurchase = (uniform: Uniform) => setUniforms(prev => [...prev, uniform]);
 
@@ -685,6 +706,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     'gha_theme', 'gha_currentTerm', 'gha_fundraiser_participants', 'gha_external_fundraiser',
     'gha_uniform_catalog', 'gha_debtors', 'gha_transport_routes', 'gha_users', 'gha_claims', 'gha_master_code',
     'gha_terms', 'gha_todos', 'gha_salary_advances', 'gha_payroll', 'gha_groceries', 'gha_budgets', 'gha_documents',
+    'gha_audit',
   ];
 
   const exportAllData = (): string => {

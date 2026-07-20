@@ -4,7 +4,7 @@ import { useAuth, ROLE_PERMISSIONS } from '../context/AuthContext';
 import { useAppContext } from '../context/AppContext';
 import { useToast } from './ToastProvider';
 import { useThemeClasses } from '../hooks/useThemeClasses';
-import { hashPassword } from '../lib/auth';
+import { verifyPassword, passwordStrength } from '../lib/auth';
 
 const ROLE_BLURB: Record<string, string> = {
   Admin: 'Full access to every section, including Settings and user management.',
@@ -40,8 +40,8 @@ export function Profile() {
     if (next.length < 5) { toast('New password must be at least 5 characters.', 'warning'); return; }
     if (next !== confirm) { toast('New password and confirmation do not match.', 'error'); return; }
     setBusy(true);
-    const curHash = await hashPassword(currentUser.username, cur);
-    if (curHash !== currentUser.password) {
+    const valid = await verifyPassword(currentUser.username, cur, currentUser.password);
+    if (!valid) {
       setBusy(false);
       toast('Your current password is incorrect.', 'error');
       return;
@@ -130,6 +130,18 @@ export function Profile() {
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
             </div>
           </div>
+          {next && (
+            <div>
+              <div className="flex gap-1">
+                {[0, 1, 2, 3].map(i => {
+                  const s = passwordStrength(next).score;
+                  const color = s <= 1 ? 'bg-red-400' : s === 2 ? 'bg-amber-400' : s === 3 ? 'bg-lime-500' : 'bg-green-500';
+                  return <span key={i} className={`h-1.5 flex-1 rounded-full ${i < s ? color : 'bg-gray-200'}`} />;
+                })}
+              </div>
+              <p className="text-xs text-gray-500 mt-1">{passwordStrength(next).label}</p>
+            </div>
+          )}
           <button type="submit" disabled={busy}
             className={`flex items-center gap-1.5 ${tc.btn} text-white px-4 py-2 rounded-lg text-sm font-medium disabled:opacity-50`}>
             <Check className="h-4 w-4" />{busy ? 'Saving…' : 'Update Password'}

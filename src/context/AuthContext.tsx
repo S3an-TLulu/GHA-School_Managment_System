@@ -1,5 +1,22 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import { hashPassword, generateMasterCode } from '../lib/auth';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
+import { hashPassword, securePassword, verifyPassword, needsRehash, generateMasterCode } from '../lib/auth';
+import { logAudit, setAuditActor } from '../lib/audit';
+
+// Sign-in lockout: after this many consecutive failures for a username, further
+// attempts are blocked for LOCKOUT_MS. Tracked per-username in localStorage so a
+// page refresh doesn't reset the counter.
+const MAX_ATTEMPTS = 5;
+const LOCKOUT_MS = 60_000; // 1 minute
+// Auto sign-out after this much inactivity.
+const IDLE_TIMEOUT_MS = 30 * 60_000; // 30 minutes
+
+interface LockState { count: number; until: number }
+function loadLockouts(): Record<string, LockState> {
+  try { return JSON.parse(localStorage.getItem('gha_lockouts') || '{}'); } catch { return {}; }
+}
+function saveLockouts(v: Record<string, LockState>) {
+  try { localStorage.setItem('gha_lockouts', JSON.stringify(v)); } catch { /* ignore */ }
+}
 
 export type UserRole = 'Admin' | 'Cashier' | 'Teacher' | 'Viewer';
 
@@ -58,7 +75,7 @@ interface AuthContextType {
   currentUser: AppUser | null;
   users: AppUser[];
   claims: AuthClaim[];
-  login: (usernameOrEmail: string, password: string) => Promise<boolean>;
+  login: (usernameOrEmail: string, password: string) => Promise<{ ok: boolean; error?: string }>;
   logout: () => void;
   addUser: (user: Omit<AppUser, 'password'> & { password: string }) => Promise<void>;
   updateUser: (id: string, user: Partial<AppUser>) => void;
@@ -92,11 +109,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       let changed = false;
       const migrated = await Promise.all(users.map(async u => {
         if (!u.password) {
-          // fresh default admin — set the known default
-          if (u.username === 'admin') { changed = true; return { ...u, password: await hashPassword('admin', 'admin123') }; }
+          // fresh default admin — set the known default (already PBKDF2)
+          if (u.username === 'admin') { changed = true; return { ...u, password: await securePassword('admin', 'admin123') }; }
           return u;
         }
-        if (!isHashed(u.password)) { changed = true; return { ...u, password: await hashPassword(u.username, u.password) }; }
+        // Legacy plain-text (neither a SHA-256 hash nor PBKDF2) → hash it now.
+        if (!isHashed(u.password) && !u.password.startsWith('pbkdf2$')) {
+          changed = true; return { ...u, password: await securePassword(u.username, u.password) };
+        }
         return u;
       }));
       if (changed) setUsers(migrated);
@@ -104,21 +124,55 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const login = async (usernameOrEmail: string, password: string): Promise<boolean> => {
+  const login = async (usernameOrEmail: string, password: string): Promise<{ ok: boolean; error?: string }> => {
     const key = usernameOrEmail.trim().toLowerCase();
     const user = users.find(u => u.username.toLowerCase() === key || (u.email || '').toLowerCase() === key);
-    if (!user) return false;
-    const hash = await hashPassword(user.username, password);
-    if (user.password !== hash) return false;
+
+    // Lockout is keyed on whatever was typed, so probing random usernames is
+    // also throttled without revealing which accounts exist.
+    const locks = loadLockouts();
+    const lock = locks[key];
+    const now = Date.now();
+    if (lock && lock.until > now) {
+      const secs = Math.ceil((lock.until - now) / 1000);
+      logAudit('login-locked', `Attempt for "${key}" while locked`, key);
+      return { ok: false, error: `Too many attempts. Try again in ${secs}s.` };
+    }
+
+    const ok = user ? await verifyPassword(user.username, password, user.password) : false;
+    if (!user || !ok) {
+      const count = (lock && lock.until > now ? lock.count : (lock?.count || 0)) + 1;
+      const until = count >= MAX_ATTEMPTS ? now + LOCKOUT_MS : 0;
+      locks[key] = { count: until ? 0 : count, until };
+      saveLockouts(locks);
+      logAudit('login-failed', `Failed sign-in for "${key}"`, key);
+      if (until) return { ok: false, error: `Too many attempts. Locked for ${LOCKOUT_MS / 1000}s.` };
+      return { ok: false, error: 'Invalid username/email or password.' };
+    }
+
+    // Success — clear any lockout, upgrade a legacy hash, record it.
+    delete locks[key];
+    saveLockouts(locks);
+    if (needsRehash(user.password)) {
+      const upgraded = await securePassword(user.username, password);
+      setUsers(prev => prev.map(u => u.id === user.id ? { ...u, password: upgraded } : u));
+    }
+    setAuditActor(user.username);
     setCurrentUser(user);
-    return true;
+    logAudit('login', `${user.fullName} (${user.role})`, user.username);
+    return { ok: true };
   };
 
-  const logout = () => setCurrentUser(null);
+  const logout = () => {
+    if (currentUser) logAudit('logout', currentUser.fullName, currentUser.username);
+    setAuditActor('system');
+    setCurrentUser(null);
+  };
 
   const addUser = async (user: Omit<AppUser, 'password'> & { password: string }) => {
-    const hashed = await hashPassword(user.username, user.password);
+    const hashed = await securePassword(user.username, user.password);
     setUsers(prev => [...prev, { ...user, password: hashed }]);
+    logAudit('user-added', `${user.fullName} — @${user.username} (${user.role})`);
   };
 
   const updateUser = (id: string, updated: Partial<AppUser>) => {
@@ -129,13 +183,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const setUserPassword = async (id: string, plainPassword: string) => {
     const user = users.find(u => u.id === id);
     if (!user) return;
-    const hashed = await hashPassword(user.username, plainPassword);
+    const hashed = await securePassword(user.username, plainPassword);
     updateUser(id, { password: hashed, mustReset: false });
+    // Distinguish an admin resetting someone else vs. a user changing their own.
+    if (currentUser && currentUser.id === id) logAudit('password-change', currentUser.fullName);
+    else logAudit('password-reset', `@${user.username}`);
   };
 
   const deleteUser = (id: string) => setUsers(prev => {
     const target = prev.find(u => u.id === id);
     if (target?.role === 'Admin' && prev.filter(u => u.role === 'Admin').length <= 1) return prev;
+    if (target) logAudit('user-deleted', `${target.fullName} — @${target.username}`);
     return prev.filter(u => u.id !== id);
   });
 
@@ -158,12 +216,35 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const hashed = await hashPassword('__master__', plainCode);
     localStorage.setItem('gha_master_code', hashed);
     setHasMasterCode(true);
+    logAudit('mastercode-set', 'Master access code updated');
   };
   const verifyMasterCode = async (plainCode: string): Promise<boolean> => {
     const stored = localStorage.getItem('gha_master_code');
     if (!stored) return false;
     return stored === await hashPassword('__master__', plainCode);
   };
+
+  // Auto sign-out after a period of inactivity — protects a walk-away session on
+  // a shared front-desk or staffroom machine. Any interaction resets the timer.
+  const idleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (!currentUser) return;
+    const reset = () => {
+      if (idleTimer.current) clearTimeout(idleTimer.current);
+      idleTimer.current = setTimeout(() => {
+        logAudit('session-timeout', currentUser.fullName, currentUser.username);
+        setAuditActor('system');
+        setCurrentUser(null);
+      }, IDLE_TIMEOUT_MS);
+    };
+    const events = ['mousedown', 'keydown', 'touchstart', 'scroll'];
+    events.forEach(e => window.addEventListener(e, reset, { passive: true }));
+    reset();
+    return () => {
+      if (idleTimer.current) clearTimeout(idleTimer.current);
+      events.forEach(e => window.removeEventListener(e, reset));
+    };
+  }, [currentUser]);
 
   return (
     <AuthContext.Provider value={{
