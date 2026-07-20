@@ -29,6 +29,7 @@ import { Settings } from './components/Settings';
 import { ClassManager } from './components/ClassManager';
 import { HR } from './components/HR';
 import { Kitchen } from './components/Kitchen';
+import { Gallery } from './components/Gallery';
 import { Profile } from './components/Profile';
 import { Results } from './components/Results';
 import { AuthProvider, useAuth } from './context/AuthContext';
@@ -87,13 +88,14 @@ function AppContent() {
       case 'settings':     return <Settings />;
       case 'hr':           return <HR />;
       case 'kitchen':      return <Kitchen />;
+      case 'gallery':      return <Gallery />;
       case 'profile':      return <Profile />;
       default:             return <Dashboard />;
     }
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex">
+    <div className="gha-shell min-h-screen bg-gray-50 flex">
       {/* Desktop sidebar */}
       <div className="hidden lg:flex h-screen sticky top-0">
         <Sidebar activeSection={activeSection} setActiveSection={setActiveSection} />

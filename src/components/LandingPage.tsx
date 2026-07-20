@@ -1,7 +1,9 @@
 import { useState } from 'react';
+import { useAppContext } from '../context/AppContext';
 import {
   ArrowRight,
   Award,
+  Camera,
   Baby,
   Blocks,
   BookOpen,
@@ -36,9 +38,19 @@ const LOGO = `${BASE}gha-logo.png`;
 const NAV_LINKS = [
   { href: '#about', label: 'About' },
   { href: '#classes', label: 'Classes' },
-  { href: '#admissions', label: 'Admissions & Fees' },
+  { href: '#admissions', label: 'Admissions' },
   { href: '#facilities', label: 'Facilities' },
+  { href: '#gallery', label: 'Gallery' },
   { href: '#contact', label: 'Contact' },
+];
+
+// Shown in the Gallery section until the school publishes its own photos
+// through the portal (Photo Gallery section).
+const STOCK_GALLERY = [
+  { imageUrl: `${BASE}photos/gha-family.jpg`, title: 'The GHA family', category: 'Campus' },
+  { imageUrl: `${BASE}photos/learners-1.jpg`, title: 'Our learners', category: 'School Life' },
+  { imageUrl: `${BASE}photos/learners-2.jpg`, title: 'Side by side', category: 'School Life' },
+  { imageUrl: `${BASE}photos/learners-3.jpg`, title: 'A bright start', category: 'Classroom' },
 ];
 
 const VALUES = [
@@ -56,14 +68,6 @@ const CLASSES = [
   { icon: Trophy, name: 'Grades 5 – 7', desc: 'Upper primary: thorough preparation for the Grade 7 national examinations and beyond.' },
 ];
 
-const FEES = [
-  { grade: 'Baby Class', cash: 'K3,200', installments: 'K3,400' },
-  { grade: 'Middle Class', cash: 'K2,900', installments: 'K3,100' },
-  { grade: 'Reception', cash: 'K2,900', installments: 'K3,100' },
-  { grade: 'Grades 1 – 4', cash: 'K2,900', installments: 'K3,100' },
-  { grade: 'Grades 5 – 7', cash: 'K3,200', installments: 'K3,400' },
-];
-
 const APPLY_STEPS = [
   { title: 'Visit or Call Us', text: 'Come see the school at 1st Kabuzu Street or call / WhatsApp us to book a visit.' },
   { title: 'Collect Application Forms', text: 'Pick up an application form at the school office and gather the required documents.' },
@@ -73,9 +77,9 @@ const APPLY_STEPS = [
 
 const FACILITIES = [
   { icon: School, title: 'Modern Classrooms', text: 'Bright, well-equipped classrooms with small class sizes for focused learning.' },
-  { icon: Library, title: 'Reading & Library Corner', text: '"A reader today, a leader tomorrow" — daily reading is at the heart of GHA.' },
-  { icon: UtensilsCrossed, title: 'Kitchen & Daily Meals', text: 'Nutritious lunches prepared on site every school day (K500 per month).' },
-  { icon: Bus, title: 'School Transport', text: 'Safe door-to-door transport on trusted routes (K750 – K1,150 per month).' },
+  { icon: Library, title: 'Reading & Writing Culture', text: 'We build the core values of reading and writing in every child, every day — "a reader today, a leader tomorrow."' },
+  { icon: UtensilsCrossed, title: 'Kitchen & Daily Meals', text: 'Nutritious lunches prepared on site every school day, served hot to our learners.' },
+  { icon: Bus, title: 'School Transport', text: 'Safe, reliable door-to-door transport on trusted routes across Lusaka.' },
   { icon: Trees, title: 'Playground & Sports', text: 'Space to run, play and compete — healthy bodies support healthy minds.' },
   { icon: Landmark, title: 'Trusted Administration', text: 'Organised records, clear communication and printed receipts for every payment.' },
 ];
@@ -86,6 +90,11 @@ interface LandingPageProps {
 
 export function LandingPage({ onLoginClick }: LandingPageProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const { galleryPhotos } = useAppContext();
+
+  // Photos published by the school through the portal take over from the
+  // bundled ones as soon as any exist.
+  const galleryItems = (galleryPhotos.length > 0 ? galleryPhotos : STOCK_GALLERY).slice(0, 8);
 
   const closeMenu = () => setMobileMenuOpen(false);
 
@@ -161,10 +170,10 @@ export function LandingPage({ onLoginClick }: LandingPageProps) {
               <GraduationCap className="h-4 w-4" /> Admissions are OPEN — 2026 Academic Year · Limited spaces!
             </p>
             <h1 className="text-4xl md:text-6xl font-extrabold tracking-tight mb-4">Great Highway Academy</h1>
-            <p className="text-xl md:text-2xl text-violet-100 font-medium mb-2">
+            <p className="text-xl md:text-2xl text-white font-medium mb-2">
               The future starts today — <span className="text-teal-300">a reader today, a leader tomorrow.</span>
             </p>
-            <p className="text-violet-200 max-w-2xl mx-auto mb-10">
+            <p className="text-indigo-100 max-w-2xl mx-auto mb-10">
               Empowering young minds today for a brighter tomorrow. Baby Class to Grade 7 in Libala, Lusaka.
             </p>
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
@@ -213,21 +222,29 @@ export function LandingPage({ onLoginClick }: LandingPageProps) {
                 the national Grade 7 examinations — but we believe school is about more than exams.
               </p>
               <p className="text-gray-600 mb-6">
-                Reading is at the heart of everything we do. Our motto says it best:{' '}
+                Reading and writing are at the heart of everything we do. Our motto says it best:{' '}
                 <em className="text-violet-700 font-semibold not-italic">
                   "The future starts today — a reader today, a leader tomorrow."
                 </em>{' '}
-                Every child is known, valued and challenged to grow academically, socially and morally.
+                We nurture these core values in every child, every day — because a child who reads and
+                writes with confidence can learn anything.
               </p>
               <ul className="space-y-3">
-                {['Zambian curriculum, Baby Class to Grade 7', 'Small classes with individual attention', 'Daily reading programme in every grade', 'Sport, music and character development'].map((item) => (
+                {['Zambian curriculum, Baby Class to Grade 7', 'Small classes with individual attention', 'Core values of reading and writing built daily in every grade', 'Sport, music and character development'].map((item) => (
                   <li key={item} className="flex items-start gap-3 text-gray-700">
                     <CheckCircle2 className="h-5 w-5 text-teal-500 mt-0.5 flex-shrink-0" /> {item}
                   </li>
                 ))}
               </ul>
             </div>
-            <div className="bg-gradient-to-br from-violet-50 to-teal-50 rounded-2xl border border-violet-100 p-8 shadow-sm">
+            <div className="space-y-6">
+              <img
+                src={`${BASE}photos/gha-family.jpg`}
+                alt="Great Highway Academy learners in front of the school"
+                className="w-full rounded-2xl shadow-lg object-cover max-h-80"
+                loading="lazy"
+              />
+              <div className="bg-gradient-to-br from-violet-50 to-teal-50 rounded-2xl border border-violet-100 p-8 shadow-sm">
               <div className="flex items-center gap-3 mb-4">
                 <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-[#232d6b] text-white">
                   <Heart className="h-6 w-6" />
@@ -241,6 +258,7 @@ export function LandingPage({ onLoginClick }: LandingPageProps) {
               </p>
               <p className="font-semibold text-[#232d6b]">Mrs. Tembo</p>
               <p className="text-sm text-gray-500">Principal, Great Highway Academy</p>
+              </div>
             </div>
           </div>
         </section>
@@ -251,7 +269,7 @@ export function LandingPage({ onLoginClick }: LandingPageProps) {
             <div className="text-center mb-12">
               <p className="text-sm font-bold text-teal-300 uppercase tracking-wider mb-2">Our Classes</p>
               <h2 className="text-3xl md:text-4xl font-extrabold mb-3">From First Steps to Grade 7</h2>
-              <p className="text-violet-200 max-w-2xl mx-auto">
+              <p className="text-indigo-100 max-w-2xl mx-auto">
                 Every stage of your child's primary journey, under one roof.
               </p>
             </div>
@@ -262,7 +280,7 @@ export function LandingPage({ onLoginClick }: LandingPageProps) {
                     <Icon className="h-6 w-6" />
                   </div>
                   <h3 className="font-bold mb-2">{name}</h3>
-                  <p className="text-sm text-violet-200">{desc}</p>
+                  <p className="text-sm text-indigo-100">{desc}</p>
                 </div>
               ))}
             </div>
@@ -282,45 +300,33 @@ export function LandingPage({ onLoginClick }: LandingPageProps) {
           </div>
 
           <div className="grid lg:grid-cols-2 gap-10 items-start">
-            {/* Fee table */}
+            {/* Fees on request */}
             <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
               <div className="bg-[#232d6b] text-white px-6 py-4">
-                <h3 className="font-bold text-lg">School Fees Per Grade (Per Term)</h3>
+                <h3 className="font-bold text-lg">School Fees & Payment Plans</h3>
               </div>
-              <div className="overflow-x-auto">
-                <table className="w-full text-left">
-                  <thead>
-                    <tr className="bg-violet-50 text-[#232d6b] text-sm uppercase tracking-wide">
-                      <th className="px-6 py-3 font-bold">Grade / Section</th>
-                      <th className="px-6 py-3 font-bold">Cash</th>
-                      <th className="px-6 py-3 font-bold">Installments</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {FEES.map(({ grade, cash, installments }) => (
-                      <tr key={grade} className="border-t border-gray-100">
-                        <td className="px-6 py-4 font-semibold text-gray-800">{grade}</td>
-                        <td className="px-6 py-4 text-gray-700">{cash}</td>
-                        <td className="px-6 py-4 text-gray-700">{installments}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              <div className="grid grid-cols-2 divide-x divide-gray-100 border-t border-gray-100">
-                <div className="px-6 py-4 flex items-center gap-3">
-                  <UtensilsCrossed className="h-6 w-6 text-teal-500 flex-shrink-0" />
-                  <div>
-                    <p className="font-semibold text-gray-800 text-sm">Lunch</p>
-                    <p className="text-sm text-gray-600">K500 / month</p>
-                  </div>
-                </div>
-                <div className="px-6 py-4 flex items-center gap-3">
-                  <Bus className="h-6 w-6 text-teal-500 flex-shrink-0" />
-                  <div>
-                    <p className="font-semibold text-gray-800 text-sm">Transport</p>
-                    <p className="text-sm text-gray-600">K750 – K1,150 / month</p>
-                  </div>
+              <div className="p-6">
+                <img
+                  src={`${BASE}photos/learners-1.jpg`}
+                  alt="Great Highway Academy learners"
+                  className="w-full rounded-xl object-cover max-h-56 mb-5"
+                  loading="lazy"
+                />
+                <p className="text-gray-600 mb-4">
+                  Our fees are affordable and family-friendly, with cash and installment options for
+                  every grade from Baby Class to Grade 7. Optional lunch and school transport plans
+                  are also available.
+                </p>
+                <p className="text-gray-600 mb-5">
+                  For the current fee structure, please contact the school office — we will gladly
+                  share it and help you choose the plan that suits your family.
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {['Cash & installment options', 'Optional lunch plan', 'Optional transport plan'].map((tag) => (
+                    <span key={tag} className="inline-flex items-center gap-1.5 bg-violet-50 text-violet-800 text-sm font-medium px-3 py-1.5 rounded-full">
+                      <CheckCircle2 className="h-4 w-4" /> {tag}
+                    </span>
+                  ))}
                 </div>
               </div>
             </div>
@@ -388,7 +394,7 @@ export function LandingPage({ onLoginClick }: LandingPageProps) {
             <div>
               <p className="text-sm font-bold text-teal-300 uppercase tracking-wider mb-2">For Parents & Staff</p>
               <h2 className="text-3xl md:text-4xl font-extrabold mb-4">The GHA School Portal</h2>
-              <p className="text-violet-200 mb-6">
+              <p className="text-indigo-100 mb-6">
                 Our school runs on a modern management system — fee payments and printed receipts, attendance,
                 academic results, timetables, announcements and more, all in one place. Staff and administrators
                 sign in here.
@@ -415,6 +421,38 @@ export function LandingPage({ onLoginClick }: LandingPageProps) {
                 </div>
               ))}
             </div>
+          </div>
+        </section>
+
+        {/* Gallery */}
+        <section id="gallery" className="bg-gray-50 py-20 scroll-mt-20">
+          <div className="max-w-6xl mx-auto px-4">
+            <div className="text-center mb-12">
+              <p className="text-sm font-bold text-teal-600 uppercase tracking-wider mb-2">Photo Gallery</p>
+              <h2 className="text-3xl md:text-4xl font-extrabold text-[#232d6b] mb-3">Life at Great Highway Academy</h2>
+              <p className="text-gray-600 max-w-2xl mx-auto inline-flex items-center gap-2">
+                <Camera className="h-5 w-5 text-violet-700" /> Moments from our events, classrooms and school family.
+              </p>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {galleryItems.map((photo) => (
+                <figure key={photo.imageUrl} className="group relative rounded-xl overflow-hidden shadow-sm border border-gray-100 bg-white">
+                  <img
+                    src={photo.imageUrl}
+                    alt={photo.title}
+                    className="w-full aspect-square object-cover group-hover:scale-105 transition-transform duration-300"
+                    loading="lazy"
+                  />
+                  <figcaption className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/75 to-transparent text-white px-3 pb-2.5 pt-8">
+                    <p className="text-sm font-semibold truncate">{photo.title}</p>
+                    <p className="text-xs text-white/85">{photo.category}</p>
+                  </figcaption>
+                </figure>
+              ))}
+            </div>
+            <p className="text-center text-sm text-gray-500 mt-6">
+              New photos are published by the school through the GHA portal after every event.
+            </p>
           </div>
         </section>
 
@@ -471,16 +509,18 @@ export function LandingPage({ onLoginClick }: LandingPageProps) {
         <div className="max-w-6xl mx-auto px-4 py-12 grid md:grid-cols-3 gap-10">
           <div>
             <div className="flex items-center gap-3 mb-4">
-              <img src={LOGO} alt="" className="h-12 w-12 rounded-full bg-white p-1" />
+              <span className="inline-flex items-center justify-center h-16 w-16 rounded-full bg-white p-1.5 ring-2 ring-teal-300/60 shadow-lg flex-shrink-0">
+                <img src={LOGO} alt="Great Highway Academy crest" className="h-full w-full object-contain" />
+              </span>
               <span className="font-extrabold text-lg">Great Highway Academy</span>
             </div>
-            <p className="text-sm text-violet-200">
+            <p className="text-sm text-indigo-100">
               The future starts today — a reader today, a leader tomorrow.
             </p>
           </div>
           <div>
             <h3 className="font-bold mb-4 text-teal-300">Quick Links</h3>
-            <ul className="space-y-2 text-sm text-violet-200">
+            <ul className="space-y-2 text-sm text-indigo-100">
               {NAV_LINKS.map((link) => (
                 <li key={link.href}>
                   <a href={link.href} className="hover:text-white transition-colors">{link.label}</a>
@@ -493,7 +533,7 @@ export function LandingPage({ onLoginClick }: LandingPageProps) {
           </div>
           <div>
             <h3 className="font-bold mb-4 text-teal-300">Get in Touch</h3>
-            <ul className="space-y-2 text-sm text-violet-200">
+            <ul className="space-y-2 text-sm text-indigo-100">
               <li>1st Kabuzu Street, Along Nationalist Rd</li>
               <li>Next to Libala SDA, Lusaka, Zambia</li>
               <li>0977 772 677 / 0966 772 677</li>
@@ -502,7 +542,7 @@ export function LandingPage({ onLoginClick }: LandingPageProps) {
           </div>
         </div>
         <div className="border-t border-white/10">
-          <p className="max-w-6xl mx-auto px-4 py-5 text-center text-sm text-violet-300 flex items-center justify-center gap-2 flex-wrap">
+          <p className="max-w-6xl mx-auto px-4 py-5 text-center text-sm text-indigo-200 flex items-center justify-center gap-2 flex-wrap">
             <Award className="h-4 w-4" /> © {new Date().getFullYear()} Great Highway Academy. Where excellence is our tradition!
           </p>
         </div>
