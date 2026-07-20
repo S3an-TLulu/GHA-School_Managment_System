@@ -31,6 +31,7 @@ import { HR } from './components/HR';
 import { Kitchen } from './components/Kitchen';
 import { Gallery } from './components/Gallery';
 import { Profile } from './components/Profile';
+import { Library } from './components/Library';
 import { Results } from './components/Results';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { useAppContext } from './context/AppContext';
@@ -89,6 +90,7 @@ function AppContent() {
       case 'hr':           return <HR />;
       case 'kitchen':      return <Kitchen />;
       case 'gallery':      return <Gallery />;
+      case 'library':      return <Library />;
       case 'profile':      return <Profile />;
       default:             return <Dashboard />;
     }

@@ -92,6 +92,7 @@ export interface PayrollRecord {
   notes?: string;
   status: 'pending' | 'paid';
   paidDate?: string;
+  paymentMethod?: 'Bank' | 'Cash' | 'Mobile Money';
 }
 
 export interface Expense {
@@ -157,6 +158,31 @@ export interface UniformCatalogItem {
   category: 'Girls' | 'Boys' | 'Both';
   stock: number;
   imageUrl?: string;
+}
+
+// A title in the school library. `totalCopies` is how many the school owns;
+// copies currently on loan are derived from active BookLoan records.
+export interface LibraryBook {
+  id: string;
+  title: string;
+  author?: string;
+  category?: string;
+  totalCopies: number;
+  coverUrl?: string;
+  notes?: string;
+}
+
+// A single borrowing of a book by a student or a member of staff.
+export interface BookLoan {
+  id: string;
+  bookId: string;
+  borrowerType: 'student' | 'teacher';
+  borrowerId: string;
+  borrowerName: string;   // snapshot so history reads well even if the person is removed
+  borrowedDate: string;
+  dueDate: string;
+  returnedDate?: string;
+  notes?: string;
 }
 
 export interface Debtor {
@@ -350,6 +376,14 @@ interface AppContextType {
   updateUniformCatalogItem: (id: string, item: Partial<UniformCatalogItem>) => void;
   deleteUniformCatalogItem: (id: string) => void;
   sellUniform: (catalogItemId: string, studentId: string) => boolean;
+  libraryBooks: LibraryBook[];
+  addLibraryBook: (b: LibraryBook) => void;
+  updateLibraryBook: (id: string, b: Partial<LibraryBook>) => void;
+  deleteLibraryBook: (id: string) => void;
+  bookLoans: BookLoan[];
+  borrowBook: (loan: BookLoan) => void;
+  returnLoan: (id: string) => void;
+  deleteLoan: (id: string) => void;
   debtors: Debtor[];
   addDebtor: (d: Debtor) => void;
   updateDebtor: (id: string, d: Partial<Debtor>) => void;
@@ -487,6 +521,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [fundraiserParticipants, setFundraiserParticipants] = useState<FundraiserParticipant[]>(() => loadFromStorage('gha_fundraiser_participants', []));
   const [externalFundraiserPayments, setExternalFundraiserPayments] = useState<ExternalFundraiserPayment[]>(() => loadFromStorage('gha_external_fundraiser', []));
   const [uniformCatalog, setUniformCatalog] = useState<UniformCatalogItem[]>(() => loadFromStorage('gha_uniform_catalog', INITIAL_UNIFORM_CATALOG));
+  const [libraryBooks, setLibraryBooks] = useState<LibraryBook[]>(() => loadFromStorage('gha_library_books', []));
+  const [bookLoans, setBookLoans] = useState<BookLoan[]>(() => loadFromStorage('gha_book_loans', []));
   const [debtors, setDebtors] = useState<Debtor[]>(() => loadFromStorage('gha_debtors', []));
   const [transportRoutes, setTransportRoutes] = useState<TransportRoute[]>(() => loadFromStorage('gha_transport_routes', []));
   const [terms, setTerms] = useState<string[]>(() => loadFromStorage('gha_terms', ['Term 1 2026', 'Term 2 2026', 'Term 3 2026', 'Term 1 2025', 'Term 2 2025', 'Term 3 2025']));
@@ -536,6 +572,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => { localStorage.setItem('gha_fundraiser_participants', JSON.stringify(fundraiserParticipants)); queueLiveSync('gha_fundraiser_participants'); }, [fundraiserParticipants]);
   useEffect(() => { localStorage.setItem('gha_external_fundraiser', JSON.stringify(externalFundraiserPayments)); queueLiveSync('gha_external_fundraiser'); }, [externalFundraiserPayments]);
   useEffect(() => { localStorage.setItem('gha_uniform_catalog', JSON.stringify(uniformCatalog)); queueLiveSync('gha_uniform_catalog'); }, [uniformCatalog]);
+  useEffect(() => { localStorage.setItem('gha_library_books', JSON.stringify(libraryBooks)); queueLiveSync('gha_library_books'); }, [libraryBooks]);
+  useEffect(() => { localStorage.setItem('gha_book_loans', JSON.stringify(bookLoans)); queueLiveSync('gha_book_loans'); }, [bookLoans]);
   useEffect(() => { localStorage.setItem('gha_debtors', JSON.stringify(debtors)); queueLiveSync('gha_debtors'); }, [debtors]);
   useEffect(() => { localStorage.setItem('gha_transport_routes', JSON.stringify(transportRoutes)); queueLiveSync('gha_transport_routes'); }, [transportRoutes]);
   useEffect(() => { localStorage.setItem('gha_terms', JSON.stringify(terms)); queueLiveSync('gha_terms'); }, [terms]);
@@ -659,6 +697,18 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     return true;
   };
 
+  const addLibraryBook = (b: LibraryBook) => setLibraryBooks(prev => [...prev, b]);
+  const updateLibraryBook = (id: string, updated: Partial<LibraryBook>) =>
+    setLibraryBooks(prev => prev.map(b => b.id === id ? { ...b, ...updated } : b));
+  const deleteLibraryBook = (id: string) => {
+    setLibraryBooks(prev => prev.filter(b => b.id !== id));
+    setBookLoans(prev => prev.filter(l => l.bookId !== id)); // drop that book's loan history too
+  };
+  const borrowBook = (loan: BookLoan) => setBookLoans(prev => [loan, ...prev]);
+  const returnLoan = (id: string) =>
+    setBookLoans(prev => prev.map(l => l.id === id ? { ...l, returnedDate: new Date().toISOString() } : l));
+  const deleteLoan = (id: string) => setBookLoans(prev => prev.filter(l => l.id !== id));
+
   const addDebtor = (d: Debtor) => setDebtors(prev => [...prev, d]);
   const updateDebtor = (id: string, updated: Partial<Debtor>) =>
     setDebtors(prev => prev.map(d => d.id === id ? { ...d, ...updated } : d));
@@ -726,7 +776,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     'gha_theme', 'gha_currentTerm', 'gha_fundraiser_participants', 'gha_external_fundraiser',
     'gha_uniform_catalog', 'gha_debtors', 'gha_transport_routes', 'gha_users', 'gha_claims', 'gha_master_code',
     'gha_terms', 'gha_todos', 'gha_salary_advances', 'gha_payroll', 'gha_groceries', 'gha_budgets', 'gha_documents',
-    'gha_audit', 'gha_gallery',
+    'gha_audit', 'gha_gallery', 'gha_library_books', 'gha_book_loans',
   ];
 
   const exportAllData = (): string => {
@@ -757,6 +807,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     students: ['gha_students'],
     payments: ['gha_payments'],
     uniforms: ['gha_uniforms', 'gha_uniform_catalog'],
+    library: ['gha_library_books', 'gha_book_loans'],
     requirements: ['gha_requirements'],
     teachers: ['gha_teachers'],
     expenses: ['gha_expenses'],
@@ -789,7 +840,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, [students, payments, uniforms, requirements, teachers, expenses, inventory, events,
       feeStructure, otherCharges, announcements, attendance, results, timetables, branding,
       currentTerm, fundraiserParticipants, externalFundraiserPayments, uniformCatalog,
-      debtors, transportRoutes, salaryAdvances, payrollRecords, terms, todos, groceries, budgets, documents, galleryPhotos]);
+      debtors, transportRoutes, salaryAdvances, payrollRecords, terms, todos, groceries, budgets, documents,
+      galleryPhotos, libraryBooks, bookLoans]);
 
   // Apply changes arriving from other devices in real time
   useEffect(() => {
@@ -804,6 +856,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       gha_fundraiser_participants: setFundraiserParticipants,
       gha_external_fundraiser: setExternalFundraiserPayments,
       gha_uniform_catalog: setUniformCatalog, gha_debtors: setDebtors,
+      gha_library_books: setLibraryBooks, gha_book_loans: setBookLoans,
       gha_transport_routes: setTransportRoutes, gha_terms: setTerms, gha_todos: setTodos,
       gha_salary_advances: setSalaryAdvances, gha_payroll: setPayrollRecords,
       gha_groceries: setGroceries, gha_budgets: setBudgets, gha_documents: setDocuments,
@@ -907,6 +960,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       fundraiserParticipants, toggleFundraiserParticipant,
       externalFundraiserPayments, addExternalFundraiserPayment, deleteExternalFundraiserPayment,
       uniformCatalog, addUniformCatalogItem, updateUniformCatalogItem, deleteUniformCatalogItem, sellUniform,
+      libraryBooks, addLibraryBook, updateLibraryBook, deleteLibraryBook,
+      bookLoans, borrowBook, returnLoan, deleteLoan,
       debtors, addDebtor, updateDebtor, deleteDebtor,
       transportRoutes, addTransportRoute, updateTransportRoute, deleteTransportRoute,
       exportAllData, importAllData, wipeData,
