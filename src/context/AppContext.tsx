@@ -259,6 +259,20 @@ export interface AppTheme {
   colorScheme: 'blue' | 'green' | 'purple' | 'orange' | 'red';
   darkMode: boolean;
   sidebarStyle: 'default' | 'compact';
+  // Portal background wallpaper: '' = none, 'stock:<name>' = bundled photo
+  // (resolved against the app base path at apply time), otherwise a data URL.
+  wallpaper?: string;
+  // How strongly the wallpaper is faded towards the page background (0–95%).
+  wallpaperDim?: number;
+}
+
+export interface GalleryPhoto {
+  id: string;
+  title: string;
+  category: string;
+  imageUrl: string; // compressed data URL
+  date: string;
+  addedBy?: string;
 }
 
 export interface TimetableCell {
@@ -394,6 +408,10 @@ interface AppContextType {
   updateBranding: (b: Partial<SchoolBranding>) => void;
   theme: AppTheme;
   updateTheme: (t: Partial<AppTheme>) => void;
+  galleryPhotos: GalleryPhoto[];
+  addGalleryPhoto: (p: GalleryPhoto) => void;
+  updateGalleryPhoto: (id: string, p: Partial<GalleryPhoto>) => void;
+  deleteGalleryPhoto: (id: string) => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -494,6 +512,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [otherCharges, setOtherCharges] = useState<OtherCharge[]>(() => loadFromStorage('gha_othercharges', INITIAL_OTHER_CHARGES));
   const [announcements, setAnnouncements] = useState<Announcement[]>(() => loadFromStorage('gha_announcements', []));
   const [currentTerm, setCurrentTerm] = useState<string>(() => loadFromStorage('gha_currentTerm', 'Term 1 2026'));
+  const [galleryPhotos, setGalleryPhotos] = useState<GalleryPhoto[]>(() => loadFromStorage('gha_gallery', []));
 
   // ---- Live sync machinery (Phase 7) ----
   // Debounced per-key push; suppress set stops remote-applied changes from
@@ -542,6 +561,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => { localStorage.setItem('gha_othercharges', JSON.stringify(otherCharges)); queueLiveSync('gha_othercharges'); }, [otherCharges]);
   useEffect(() => { localStorage.setItem('gha_announcements', JSON.stringify(announcements)); queueLiveSync('gha_announcements'); }, [announcements]);
   useEffect(() => { localStorage.setItem('gha_currentTerm', JSON.stringify(currentTerm)); queueLiveSync('gha_currentTerm'); }, [currentTerm]);
+  useEffect(() => { localStorage.setItem('gha_gallery', JSON.stringify(galleryPhotos)); queueLiveSync('gha_gallery'); }, [galleryPhotos]);
 
   const addStudent = (student: Student) => setStudents(prev => [...prev, student]);
   const updateStudent = (id: string, updated: Partial<Student>) =>
@@ -706,7 +726,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     'gha_theme', 'gha_currentTerm', 'gha_fundraiser_participants', 'gha_external_fundraiser',
     'gha_uniform_catalog', 'gha_debtors', 'gha_transport_routes', 'gha_users', 'gha_claims', 'gha_master_code',
     'gha_terms', 'gha_todos', 'gha_salary_advances', 'gha_payroll', 'gha_groceries', 'gha_budgets', 'gha_documents',
-    'gha_audit',
+    'gha_audit', 'gha_gallery',
   ];
 
   const exportAllData = (): string => {
@@ -751,6 +771,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     hr: ['gha_salary_advances', 'gha_payroll'],
     kitchen: ['gha_groceries'],
     documents: ['gha_documents'],
+    gallery: ['gha_gallery'],
   };
 
   // Auto cloud sync: when enabled in Settings → Cloud Sync, push the whole
@@ -768,7 +789,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, [students, payments, uniforms, requirements, teachers, expenses, inventory, events,
       feeStructure, otherCharges, announcements, attendance, results, timetables, branding,
       currentTerm, fundraiserParticipants, externalFundraiserPayments, uniformCatalog,
-      debtors, transportRoutes, salaryAdvances, payrollRecords, terms, todos, groceries, budgets, documents]);
+      debtors, transportRoutes, salaryAdvances, payrollRecords, terms, todos, groceries, budgets, documents, galleryPhotos]);
 
   // Apply changes arriving from other devices in real time
   useEffect(() => {
@@ -786,6 +807,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       gha_transport_routes: setTransportRoutes, gha_terms: setTerms, gha_todos: setTodos,
       gha_salary_advances: setSalaryAdvances, gha_payroll: setPayrollRecords,
       gha_groceries: setGroceries, gha_budgets: setBudgets, gha_documents: setDocuments,
+      gha_gallery: setGalleryPhotos,
     } as Record<string, (v: never) => void>;
 
     const unsubscribe = subscribeLive((key, data) => {
@@ -864,6 +886,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const updateBranding = (b: Partial<SchoolBranding>) => setBranding(prev => ({ ...prev, ...b }));
   const updateTheme = (t: Partial<AppTheme>) => setTheme(prev => ({ ...prev, ...t }));
 
+  const addGalleryPhoto = (p: GalleryPhoto) => setGalleryPhotos(prev => [p, ...prev]);
+  const updateGalleryPhoto = (id: string, updated: Partial<GalleryPhoto>) =>
+    setGalleryPhotos(prev => prev.map(g => g.id === id ? { ...g, ...updated } : g));
+  const deleteGalleryPhoto = (id: string) => setGalleryPhotos(prev => prev.filter(g => g.id !== id));
+
   return (
     <AppContext.Provider value={{
       students, payments, uniforms, requirements, teachers, expenses, inventory, events,
@@ -898,7 +925,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       results, addResult, updateResult, deleteResult, saveClassResults,
       timetables, saveTimetable,
       branding, updateBranding,
-      theme, updateTheme
+      theme, updateTheme,
+      galleryPhotos, addGalleryPhoto, updateGalleryPhoto, deleteGalleryPhoto
     }}>
       {children}
     </AppContext.Provider>

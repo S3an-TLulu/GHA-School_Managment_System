@@ -6,8 +6,10 @@ This folder contains the public website for **Great Highway Academy**:
 |---|---|
 | `index.html` | The whole website in one self-contained file (no build step, no database, no external libraries) |
 | `gha-logo.png` | The school crest, shown in the header, hero, footer and browser tab |
+| `images/` | Photos used across the page (about, fees card, gallery) |
 
-Upload **both files together** — the page loads the logo from the same folder.
+Upload **everything together** — `index.html`, `gha-logo.png` and the whole
+`images/` folder — the page loads them from the same location.
 
 A live preview of this exact page is also published with the app at:
 `https://s3an-tlulu.github.io/GHA-School_Managment_System/website/`
@@ -26,8 +28,8 @@ A live preview of this exact page is also published with the app at:
 2. In cPanel, open **Files → File Manager**.
 3. Go into the **`public_html`** folder (this is your website's root — what visitors see at `https://yourdomain.com`).
 4. If there is a default placeholder file (`index.html` or `index.php` from InterServer), delete it or rename it to `index.old`.
-5. Click **Upload**, then select `index.html` and `gha-logo.png` from this folder (`website/` in the project).
-6. Confirm both files sit directly inside `public_html` — i.e. `public_html/index.html` and `public_html/gha-logo.png` (not in a subfolder).
+5. Click **Upload**, then select `index.html` and `gha-logo.png` from this folder (`website/` in the project). Upload the photos too: create a folder named `images` inside `public_html` and upload everything from `website/images/` into it. (Tip: uploading a ZIP of the whole `website` folder and using File Manager's **Extract** is quicker.)
+6. Confirm the layout is `public_html/index.html`, `public_html/gha-logo.png` and `public_html/images/*.jpg` (not nested in an extra subfolder).
 7. Visit your domain in a browser — the site should appear immediately.
 
 ## 3. Option B — Upload with FTP (FileZilla)
@@ -35,7 +37,7 @@ A live preview of this exact page is also published with the app at:
 1. In cPanel, open **Files → FTP Accounts** to see/create your FTP credentials (host is usually your domain or server hostname, port 21; SFTP may also be available — check your welcome email).
 2. In FileZilla: **Host** = your domain or server IP, **Username/Password** = your FTP account, **Port** = 21, then Quickconnect.
 3. On the right (remote) side, open `public_html`.
-4. Drag `index.html` and `gha-logo.png` from the left (local) side into `public_html`.
+4. Drag `index.html`, `gha-logo.png` and the `images` folder from the left (local) side into `public_html`.
 
 ## 4. Pointing your custom domain at InterServer
 
@@ -71,9 +73,10 @@ If you ever move the portal (e.g. to `portal.gha-academy.com`), update the link:
 
 ## 7. Updating the site later
 
-- Edit `website/index.html` in this project (fees, phone numbers, text — the fee table is one clearly marked block).
+- Edit `website/index.html` in this project (phone numbers, text, gallery entries).
 - Copy the same file over `public/website/index.html` so the GitHub Pages preview stays in sync.
 - Re-upload it to `public_html`, overwriting the old file. Changes are live instantly (press Ctrl+F5 to bypass your browser cache).
+- **Refreshing the gallery:** drop new photos into `public_html/images/` and add a matching `<figure>` block in the gallery section of `index.html` (it's marked with a comment). Photos added through the portal's Photo Gallery appear automatically on the *app's* landing page; the static site shows whatever is in `images/`.
 
 ## 8. Troubleshooting
 

@@ -1,6 +1,23 @@
-import { useEffect } from 'react';
-import { Palette, Monitor, Layout } from 'lucide-react';
+import { useEffect, useRef } from 'react';
+import { Palette, Monitor, Layout, Image as ImageIcon, Upload, Ban } from 'lucide-react';
 import { useAppContext, AppTheme } from '../context/AppContext';
+import { compressImage } from '../lib/images';
+
+// Bundled wallpapers shipped with the app (public/photos). Stored as
+// 'stock:<name>' so the URL survives a change of deployment base path.
+const STOCK_WALLPAPERS = [
+  { id: 'stock:gha-family', label: 'GHA Family' },
+  { id: 'stock:learners-1', label: 'Our Learners' },
+  { id: 'stock:learners-2', label: 'Side by Side' },
+  { id: 'stock:learners-3', label: 'Bright Start' },
+];
+
+export function resolveWallpaperUrl(wallpaper: string): string {
+  if (wallpaper.startsWith('stock:')) {
+    return `${import.meta.env.BASE_URL}photos/${wallpaper.slice(6)}.jpg`;
+  }
+  return wallpaper;
+}
 
 const SCHEMES: { id: AppTheme['colorScheme']; label: string; primary: string; accent: string; preview: string }[] = [
   { id: 'blue',   label: 'Ocean Blue',   primary: '#1d4ed8', accent: '#3b82f6', preview: 'bg-blue-600' },
@@ -70,6 +87,22 @@ function applyTheme(theme: AppTheme) {
     ::selection { background-color: #2563eb !important; color: #ffffff !important; }
     thead.bg-gray-50 th, tr.bg-gray-50 th, .bg-gray-50 th { background-color: #1e293b !important; color: #cbd5e1 !important; }
     ` : ''}
+    ${theme.wallpaper ? (() => {
+      // Fade the wallpaper towards the normal page colour so content stays
+      // readable; the app shell goes transparent to let it show through.
+      const dim = Math.min(95, Math.max(0, theme.wallpaperDim ?? 75)) / 100;
+      const tint = theme.darkMode ? `rgba(15,23,42,${dim})` : `rgba(243,244,246,${dim})`;
+      const url = resolveWallpaperUrl(theme.wallpaper).replace(/"/g, '%22');
+      return `
+    body {
+      background-image: linear-gradient(${tint}, ${tint}), url("${url}") !important;
+      background-size: cover !important;
+      background-position: center !important;
+      background-attachment: fixed !important;
+    }
+    .gha-shell { background-color: transparent !important; }
+      `;
+    })() : ''}
   `;
 
   if (theme.darkMode) {
@@ -80,11 +113,28 @@ function applyTheme(theme: AppTheme) {
 }
 
 export function ThemeManager() {
-  const { theme, updateTheme } = useAppContext();
+  const { theme, updateTheme, galleryPhotos } = useAppContext();
+  const fileInput = useRef<HTMLInputElement>(null);
 
   useEffect(() => { applyTheme(theme); }, [theme]);
 
   const current = SCHEMES.find(s => s.id === theme.colorScheme) || SCHEMES[0];
+  const wallpaper = theme.wallpaper || '';
+  const dim = theme.wallpaperDim ?? 75;
+
+  const setWallpaper = (w: string) => updateTheme({ wallpaper: w });
+
+  const uploadWallpaper = async (file: File | undefined) => {
+    if (!file) return;
+    try {
+      // Wallpapers can afford a larger size than profile photos, but still
+      // need to fit comfortably in localStorage / cloud sync as JSON.
+      const dataUrl = await compressImage(file, 1600, 0.75);
+      setWallpaper(dataUrl);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Could not read that image.');
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -173,6 +223,75 @@ export function ThemeManager() {
             </button>
           ))}
         </div>
+      </div>
+
+      {/* Background wallpaper */}
+      <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
+        <div className="flex items-center space-x-2 mb-1">
+          <ImageIcon className="h-4 w-4 text-blue-600" />
+          <h2 className="font-semibold text-gray-900">Background Wallpaper</h2>
+        </div>
+        <p className="text-xs text-gray-500 mb-4">
+          Choose a stock wallpaper, pick a photo from the school gallery, or upload your own.
+          The image sits softly behind the whole portal.
+        </p>
+
+        <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3">
+          <button onClick={() => setWallpaper('')}
+            className={`relative aspect-video rounded-lg border-2 flex flex-col items-center justify-center text-gray-500 bg-gray-50 ${
+              wallpaper === '' ? 'border-gray-900 shadow-md' : 'border-gray-200 hover:border-gray-400'
+            }`}>
+            <Ban className="h-5 w-5 mb-1" />
+            <span className="text-xs font-medium">None</span>
+          </button>
+
+          {STOCK_WALLPAPERS.map(w => (
+            <button key={w.id} onClick={() => setWallpaper(w.id)} title={w.label}
+              className={`relative aspect-video rounded-lg border-2 overflow-hidden ${
+                wallpaper === w.id ? 'border-gray-900 shadow-md' : 'border-gray-200 hover:border-gray-400'
+              }`}>
+              <img src={resolveWallpaperUrl(w.id)} alt={w.label} className="w-full h-full object-cover" />
+              <span className="absolute inset-x-0 bottom-0 bg-black/50 text-white text-[10px] px-1 py-0.5 truncate">{w.label}</span>
+            </button>
+          ))}
+
+          <button onClick={() => fileInput.current?.click()}
+            className="relative aspect-video rounded-lg border-2 border-dashed border-gray-300 hover:border-gray-500 flex flex-col items-center justify-center text-gray-500">
+            <Upload className="h-5 w-5 mb-1" />
+            <span className="text-xs font-medium">Upload</span>
+          </button>
+          <input ref={fileInput} type="file" accept="image/*" className="hidden"
+            onChange={e => { uploadWallpaper(e.target.files?.[0]); e.target.value = ''; }} />
+        </div>
+
+        {galleryPhotos.length > 0 && (
+          <div className="mt-4">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">From the Photo Gallery</p>
+            <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3">
+              {galleryPhotos.slice(0, 12).map(p => (
+                <button key={p.id} onClick={() => setWallpaper(p.imageUrl)} title={p.title}
+                  className={`relative aspect-video rounded-lg border-2 overflow-hidden ${
+                    wallpaper === p.imageUrl ? 'border-gray-900 shadow-md' : 'border-gray-200 hover:border-gray-400'
+                  }`}>
+                  <img src={p.imageUrl} alt={p.title} className="w-full h-full object-cover" />
+                  <span className="absolute inset-x-0 bottom-0 bg-black/50 text-white text-[10px] px-1 py-0.5 truncate">{p.title}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {wallpaper !== '' && (
+          <div className="mt-4 max-w-sm">
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Fade into background — <strong>{dim}%</strong>
+            </label>
+            <input type="range" min={0} max={95} step={5} value={dim}
+              onChange={e => updateTheme({ wallpaperDim: Number(e.target.value) })}
+              className="w-full" />
+            <p className="text-xs text-gray-500 mt-1">Higher = more subtle, keeps text easy to read.</p>
+          </div>
+        )}
       </div>
 
       {/* Theme preview */}
