@@ -1,10 +1,13 @@
-import { useState } from 'react';
-import { Plus, Search, Pencil, Trash2, Eye, Users } from 'lucide-react';
+import { useState, useRef } from 'react';
+import { Plus, Search, Pencil, Trash2, Eye, Users, Download, Upload, CreditCard } from 'lucide-react';
 import { useAppContext, Student } from '../context/AppContext';
 import { StudentModal } from './StudentModal';
 import { StudentProfile } from './StudentProfile';
 import { useToast } from './ToastProvider';
 import { useThemeClasses } from '../hooks/useThemeClasses';
+import { exportCSV } from '../lib/exports';
+import { parseCSVObjects } from '../lib/exports';
+import { printIdCards } from '../lib/idcard';
 
 const STATUS_BADGE: Record<string, string> = {
   active:      'bg-green-100 text-green-700',
@@ -13,7 +16,7 @@ const STATUS_BADGE: Record<string, string> = {
 };
 
 export function Students() {
-  const { students, addStudent, updateStudent, deleteStudent } = useAppContext();
+  const { students, branding, addStudent, updateStudent, deleteStudent, addStudentsBulk } = useAppContext();
   const { toast } = useToast();
   const tc = useThemeClasses();
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -21,6 +24,48 @@ export function Students() {
   const [profileStudent, setProfileStudent] = useState<Student | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [deleteConfirm, setDeleteConfirm] = useState<Student | null>(null);
+  const fileInput = useRef<HTMLInputElement>(null);
+
+  const handleExport = () => {
+    if (students.length === 0) { toast('No students to export.', 'warning'); return; }
+    exportCSV('GHA_Students',
+      ['Name', 'Grade', 'Guardian Name', 'Guardian Phone', 'Guardian Email', 'Admission Number', 'Gender', 'Date of Birth', 'Enrollment Date', 'Status', 'Address'],
+      students.map(s => [
+        s.name, s.grade, s.guardianName, s.guardianPhone, s.guardianEmail || '',
+        s.admissionNumber || '', s.gender || '', s.dateOfBirth || '',
+        s.enrollmentDate ? s.enrollmentDate.split('T')[0] : '', s.status || 'active', s.address || '',
+      ]));
+    toast(`Exported ${students.length} students.`, 'success');
+  };
+
+  const handleImport = (file: File) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const rows = parseCSVObjects(String(reader.result));
+      // Required: a name. Grade defaults to "Unassigned" if missing.
+      const valid = rows.filter(r => (r.name || r.studentname || r.fullname || '').trim());
+      if (valid.length === 0) { toast('No rows with a Name column were found.', 'error'); return; }
+      const gender = (v: string): Student['gender'] => /^m/i.test(v) ? 'Male' : /^f/i.test(v) ? 'Female' : undefined;
+      const now = new Date().toISOString();
+      const newStudents: Student[] = valid.map((r, i) => ({
+        id: `student-${Date.now()}-${i}`,
+        name: (r.name || r.studentname || r.fullname).trim(),
+        grade: (r.grade || r.class || 'Unassigned').trim(),
+        guardianName: (r.guardianname || r.parentname || r.guardian || '').trim(),
+        guardianPhone: (r.guardianphone || r.parentphone || r.phone || '').trim(),
+        guardianEmail: (r.guardianemail || r.parentemail || r.email || '').trim() || undefined,
+        admissionNumber: (r.admissionnumber || r.admissionno || r.admno || '').trim() || undefined,
+        gender: gender(r.gender || r.sex || ''),
+        dateOfBirth: (r.dateofbirth || r.dob || '').trim() || undefined,
+        address: (r.address || '').trim() || undefined,
+        enrollmentDate: (r.enrollmentdate || r.enrolmentdate || '').trim() || now,
+        status: 'active',
+      }));
+      addStudentsBulk(newStudents);
+      toast(`Imported ${newStudents.length} student${newStudents.length !== 1 ? 's' : ''}.`, 'success');
+    };
+    reader.readAsText(file);
+  };
 
   const filteredStudents = students.filter(s =>
     s.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -70,13 +115,32 @@ export function Students() {
           <h1 className="text-2xl font-bold text-gray-900">Students</h1>
           <p className="text-gray-500 text-sm">Manage student registrations and information</p>
         </div>
-        <button
-          onClick={() => setIsModalOpen(true)}
-          className={`flex items-center space-x-2 ${tc.btn} text-white px-4 py-2 rounded-lg transition-colors text-sm font-medium focus:outline-none focus:ring-2 focus:ring-offset-1`}
-        >
-          <Plus className="h-4 w-4" />
-          <span>Enrol Student</span>
-        </button>
+        <div className="flex items-center gap-2 flex-wrap">
+          <input ref={fileInput} type="file" accept=".csv,text/csv" className="hidden"
+            onChange={e => { const f = e.target.files?.[0]; e.target.value = ''; if (f) handleImport(f); }} />
+          <button onClick={() => fileInput.current?.click()}
+            className="flex items-center gap-2 border border-gray-300 text-gray-700 hover:bg-gray-50 px-3 py-2 rounded-lg text-sm font-medium">
+            <Upload className="h-4 w-4" /><span className="hidden sm:inline">Import CSV</span>
+          </button>
+          <button onClick={handleExport}
+            className="flex items-center gap-2 border border-gray-300 text-gray-700 hover:bg-gray-50 px-3 py-2 rounded-lg text-sm font-medium">
+            <Download className="h-4 w-4" /><span className="hidden sm:inline">Export</span>
+          </button>
+          <button onClick={() => {
+            if (filteredStudents.length === 0) { toast('No students to print.', 'warning'); return; }
+            printIdCards(filteredStudents, branding);
+          }}
+            className="flex items-center gap-2 border border-gray-300 text-gray-700 hover:bg-gray-50 px-3 py-2 rounded-lg text-sm font-medium">
+            <CreditCard className="h-4 w-4" /><span className="hidden sm:inline">ID Cards</span>
+          </button>
+          <button
+            onClick={() => setIsModalOpen(true)}
+            className={`flex items-center space-x-2 ${tc.btn} text-white px-4 py-2 rounded-lg transition-colors text-sm font-medium focus:outline-none focus:ring-2 focus:ring-offset-1`}
+          >
+            <Plus className="h-4 w-4" />
+            <span>Enrol Student</span>
+          </button>
+        </div>
       </div>
 
       {/* Stats row */}
@@ -150,6 +214,10 @@ export function Students() {
                       <button onClick={() => setProfileStudent(student)} title="View Profile"
                         className="p-1.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors">
                         <Eye className="h-4 w-4" />
+                      </button>
+                      <button onClick={() => printIdCards([student], branding)} title="Print ID Card"
+                        className="p-1.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors">
+                        <CreditCard className="h-4 w-4" />
                       </button>
                       <button onClick={() => handleEdit(student)} title="Edit"
                         className={`p-1.5 rounded-lg ${tc.text} hover:${tc.light} transition-colors`}>

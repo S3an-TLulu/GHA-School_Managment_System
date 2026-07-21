@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { GraduationCap, Users, UserCheck, ArrowRight, Check, Search, UserPlus, Plus, Trash2 } from 'lucide-react';
+import { GraduationCap, Users, UserCheck, ArrowRight, Check, Search, UserPlus, Plus, Trash2, ArrowUpRight, X } from 'lucide-react';
 import { useAppContext, Student } from '../context/AppContext';
 import { useToast } from './ToastProvider';
 import { useThemeClasses } from '../hooks/useThemeClasses';
@@ -10,9 +10,10 @@ interface BulkRow { name: string; gender: 'Male' | 'Female'; guardianName: strin
 const EMPTY_ROW: BulkRow = { name: '', gender: 'Female', guardianName: '', guardianPhone: '' };
 
 export function ClassManager() {
-  const { students, teachers, updateStudent, updateTeacher, addStudentsBulk } = useAppContext();
+  const { students, teachers, updateStudent, updateTeacher, addStudentsBulk, bulkUpdateStudents } = useAppContext();
   const { toast } = useToast();
   const tc = useThemeClasses();
+  const [promoteOpen, setPromoteOpen] = useState(false);
   const [selectedClass, setSelectedClass] = useState(GRADES[0]);
   const [search, setSearch] = useState('');
   const [picked, setPicked] = useState<Set<string>>(new Set());
@@ -79,11 +80,39 @@ export function ClassManager() {
     }
   };
 
+  // Year-end promotion: every class moves up one; the final grade graduates
+  // (marked inactive so it drops out of active rolls but history is kept).
+  const promotionPlan = GRADES.map((g, i) => ({
+    from: g,
+    to: i < GRADES.length - 1 ? GRADES[i + 1] : 'Graduated (archived)',
+    count: activeStudents.filter(s => s.grade === g).length,
+  })).filter(p => p.count > 0);
+  const promotableTotal = promotionPlan.reduce((s, p) => s + p.count, 0);
+
+  const applyPromotion = () => {
+    const changes: { id: string; patch: Partial<Student> }[] = [];
+    activeStudents.forEach(s => {
+      const idx = GRADES.indexOf(s.grade);
+      if (idx === -1) return;
+      if (idx < GRADES.length - 1) changes.push({ id: s.id, patch: { grade: GRADES[idx + 1] } });
+      else changes.push({ id: s.id, patch: { status: 'inactive' } }); // graduated
+    });
+    bulkUpdateStudents(changes);
+    setPromoteOpen(false);
+    toast(`Promoted ${changes.length} student${changes.length !== 1 ? 's' : ''} to the next class.`, 'success');
+  };
+
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">Class Manager</h1>
-        <p className="text-gray-600">Assign children and teachers to classes</p>
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Class Manager</h1>
+          <p className="text-gray-600">Assign children and teachers to classes</p>
+        </div>
+        <button onClick={() => setPromoteOpen(true)}
+          className="flex items-center gap-2 border border-gray-300 text-gray-700 hover:bg-gray-50 px-4 py-2 rounded-lg text-sm font-medium">
+          <ArrowUpRight className="h-4 w-4" /> End of Year Promotion
+        </button>
       </div>
 
       {/* Class picker */}
@@ -268,6 +297,45 @@ export function ClassManager() {
           </div>
         </div>
       </div>
+
+      {/* End-of-year promotion modal */}
+      {promoteOpen && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between p-5 border-b border-gray-200">
+              <h2 className="text-lg font-semibold text-gray-900">End of Year Promotion</h2>
+              <button onClick={() => setPromoteOpen(false)} className="p-2 hover:bg-gray-100 rounded-lg"><X className="h-5 w-5 text-gray-500" /></button>
+            </div>
+            <div className="p-5 space-y-4">
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm text-amber-800">
+                This moves <strong>every active student up one class</strong>. The top class graduates and is archived (marked inactive). Please <strong>download a backup first</strong> — this cannot be undone with one click.
+              </div>
+              {promotionPlan.length === 0 ? (
+                <p className="text-sm text-gray-400 text-center py-4">No active students to promote.</p>
+              ) : (
+                <div className="space-y-1.5">
+                  {promotionPlan.map(p => (
+                    <div key={p.from} className="flex items-center justify-between text-sm bg-gray-50 rounded-lg px-3 py-2">
+                      <span className="text-gray-600">{p.from}</span>
+                      <span className="flex items-center gap-2 font-medium text-gray-900">
+                        <ArrowRight className="h-3.5 w-3.5 text-gray-400" />
+                        {p.to} <span className="text-xs text-gray-400">({p.count})</span>
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div className="flex space-x-3 pt-1">
+                <button onClick={() => setPromoteOpen(false)} className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50">Cancel</button>
+                <button onClick={applyPromotion} disabled={promotableTotal === 0}
+                  className="flex-1 px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg disabled:opacity-50">
+                  Promote {promotableTotal || ''} Students
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

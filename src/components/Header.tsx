@@ -2,11 +2,13 @@ import { LogOut, School, Menu, UserCircle } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useAppContext } from '../context/AppContext';
 import { NotificationBell } from './NotificationBell';
+import { GlobalSearch } from './GlobalSearch';
 
-export function Header({ onMenuClick, onGoToUsers, onGoToProfile }: {
+export function Header({ onMenuClick, onGoToUsers, onGoToProfile, onNavigate }: {
   onMenuClick?: () => void;
   onGoToUsers?: (username: string) => void;
   onGoToProfile?: () => void;
+  onNavigate?: (section: string) => void;
 }) {
   const { logout, currentUser } = useAuth();
   const { branding, teachers } = useAppContext();
@@ -48,6 +50,8 @@ export function Header({ onMenuClick, onGoToUsers, onGoToProfile }: {
           <p className="text-xs text-gray-400 hidden lg:block">
             {new Date().toLocaleDateString('en-ZM', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
           </p>
+
+          <GlobalSearch onNavigate={onNavigate} />
 
           <NotificationBell onGoToUsers={onGoToUsers} />
 
