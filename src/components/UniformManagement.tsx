@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   LayoutDashboard, Shirt, Tags, Ruler, Package, ArrowLeftRight, BarChart3, Settings2,
   Plus, Pencil, Trash2, X, Printer, Download, AlertTriangle, Search, FileText, Image as ImageIcon,
-  Users, Scissors, ClipboardCheck,
+  Users, Scissors, ClipboardCheck, QrCode,
 } from 'lucide-react';
 import {
   useAppContext, UniformCategory, UniformItem, UniformSize, StockRecord, StockTxnType, UniformGender,
@@ -12,7 +12,9 @@ import { useToast } from './ToastProvider';
 import { useThemeClasses } from '../hooks/useThemeClasses';
 import { compressImage } from '../lib/images';
 import { exportCSV } from '../lib/exports';
-import { printItemSpec, printBlankCatalogue, printSizeChart, printStockCount, printMeasurementForm, printProductionSheet, printIssueForm } from '../lib/uniformDocs';
+import { printItemSpec, printBlankCatalogue, printSizeChart, printStockCount, printMeasurementForm, printProductionSheet, printIssueForm, printPurchaseOrder } from '../lib/uniformDocs';
+import { suggestSize, growthHint } from '../lib/sizeSuggest';
+import { qrDataUrl, itemDeepLink } from '../lib/qr';
 
 type Tab = 'dashboard' | 'catalogue' | 'categories' | 'sizes' | 'measurements' | 'tailors' | 'issuing' | 'inventory' | 'stock' | 'reports' | 'settings';
 const GENDERS: UniformGender[] = ['Boys', 'Girls', 'Unisex'];
@@ -246,11 +248,33 @@ export function UniformManagement() {
   const [itemModal, setItemModal] = useState<{ open: boolean; edit: UniformItem | null }>({ open: false, edit: null });
   const [sizeModal, setSizeModal] = useState<{ open: boolean; edit: UniformSize | null }>({ open: false, edit: null });
   const [stockModal, setStockModal] = useState<{ open: boolean; edit: StockRecord | null }>({ open: false, edit: null });
+  const [qrModal, setQrModal] = useState<{ item: UniformItem; url: string } | null>(null);
   const [search, setSearch] = useState('');
   const [catFilter, setCatFilter] = useState('');
   const [genderFilter, setGenderFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [newCat, setNewCat] = useState({ name: '', group: 'Formal Uniform' });
+  const [poSupplier, setPoSupplier] = useState('');
+
+  // Deep-link: if a QR scan set a target item, open its catalogue entry.
+  useEffect(() => {
+    const target = localStorage.getItem('gha_uniform_target');
+    if (!target) return;
+    localStorage.removeItem('gha_uniform_target');
+    const it = uniformItems.find(i => i.id === target);
+    if (it) { setTab('catalogue'); setItemModal({ open: true, edit: it }); }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const showQr = async (item: UniformItem) => {
+    try { setQrModal({ item, url: await qrDataUrl(itemDeepLink(item.id)) }); }
+    catch { toast('Could not generate QR code.', 'error'); }
+  };
+  const printSpec = async (item: UniformItem) => {
+    let qr: string | undefined;
+    try { qr = await qrDataUrl(itemDeepLink(item.id)); } catch { /* spec still prints without QR */ }
+    printItemSpec(item, uniformCategories.find(c => c.id === item.categoryId), branding, qr);
+  };
 
   // ---- derived ----
   const stockFor = (itemId: string) => uniformStock.filter(s => s.itemId === itemId).reduce((a, s) => a + s.quantity, 0);
@@ -362,7 +386,8 @@ export function UniformManagement() {
                         <td className="px-4 py-2.5 font-medium text-gray-900">K{i.price.toLocaleString()}</td>
                         <td className="px-4 py-2.5"><span className={`text-xs px-2 py-0.5 rounded-full ${i.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>{i.status}</span></td>
                         <td className="px-4 py-2.5 text-right whitespace-nowrap">
-                          <button onClick={() => printItemSpec(i, uniformCategories.find(c => c.id === i.categoryId), branding)} title="Spec sheet" className="p-1.5 text-gray-500 hover:bg-gray-100 rounded"><Printer className="h-3.5 w-3.5" /></button>
+                          <button onClick={() => showQr(i)} title="QR code" className="p-1.5 text-gray-500 hover:bg-gray-100 rounded"><QrCode className="h-3.5 w-3.5" /></button>
+                          <button onClick={() => printSpec(i)} title="Spec sheet" className="p-1.5 text-gray-500 hover:bg-gray-100 rounded"><Printer className="h-3.5 w-3.5" /></button>
                           <button onClick={() => setItemModal({ open: true, edit: i })} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded"><Pencil className="h-3.5 w-3.5" /></button>
                           <button onClick={() => { deleteUniformItem(i.id); toast('Item removed.', 'info'); }} className="p-1.5 text-red-600 hover:bg-red-50 rounded"><Trash2 className="h-3.5 w-3.5" /></button>
                         </td>
@@ -436,7 +461,16 @@ export function UniformManagement() {
               {lowStock.length > 0 && <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 flex items-center gap-2 text-sm text-amber-800"><AlertTriangle className="h-4 w-4" />{lowStock.length} line(s) at/below minimum stock.</div>}
               <div className="flex justify-between items-center flex-wrap gap-2">
                 <p className="text-sm text-gray-500">{uniformStock.length} stock lines · valuation K{stockValuation.toLocaleString()}</p>
-                <button onClick={() => setStockModal({ open: true, edit: null })} className={`flex items-center gap-1.5 ${tc.btn} text-white px-3 py-2 rounded-lg text-sm`}><Plus className="h-4 w-4" />Add Stock</button>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <select value={poSupplier} onChange={e => setPoSupplier(e.target.value)} className="px-2.5 py-2 border border-gray-300 rounded-lg text-sm"><option value="">Supplier…</option>{ctx.uniformSuppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</select>
+                  <button onClick={() => {
+                    const sup = ctx.uniformSuppliers.find(s => s.id === poSupplier);
+                    const lines = lowStock.map(s => ({ name: itemName(s.itemId), size: s.size, qty: Math.max(s.reorderLevel ?? s.minStock, s.minStock) - s.quantity, cost: s.cost })).filter(l => l.qty > 0);
+                    if (lines.length === 0) { toast('No items are below minimum stock.', 'warning'); return; }
+                    printPurchaseOrder(sup?.name || 'Supplier', sup ? [sup.phone, sup.email].filter(Boolean).join(' · ') : '', `PO-${Date.now().toString().slice(-6)}`, lines, branding);
+                  }} className="flex items-center gap-1.5 border border-gray-300 text-gray-700 hover:bg-gray-50 px-3 py-2 rounded-lg text-sm"><Printer className="h-4 w-4" />Reorder PO</button>
+                  <button onClick={() => setStockModal({ open: true, edit: null })} className={`flex items-center gap-1.5 ${tc.btn} text-white px-3 py-2 rounded-lg text-sm`}><Plus className="h-4 w-4" />Add Stock</button>
+                </div>
               </div>
               <div className="overflow-x-auto border border-gray-200 rounded-lg">
                 <table className="min-w-full text-sm divide-y divide-gray-100">
@@ -493,6 +527,22 @@ export function UniformManagement() {
           {tab === 'settings' && <UniformSettingsTab />}
         </div>
       </div>
+
+      {qrModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setQrModal(null)}>
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-xs p-5 text-center" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-3"><h2 className="text-base font-semibold text-gray-900">{qrModal.item.name}</h2><button onClick={() => setQrModal(null)} className="p-1 hover:bg-gray-100 rounded"><X className="h-4 w-4 text-gray-500" /></button></div>
+            <img src={qrModal.url} alt="QR code" className="w-48 h-48 mx-auto" />
+            <p className="text-xs text-gray-500 mt-2">{qrModal.item.itemCode}</p>
+            <p className="text-[10px] text-gray-400 mt-1 break-all">{itemDeepLink(qrModal.item.id)}</p>
+            <div className="flex gap-2 mt-3">
+              <a href={qrModal.url} download={`QR_${qrModal.item.itemCode}.png`} className="flex-1 text-sm border border-gray-300 rounded-lg py-1.5 hover:bg-gray-50">Download</a>
+              <button onClick={() => { const w = window.open('', '_blank'); if (w) { w.document.write(`<img src="${qrModal.url}" style="width:300px" onload="print()" />`); w.document.close(); } }} className="flex-1 text-sm gha-primary-btn text-white rounded-lg py-1.5">Print</button>
+            </div>
+            <p className="text-[10px] text-gray-400 mt-2">Scanning opens this item in the system.</p>
+          </div>
+        </div>
+      )}
 
       {itemModal.open && <ItemModal item={itemModal.edit} onClose={() => setItemModal({ open: false, edit: null })} />}
       {sizeModal.open && <SizeModal size={sizeModal.edit} onClose={() => setSizeModal({ open: false, edit: null })} />}
@@ -553,7 +603,7 @@ export function UniformManagement() {
     const [csv, setCsv] = useState({ colours: uniformSettings.colours.join(', '), seasons: uniformSettings.seasons.join(', '), materials: uniformSettings.materials.join(', ') });
     const [prefix, setPrefix] = useState(uniformSettings.itemCodePrefix);
     const [minStock, setMinStock] = useState(String(uniformSettings.defaultMinStock));
-    const [tName, setTName] = useState(''); const [sName, setSName] = useState('');
+    const [tName, setTName] = useState(''); const [sName, setSName] = useState(''); const [sPhone, setSPhone] = useState('');
     const inp = 'w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent';
     const save = () => { updateUniformSettings({ itemCodePrefix: prefix.trim() || 'UNI', defaultMinStock: parseInt(minStock) || 5, colours: csv.colours.split(',').map(s => s.trim()).filter(Boolean), seasons: csv.seasons.split(',').map(s => s.trim()).filter(Boolean), materials: csv.materials.split(',').map(s => s.trim()).filter(Boolean) }); toast('Settings saved.', 'success'); };
     return (
@@ -579,10 +629,12 @@ export function UniformManagement() {
           </div>
           <div>
             <p className="font-semibold text-gray-900 mb-2">Suppliers</p>
-            <form className="flex gap-2 mb-2" onSubmit={e => { e.preventDefault(); if (!sName.trim()) return; addUniformSupplier({ id: `sup-${Date.now()}`, name: sName.trim() }); setSName(''); }}>
-              <input className={inp} placeholder="Supplier name" value={sName} onChange={e => setSName(e.target.value)} /><button className={`${tc.btn} text-white px-3 rounded-lg text-sm`}>Add</button>
+            <form className="flex gap-2 mb-2 flex-wrap" onSubmit={e => { e.preventDefault(); if (!sName.trim()) return; addUniformSupplier({ id: `sup-${Date.now()}`, name: sName.trim(), phone: sPhone.trim() || undefined }); setSName(''); setSPhone(''); }}>
+              <input className={`${inp} flex-1`} placeholder="Supplier name" value={sName} onChange={e => setSName(e.target.value)} />
+              <input className={`${inp} w-32`} placeholder="Phone" value={sPhone} onChange={e => setSPhone(e.target.value)} />
+              <button className={`${tc.btn} text-white px-3 rounded-lg text-sm`}>Add</button>
             </form>
-            {uniformSuppliers.map(s => <div key={s.id} className="flex justify-between items-center px-3 py-1.5 bg-gray-50 rounded-lg mb-1 text-sm"><span>{s.name}</span><button onClick={() => deleteUniformSupplier(s.id)} className="text-red-500"><Trash2 className="h-3.5 w-3.5" /></button></div>)}
+            {uniformSuppliers.map(s => <div key={s.id} className="flex justify-between items-center px-3 py-1.5 bg-gray-50 rounded-lg mb-1 text-sm"><span>{s.name}{s.phone ? <span className="text-xs text-gray-400 ml-2">{s.phone}</span> : null}</span><button onClick={() => deleteUniformSupplier(s.id)} className="text-red-500"><Trash2 className="h-3.5 w-3.5" /></button></div>)}
           </div>
         </div>
       </div>
@@ -598,28 +650,23 @@ export function UniformManagement() {
     const [f, setF] = useState<Record<string, string>>(blank);
     const inp = 'w-full px-2.5 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent';
     const N = (v: string) => v === '' ? undefined : parseFloat(v);
-    // Recommend a size by closest chest measurement in the master chart.
-    const recommend = (chest?: number): string | undefined => {
-      if (!chest || uniformSizes.length === 0) return undefined;
-      const withChest = uniformSizes.filter(s => s.chest !== undefined);
-      if (withChest.length === 0) return undefined;
-      return withChest.reduce((best, s) => Math.abs((s.chest as number) - chest) < Math.abs((best.chest as number) - chest) ? s : best).sizeCode;
-    };
     const student = activeStudents.find(s => s.id === sid);
+    // AI-assisted size suggestion across multiple measurements.
+    const partial = { chest: N(f.chest), waist: N(f.waist), hip: N(f.hip), shoulder: N(f.shoulder), neck: N(f.neck) };
+    const sugg = suggestSize(partial, uniformSizes);
+    const hint = student ? growthHint(partial, measurementHistory.filter(h => h.studentId === sid)) : null;
     const save = () => {
       if (!sid) { toast('Pick a student first.', 'warning'); return; }
-      const chest = N(f.chest);
       saveStudentMeasurement({
         id: `msr-${Date.now()}`, studentId: sid, className: student?.grade, gender: student?.gender,
         dateMeasured: new Date().toISOString(), measuredBy: 'Admin',
-        height: N(f.height), chest, waist: N(f.waist), hip: N(f.hip), shoulder: N(f.shoulder), sleeve: N(f.sleeve),
+        height: N(f.height), chest: N(f.chest), waist: N(f.waist), hip: N(f.hip), shoulder: N(f.shoulder), sleeve: N(f.sleeve),
         neck: N(f.neck), shirtLength: N(f.shirtLength), trouserLength: N(f.trouserLength), skirtLength: N(f.skirtLength),
-        footSize: f.footSize || undefined, headSize: N(f.headSize), recommendedSize: recommend(chest), tailorNotes: f.tailorNotes || undefined,
+        footSize: f.footSize || undefined, headSize: N(f.headSize), recommendedSize: sugg?.sizeCode, tailorNotes: f.tailorNotes || undefined,
       });
-      toast(`Measurement saved${recommend(chest) ? ` — recommended size ${recommend(chest)}` : ''}.`, 'success');
+      toast(`Measurement saved${sugg ? ` — recommended size ${sugg.sizeCode}` : ''}.`, 'success');
       setF(blank); setSid('');
     };
-    const rec = recommend(N(f.chest));
     const fields: [string, string][] = [['Height', 'height'], ['Chest', 'chest'], ['Waist', 'waist'], ['Hip', 'hip'], ['Shoulder', 'shoulder'], ['Sleeve', 'sleeve'], ['Neck', 'neck'], ['Shirt Length', 'shirtLength'], ['Trouser Length', 'trouserLength'], ['Skirt Length', 'skirtLength'], ['Foot Size', 'footSize'], ['Head Size', 'headSize']];
     return (
       <div className="space-y-5">
@@ -633,8 +680,16 @@ export function UniformManagement() {
             {fields.map(([label, key]) => <div key={key}><label className="text-xs text-gray-500">{label}</label><input className={inp} value={f[key]} onChange={e => setF({ ...f, [key]: e.target.value })} /></div>)}
           </div>
           <input className={`${inp} mt-2`} placeholder="Tailor notes" value={f.tailorNotes} onChange={e => setF({ ...f, tailorNotes: e.target.value })} />
-          <div className="flex items-center justify-between mt-3">
-            <span className="text-sm text-gray-500">{rec ? <>Recommended size: <strong className="text-gray-900">{rec}</strong></> : 'Enter chest to get a size suggestion'}</span>
+          {hint && <p className="text-xs text-amber-600 mt-2">📈 {hint}</p>}
+          <div className="flex items-center justify-between mt-3 flex-wrap gap-2">
+            <span className="text-sm text-gray-500">
+              {sugg ? (
+                <>Suggested size: <strong className="text-gray-900">{sugg.sizeCode}</strong>
+                  <span className={`ml-2 text-xs px-2 py-0.5 rounded-full ${sugg.confidence === 'high' ? 'bg-green-100 text-green-700' : sugg.confidence === 'medium' ? 'bg-amber-100 text-amber-700' : 'bg-gray-100 text-gray-500'}`}>{sugg.confidence} confidence</span>
+                  <span className="text-xs text-gray-400 ml-1">({sugg.usedDims} measurement{sugg.usedDims !== 1 ? 's' : ''})</span>
+                </>
+              ) : 'Enter measurements to get an AI size suggestion'}
+            </span>
             <button onClick={save} className={`${tc.btn} text-white px-4 py-2 rounded-lg text-sm font-medium`}>Save Measurement</button>
           </div>
         </div>
@@ -741,17 +796,31 @@ export function UniformManagement() {
 
   // ---- Issuing tab ----
   function IssuingTab() {
-    const { students, uniformItems, uniformIssues, uniformReturns, issueUniform, returnUniform } = ctx;
+    const { students, uniformItems, uniformStock, uniformIssues, uniformReturns, issueUniform, returnUniform, addPayment, currentTerm } = ctx;
     const activeStudents = students.filter(s => !s.status || s.status === 'active');
-    const [f, setF] = useState({ studentId: '', itemId: '', size: '', quantity: '1', condition: 'New' });
+    const [f, setF] = useState({ studentId: '', itemId: '', size: '', quantity: '1', condition: 'New', bill: true });
     const inp = 'px-2.5 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent';
     const nameOf = (id: string) => students.find(s => s.id === id)?.name || '—';
     const itemOf = (id: string) => uniformItems.find(i => i.id === id)?.name || '—';
+    // Price: prefer the stock line's selling price, else the item's catalogue price.
+    const priceFor = (itemId: string, size: string) => {
+      const stk = uniformStock.find(s => s.itemId === itemId && s.size === size);
+      return stk?.sellPrice ?? uniformItems.find(i => i.id === itemId)?.price ?? 0;
+    };
     const submit = (e: React.FormEvent) => {
       e.preventDefault();
       if (!f.studentId || !f.itemId || !f.size.trim()) { toast('Student, item and size are required.', 'warning'); return; }
-      issueUniform({ id: `iss-${Date.now()}`, studentId: f.studentId, itemId: f.itemId, size: f.size.trim(), quantity: parseInt(f.quantity) || 1, issueDate: new Date().toISOString(), issuedBy: 'Admin', condition: f.condition });
-      toast('Uniform issued and stock updated.', 'success');
+      const qty = parseInt(f.quantity) || 1;
+      issueUniform({ id: `iss-${Date.now()}`, studentId: f.studentId, itemId: f.itemId, size: f.size.trim(), quantity: qty, issueDate: new Date().toISOString(), issuedBy: 'Admin', condition: f.condition });
+      // Finance integration: bill the uniform to the student's fee account.
+      if (f.bill) {
+        const amount = priceFor(f.itemId, f.size.trim()) * qty;
+        if (amount > 0) {
+          addPayment({ id: `pay-${Date.now()}`, studentId: f.studentId, type: `Uniform: ${itemOf(f.itemId)}`, amount,
+            dueDate: new Date().toISOString(), status: 'pending', createdDate: new Date().toISOString(), term: currentTerm, notes: `Issued ${qty} × ${f.size.trim()}` });
+        }
+      }
+      toast(`Uniform issued${f.bill ? ' and billed to account' : ''}; stock updated.`, 'success');
       setF({ ...f, size: '', quantity: '1' });
     };
     return (
@@ -762,6 +831,7 @@ export function UniformManagement() {
           <input className={`${inp} w-24`} placeholder="Size" value={f.size} onChange={e => setF({ ...f, size: e.target.value })} />
           <input className={`${inp} w-20`} type="number" min="1" value={f.quantity} onChange={e => setF({ ...f, quantity: e.target.value })} />
           <select className={inp} value={f.condition} onChange={e => setF({ ...f, condition: e.target.value })}><option>New</option><option>Good</option><option>Fair</option></select>
+          <label className="flex items-center gap-1.5 text-sm text-gray-700 px-1"><input type="checkbox" checked={f.bill} onChange={e => setF({ ...f, bill: e.target.checked })} />Bill to account{f.itemId && f.size ? ` (K${priceFor(f.itemId, f.size.trim())})` : ''}</label>
           <button type="submit" className={`${tc.btn} text-white px-3 py-2 rounded-lg text-sm`}>Issue</button>
           <button type="button" onClick={() => printIssueForm('Return', branding)} className="border border-gray-300 text-gray-700 hover:bg-gray-50 px-3 py-2 rounded-lg text-sm">Blank Return Form</button>
         </form>

@@ -45,13 +45,14 @@ function shell(title: string, branding: SchoolBranding, body: string) {
 }
 
 // Full specification sheet for one uniform item (with images).
-export function printItemSpec(item: UniformItem, category: UniformCategory | undefined, branding: SchoolBranding) {
+export function printItemSpec(item: UniformItem, category: UniformCategory | undefined, branding: SchoolBranding, qr?: string) {
   const row = (label: string, val?: string | boolean | number) =>
     `<div class="field"><b>${label}</b><span>${val === true ? 'Yes' : val === false ? 'No' : esc(String(val ?? '—'))}</span></div>`;
   const imgs = Object.entries({ Front: item.images.front, Back: item.images.back, Side: item.images.side, Detail: item.images.detail, Material: item.images.material })
     .filter(([, u]) => u)
     .map(([label, u]) => `<figure><img src="${u}" alt="" /><figcaption>${label}</figcaption></figure>`).join('');
   open(shell('Uniform Specification Sheet', branding, `
+    ${qr ? `<img src="${qr}" alt="QR" style="width:90px;height:90px;float:right" />` : ''}
     <h2 style="margin-bottom:8px">${esc(item.name)} <span style="color:#6b7280;font-size:13px">(${esc(item.itemCode)})</span></h2>
     ${row('Category', category?.name)}
     ${row('Gender', item.gender)}
@@ -152,4 +153,19 @@ export function printIssueForm(kind: 'Issue' | 'Return', branding: SchoolBrandin
     <div class="field"><b>Date</b><span>&nbsp;</span></div>
     <table style="margin-top:10px"><thead><tr><th>Item</th><th>Size</th><th>Qty</th><th>Condition</th></tr></thead><tbody>${rows}</tbody></table>
     <div class="sig"><div>${kind === 'Issue' ? 'Issued By' : 'Received By'}</div><div>Parent / Guardian Signature</div></div>`));
+}
+
+// Purchase order to a supplier. Rows: item, size, qty, unit cost.
+export function printPurchaseOrder(supplierName: string, supplierContact: string, poNo: string, rows: { name: string; size: string; qty: number; cost?: number }[], branding: SchoolBranding) {
+  const body = (rows.length ? rows : [{ name: '', size: '', qty: 0 }, { name: '', size: '', qty: 0 }, { name: '', size: '', qty: 0 }])
+    .map(r => `<tr${r.name ? '' : ' class="blank"'}><td>${esc(r.name)}</td><td>${esc(r.size)}</td><td style="text-align:center">${r.qty || ''}</td><td style="text-align:right">${r.cost ? 'K' + r.cost : ''}</td><td style="text-align:right">${r.cost && r.qty ? 'K' + (r.cost * r.qty).toLocaleString() : ''}</td></tr>`).join('');
+  const total = rows.reduce((a, r) => a + (r.cost || 0) * r.qty, 0);
+  open(shell('Purchase Order', branding, `
+    <div class="field"><b>PO Number</b><span>${esc(poNo)}</span></div>
+    <div class="field"><b>Date</b><span>${new Date().toLocaleDateString('en-GB')}</span></div>
+    <div class="field"><b>Supplier</b><span>${esc(supplierName)}</span></div>
+    ${supplierContact ? `<div class="field"><b>Contact</b><span>${esc(supplierContact)}</span></div>` : ''}
+    <table style="margin-top:10px"><thead><tr><th>Item</th><th>Size</th><th>Qty</th><th>Unit Cost</th><th>Line Total</th></tr></thead><tbody>${body}</tbody>
+    ${total > 0 ? `<tfoot><tr><td colspan="4" style="text-align:right;font-weight:700">Total</td><td style="text-align:right;font-weight:700">K${total.toLocaleString()}</td></tr></tfoot>` : ''}</table>
+    <div class="sig"><div>Authorised By</div><div>Supplier Acknowledgement</div></div>`));
 }

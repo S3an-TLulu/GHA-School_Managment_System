@@ -52,6 +52,17 @@ function AppContent() {
 
   useEffect(() => { applyTheme(theme); }, [theme]);
 
+  // Deep link from a uniform QR code (#uniform/<itemId>): once signed in, jump
+  // to Uniform Management, which reads the stashed target and opens the item.
+  useEffect(() => {
+    const m = location.hash.match(/#uniform\/(.+)$/);
+    if (m && isAuthenticated) {
+      localStorage.setItem('gha_uniform_target', m[1]);
+      setActiveSection('uniforms');
+      history.replaceState(null, '', location.pathname + location.search);
+    }
+  }, [isAuthenticated]);
+
   if (!isAuthenticated) {
     if (showLogin) {
       return <Login onBack={() => setShowLogin(false)} />;
