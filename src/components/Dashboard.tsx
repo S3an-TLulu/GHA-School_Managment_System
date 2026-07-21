@@ -56,6 +56,16 @@ export function Dashboard() {
 
   const activeStudentList = students.filter(s => !s.status || s.status === 'active');
 
+  // Revenue vs expenses over the most recent terms, for the trend chart.
+  const trendTerms = [...new Set([...payments.map(p => p.term), ...expenses.map(e => e.term)].filter(Boolean) as string[])]
+    .sort().slice(-6);
+  const trend = trendTerms.map(term => ({
+    term,
+    revenue: payments.filter(p => p.term === term && p.status === 'paid').reduce((s, p) => s + p.amount, 0),
+    expense: expenses.filter(e => e.term === term).reduce((s, e) => s + e.amount, 0),
+  }));
+  const trendMax = Math.max(1, ...trend.map(t => Math.max(t.revenue, t.expense)));
+
   const priorityDot: Record<string, string> = {
     normal: 'bg-blue-400',
     important: 'bg-yellow-400',
@@ -151,6 +161,32 @@ export function Dashboard() {
           <p className="text-xs text-gray-400 mt-1">payment{overdueCount !== 1 ? 's' : ''} overdue this term</p>
         </div>
       </div>
+
+      {trend.length > 0 && (
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center space-x-2">
+              <TrendingUp className={`h-5 w-5 ${tc.text}`} />
+              <h3 className="text-base font-semibold text-gray-900">Revenue vs Expenses</h3>
+            </div>
+            <div className="flex items-center gap-3 text-xs text-gray-500">
+              <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-green-500" />Revenue</span>
+              <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-red-400" />Expenses</span>
+            </div>
+          </div>
+          <div className="flex items-end justify-around gap-3 h-44">
+            {trend.map(t => (
+              <div key={t.term} className="flex flex-col items-center flex-1 min-w-0 h-full justify-end">
+                <div className="flex items-end gap-1 h-full w-full justify-center">
+                  <div className="w-4 sm:w-6 bg-green-500 rounded-t transition-all" style={{ height: `${Math.max(2, (t.revenue / trendMax) * 100)}%` }} title={`Revenue: K${t.revenue.toLocaleString()}`} />
+                  <div className="w-4 sm:w-6 bg-red-400 rounded-t transition-all" style={{ height: `${Math.max(2, (t.expense / trendMax) * 100)}%` }} title={`Expenses: K${t.expense.toLocaleString()}`} />
+                </div>
+                <p className="text-[10px] text-gray-500 mt-1.5 text-center leading-tight truncate w-full">{t.term.replace('Term ', 'T')}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">

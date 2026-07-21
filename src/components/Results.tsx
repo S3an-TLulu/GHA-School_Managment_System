@@ -22,7 +22,7 @@ function calcAverage(subjects: Record<string, number>): number {
 }
 
 export function Results() {
-  const { students, results, saveClassResults, deleteResult, terms } = useAppContext();
+  const { students, results, saveClassResults, deleteResult, terms, branding } = useAppContext();
   const TERMS = terms;
   const tc = useThemeClasses();
   const toast = useToast();
@@ -41,6 +41,21 @@ export function Results() {
 
   const getStudentResult = (studentId: string): StudentResult | undefined =>
     classResults.find(r => r.studentId === studentId);
+
+  // Rank a student within their class by average (only students with results).
+  const classRank = (studentId: string): { rank: number; total: number } | null => {
+    const ranked = classStudents
+      .map(s => { const r = getStudentResult(s.id); return { id: s.id, avg: r ? calcAverage(r.subjects) : -1 }; })
+      .filter(r => r.avg >= 0)
+      .sort((a, b) => b.avg - a.avg);
+    const idx = ranked.findIndex(r => r.id === studentId);
+    return idx === -1 ? null : { rank: idx + 1, total: ranked.length };
+  };
+
+  const ordinal = (n: number) => {
+    const s = ['th', 'st', 'nd', 'rd'], v = n % 100;
+    return n + (s[(v - 20) % 10] || s[v] || s[0]);
+  };
 
   const startEditing = () => {
     const grid: Record<string, Record<string, string>> = {};
@@ -124,13 +139,15 @@ export function Results() {
     <style>body{font-family:Arial,sans-serif;padding:24px;max-width:600px;margin:auto;} table{border-collapse:collapse;width:100%;margin-top:12px;} th{background:#1d4ed8;color:white;padding:8px 12px;text-align:left;} @media print{button{display:none;}}</style></head>
     <body>
     <div style="text-align:center;border-bottom:2px solid #1d4ed8;padding-bottom:16px;margin-bottom:16px;">
-      <h2 style="margin:0;color:#1d4ed8;">Great Highway Academy</h2>
-      <p style="margin:4px 0;color:#6b7280;font-size:13px;">Excellence in Education</p>
+      ${branding.logoUrl ? `<img src="${branding.logoUrl}" style="height:48px;width:48px;object-fit:cover;border-radius:8px;margin-bottom:6px;" />` : ''}
+      <h2 style="margin:0;color:#1d4ed8;">${branding.schoolName || 'School'}</h2>
+      <p style="margin:4px 0;color:#6b7280;font-size:13px;">${branding.motto || ''}</p>
       <h3 style="margin:8px 0 0;">Academic Report Card</h3>
     </div>
     <table style="border-collapse:collapse;width:100%;margin-bottom:12px;">
       <tr><td style="padding:4px 8px;width:120px;color:#6b7280;font-size:13px;">Student Name</td><td style="padding:4px 8px;font-weight:600;">${student.name}</td><td style="padding:4px 8px;width:80px;color:#6b7280;font-size:13px;">Class</td><td style="padding:4px 8px;font-weight:600;">${selectedClass}</td></tr>
       <tr><td style="padding:4px 8px;color:#6b7280;font-size:13px;">Admission No.</td><td style="padding:4px 8px;">${student.admissionNumber ?? '—'}</td><td style="padding:4px 8px;color:#6b7280;font-size:13px;">Term</td><td style="padding:4px 8px;">${selectedTerm}</td></tr>
+      ${(() => { const r = classRank(studentId); return r ? `<tr><td style="padding:4px 8px;color:#6b7280;font-size:13px;">Position</td><td style="padding:4px 8px;font-weight:600;">${ordinal(r.rank)} of ${r.total}</td><td style="padding:4px 8px;color:#6b7280;font-size:13px;">Subjects</td><td style="padding:4px 8px;">${subjects.length}</td></tr>` : ''; })()}
     </table>
     <table>
       <thead><tr><th>Subject</th><th style="text-align:center;">Mark</th><th style="text-align:center;">Grade</th></tr></thead>
@@ -183,7 +200,7 @@ export function Results() {
     <style>body{font-family:Arial,sans-serif;padding:20px;} table{border-collapse:collapse;width:100%;} @media print{button{display:none;}}</style></head>
     <body>
     <div style="text-align:center;margin-bottom:16px;">
-      <h2 style="margin:0;">Great Highway Academy</h2>
+      <h2 style="margin:0;">${branding.schoolName || 'School'}</h2>
       <p style="margin:4px 0;color:#6b7280;">Class Results — ${selectedClass} | ${selectedTerm}</p>
     </div>
     <table>

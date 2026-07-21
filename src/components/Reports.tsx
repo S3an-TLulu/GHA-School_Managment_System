@@ -17,7 +17,7 @@ function downloadCSV(rows: string[][], filename: string) {
 }
 
 export function Reports() {
-  const { students, payments, uniforms, expenses, results, events, fundraiserParticipants, currentTerm } = useAppContext();
+  const { students, payments, uniforms, expenses, results, events, fundraiserParticipants, externalFundraiserPayments, currentTerm } = useAppContext();
   const tc = useThemeClasses();
   const [selectedReport, setSelectedReport] = useState('financial');
   const [termFilter, setTermFilter] = useState(currentTerm);
@@ -698,6 +698,87 @@ export function Reports() {
     </div>
   );
 
+  // Profit & Loss: income sources vs expense categories for the chosen term.
+  // Fees and expenses respect the term filter; fundraiser and uniform income
+  // aren't term-tagged, so they're shown as all-time lines (noted below).
+  const EXP_CATS = ['Utilities', 'Salaries', 'Supplies', 'Maintenance', 'Food', 'Transport', 'Other'];
+  const pnl = (() => {
+    const feeIncome = termPayments.filter(p => p.status === 'paid').reduce((s, p) => s + p.amount, 0);
+    const fundIncome = fundraiserParticipants.reduce((s, p) => s + p.amountPaid, 0)
+      + externalFundraiserPayments.reduce((s, p) => s + p.amountPaid, 0);
+    const uniformIncome = uniforms.reduce((s, u) => s + u.price, 0);
+    const income: [string, number, boolean][] = [
+      ['School fees collected', feeIncome, false],
+      ['Fundraiser income', fundIncome, true],
+      ['Uniform sales', uniformIncome, true],
+    ];
+    const byCat: [string, number][] = EXP_CATS
+      .map(c => [c, termExpenses.filter(e => e.category === c).reduce((s, e) => s + e.amount, 0)] as [string, number])
+      .filter(([, v]) => v > 0);
+    const totalIncome = income.reduce((s, [, v]) => s + v, 0);
+    const totalExp = byCat.reduce((s, [, v]) => s + v, 0);
+    return { income, byCat, totalIncome, totalExp, net: totalIncome - totalExp };
+  })();
+
+  const exportPnl = () => downloadCSV([
+    ['Profit & Loss', termFilter || 'All Terms'],
+    [],
+    ['INCOME', ''],
+    ...pnl.income.map(([l, v]) => [l, String(v)]),
+    ['Total income', String(pnl.totalIncome)],
+    [],
+    ['EXPENSES', ''],
+    ...pnl.byCat.map(([l, v]) => [l, String(v)]),
+    ['Total expenses', String(pnl.totalExp)],
+    [],
+    ['NET', String(pnl.net)],
+  ], `GHA_ProfitLoss_${(termFilter || 'AllTerms').replace(/\s+/g, '')}_${new Date().toISOString().split('T')[0]}.csv`);
+
+  const renderPnlReport = () => (
+    <div className="space-y-4 max-w-2xl">
+      <div className="flex items-center justify-between">
+        <p className="text-sm text-gray-500">Income statement{termFilter ? ` — ${termFilter}` : ' — all terms'}</p>
+        <button onClick={exportPnl} className="flex items-center gap-1.5 px-3 py-1.5 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700">
+          <Download className="h-4 w-4" /> Export
+        </button>
+      </div>
+
+      <div className="border border-gray-200 rounded-lg overflow-hidden">
+        <div className="px-4 py-2 bg-green-50 text-green-800 text-xs font-semibold uppercase tracking-wide">Income</div>
+        {pnl.income.map(([label, val, allTime]) => (
+          <div key={label} className="flex justify-between px-4 py-2 text-sm border-b border-gray-50">
+            <span className="text-gray-600">{label}{allTime && <span className="text-gray-400 text-xs"> (all-time)</span>}</span>
+            <span className="font-medium text-gray-900">K{val.toLocaleString()}</span>
+          </div>
+        ))}
+        <div className="flex justify-between px-4 py-2 text-sm font-semibold bg-gray-50">
+          <span>Total income</span><span className="text-green-700">K{pnl.totalIncome.toLocaleString()}</span>
+        </div>
+      </div>
+
+      <div className="border border-gray-200 rounded-lg overflow-hidden">
+        <div className="px-4 py-2 bg-red-50 text-red-800 text-xs font-semibold uppercase tracking-wide">Expenses</div>
+        {pnl.byCat.length === 0 ? (
+          <p className="px-4 py-3 text-sm text-gray-400">No expenses recorded{termFilter ? ` for ${termFilter}` : ''}.</p>
+        ) : pnl.byCat.map(([label, val]) => (
+          <div key={label} className="flex justify-between px-4 py-2 text-sm border-b border-gray-50">
+            <span className="text-gray-600">{label}</span>
+            <span className="font-medium text-gray-900">K{val.toLocaleString()}</span>
+          </div>
+        ))}
+        <div className="flex justify-between px-4 py-2 text-sm font-semibold bg-gray-50">
+          <span>Total expenses</span><span className="text-red-700">K{pnl.totalExp.toLocaleString()}</span>
+        </div>
+      </div>
+
+      <div className={`flex justify-between items-center px-4 py-3 rounded-lg ${pnl.net >= 0 ? 'bg-green-600' : 'bg-red-600'} text-white`}>
+        <span className="font-semibold">Net {pnl.net >= 0 ? 'Surplus' : 'Deficit'}</span>
+        <span className="text-xl font-bold">K{Math.abs(pnl.net).toLocaleString()} {pnl.net >= 0 ? '▲' : '▼'}</span>
+      </div>
+      <p className="text-xs text-gray-400">Fees and expenses reflect the selected term. Fundraiser and uniform income are not term-tagged, so they're shown all-time.</p>
+    </div>
+  );
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-4">
@@ -734,6 +815,7 @@ export function Reports() {
           <div className="flex space-x-1">
             {[
               { id: 'financial', label: 'Financial Summary', icon: DollarSign },
+              { id: 'pnl', label: 'Profit & Loss', icon: BarChart3 },
               { id: 'arrears', label: 'Arrears Aging', icon: TrendingDown },
               { id: 'class', label: 'Class Summary', icon: BarChart3 },
               { id: 'student', label: 'Student Report', icon: FileText },
@@ -752,6 +834,7 @@ export function Reports() {
         </div>
         <div className="p-6">
           {selectedReport === 'financial' && renderFinancialReport()}
+          {selectedReport === 'pnl' && renderPnlReport()}
           {selectedReport === 'arrears' && renderArrearsReport()}
           {selectedReport === 'class' && renderClassReport()}
           {selectedReport === 'student' && renderStudentReport()}
