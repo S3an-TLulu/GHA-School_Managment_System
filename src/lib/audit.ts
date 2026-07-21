@@ -81,4 +81,7 @@ export const AUDIT_LABELS: Record<string, string> = {
   'data-exported': 'Exported a backup',
   'message-queued': 'Queued a message',
   'message-broadcast': 'Sent a broadcast',
+  'uniform-item-added': 'Added a uniform item',
+  'stock-movement': 'Stock movement',
+  'tailor-order-created': 'Created a tailor order',
 };

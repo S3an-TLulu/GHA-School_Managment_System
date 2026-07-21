@@ -6,7 +6,7 @@ import { Students } from './components/Students';
 import { FeeStructure } from './components/FeeStructure';
 import { Announcements } from './components/Announcements';
 import { Payments } from './components/Payments';
-import { Uniforms } from './components/Uniforms';
+import { UniformManagement } from './components/UniformManagement';
 import { Requirements } from './components/Requirements';
 import { Reports } from './components/Reports';
 import { Teachers } from './components/Teachers';
@@ -71,7 +71,7 @@ function AppContent() {
       case 'cashier':      return <OfficeCashier />;
       case 'expenses':     return <Expenses />;
       case 'statements':   return <FamilyStatements />;
-      case 'uniforms':     return <Uniforms />;
+      case 'uniforms':     return <UniformManagement />;
       case 'requirements': return <Requirements />;
       case 'inventory':    return <Inventory />;
       case 'events':       return <Events />;

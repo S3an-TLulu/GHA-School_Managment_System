@@ -70,7 +70,7 @@ const menuGroups = [
     items: [
       { id: 'kitchen',      label: 'Kitchen',      icon: ChefHat },
       { id: 'library',      label: 'Library',      icon: BookOpen },
-      { id: 'uniforms',     label: 'Uniforms',     icon: ShoppingBag },
+      { id: 'uniforms',     label: 'Uniform Management', icon: ShoppingBag },
       { id: 'requirements', label: 'Requirements', icon: ClipboardList },
       { id: 'inventory',    label: 'Inventory',    icon: Package },
     ]
