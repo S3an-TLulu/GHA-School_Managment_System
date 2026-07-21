@@ -6,7 +6,7 @@ import { Students } from './components/Students';
 import { FeeStructure } from './components/FeeStructure';
 import { Announcements } from './components/Announcements';
 import { Payments } from './components/Payments';
-import { Uniforms } from './components/Uniforms';
+import { UniformManagement } from './components/UniformManagement';
 import { Requirements } from './components/Requirements';
 import { Reports } from './components/Reports';
 import { Teachers } from './components/Teachers';
@@ -52,6 +52,17 @@ function AppContent() {
 
   useEffect(() => { applyTheme(theme); }, [theme]);
 
+  // Deep link from a uniform QR code (#uniform/<itemId>): once signed in, jump
+  // to Uniform Management, which reads the stashed target and opens the item.
+  useEffect(() => {
+    const m = location.hash.match(/#uniform\/(.+)$/);
+    if (m && isAuthenticated) {
+      localStorage.setItem('gha_uniform_target', m[1]);
+      setActiveSection('uniforms');
+      history.replaceState(null, '', location.pathname + location.search);
+    }
+  }, [isAuthenticated]);
+
   if (!isAuthenticated) {
     if (showLogin) {
       return <Login onBack={() => setShowLogin(false)} />;
@@ -71,7 +82,7 @@ function AppContent() {
       case 'cashier':      return <OfficeCashier />;
       case 'expenses':     return <Expenses />;
       case 'statements':   return <FamilyStatements />;
-      case 'uniforms':     return <Uniforms />;
+      case 'uniforms':     return <UniformManagement />;
       case 'requirements': return <Requirements />;
       case 'inventory':    return <Inventory />;
       case 'events':       return <Events />;

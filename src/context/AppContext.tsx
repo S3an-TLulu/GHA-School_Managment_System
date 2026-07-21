@@ -160,6 +160,138 @@ export interface UniformCatalogItem {
   imageUrl?: string;
 }
 
+// ---- Uniform Management & Tailoring module ----
+// There is no SQL database — each "table" below is a typed array persisted to a
+// gha_* localStorage key and cloud-synced, with string ids as foreign keys.
+export interface UniformCategory { id: string; name: string; group: string; active: boolean; }
+
+export type UniformGender = 'Boys' | 'Girls' | 'Unisex';
+export interface UniformImages { front?: string; back?: string; side?: string; detail?: string; material?: string; variants?: string[]; }
+export interface UniformItem {
+  id: string;
+  itemCode: string;
+  name: string;
+  categoryId: string;
+  gender: UniformGender;
+  grades: string[];
+  description?: string;
+  material?: string;
+  colour?: string;
+  sleeveType?: string;
+  collarType?: string;
+  season?: string;
+  badgeRequired?: boolean;
+  logoPosition?: string;
+  images: UniformImages;
+  notes?: string;
+  status: 'active' | 'inactive';
+  price: number;
+}
+
+export interface UniformSize {
+  id: string;
+  sizeCode: string;
+  ageRange?: string;
+  typicalGrade?: string;
+  chest?: number; waist?: number; hip?: number; shoulder?: number; neck?: number;
+  shirtLength?: number; sleeveLength?: number; trouserLength?: number;
+  skirtLength?: number; shortLength?: number;
+  sockSize?: string; shoeSize?: string; headCirc?: number;
+  notes?: string;
+}
+
+export interface StockRecord {
+  id: string;
+  itemId: string;
+  colour?: string;
+  size: string;
+  quantity: number;
+  minStock: number;
+  reorderLevel?: number;
+  location?: string;
+  supplierId?: string;
+  purchaseDate?: string;
+  cost?: number;
+  sellPrice?: number;
+}
+
+export type StockTxnType = 'purchase' | 'sale' | 'issue' | 'return' | 'adjustment' | 'transfer' | 'damaged' | 'lost';
+export interface StockTransaction {
+  id: string;
+  itemId: string;
+  size: string;
+  colour?: string;
+  type: StockTxnType;
+  quantity: number; // signed: positive adds stock, negative removes
+  date: string;
+  user?: string;
+  reason?: string;
+  reference?: string;
+}
+
+export interface Tailor { id: string; name: string; phone?: string; email?: string; specialty?: string; notes?: string; }
+export interface UniformSupplier { id: string; name: string; phone?: string; email?: string; address?: string; notes?: string; }
+export interface UniformMaterial { id: string; name: string; colour?: string; notes?: string; }
+
+export interface TailorOrderItem { itemId: string; size: string; quantity: number; material?: string; instructions?: string; }
+export type TailorOrderStatus = 'draft' | 'sent' | 'in_production' | 'completed' | 'collected' | 'cancelled';
+export interface TailorOrder {
+  id: string;
+  orderNo: string;
+  tailorId: string;
+  date: string;
+  dueDate?: string;
+  status: TailorOrderStatus;
+  priority: 'low' | 'normal' | 'high';
+  notes?: string;
+  items: TailorOrderItem[];
+}
+
+export interface StudentMeasurement {
+  id: string;
+  studentId: string;
+  className?: string;
+  gender?: string;
+  dateMeasured: string;
+  measuredBy?: string;
+  height?: number; chest?: number; waist?: number; hip?: number; shoulder?: number;
+  sleeve?: number; neck?: number; shirtLength?: number; trouserLength?: number;
+  skirtLength?: number; footSize?: string; headSize?: number;
+  recommendedSize?: string;
+  tailorNotes?: string;
+}
+export interface MeasurementHistory extends StudentMeasurement { archivedAt: string; }
+
+export interface UniformIssue {
+  id: string;
+  studentId: string;
+  itemId: string;
+  size: string;
+  quantity: number;
+  issueDate: string;
+  issuedBy?: string;
+  condition?: string;
+  replacementDate?: string;
+}
+export interface UniformReturn {
+  id: string;
+  studentId: string;
+  itemId: string;
+  size: string;
+  quantity: number;
+  returnDate: string;
+  reason?: string;
+  condition?: string;
+}
+
+export interface UniformSettings {
+  itemCodePrefix: string;
+  colours: string[];
+  seasons: string[];
+  materials: string[];
+  defaultMinStock: number;
+}
+
 // A title in the school library. `totalCopies` is how many the school owns;
 // copies currently on loan are derived from active BookLoan records.
 export interface LibraryBook {
@@ -376,6 +508,47 @@ interface AppContextType {
   updateUniformCatalogItem: (id: string, item: Partial<UniformCatalogItem>) => void;
   deleteUniformCatalogItem: (id: string) => void;
   sellUniform: (catalogItemId: string, studentId: string) => boolean;
+  // Uniform Management module
+  uniformCategories: UniformCategory[];
+  addUniformCategory: (c: UniformCategory) => void;
+  updateUniformCategory: (id: string, c: Partial<UniformCategory>) => void;
+  deleteUniformCategory: (id: string) => void;
+  uniformItems: UniformItem[];
+  addUniformItem: (i: UniformItem) => void;
+  updateUniformItem: (id: string, i: Partial<UniformItem>) => void;
+  deleteUniformItem: (id: string) => void;
+  uniformSizes: UniformSize[];
+  addUniformSize: (s: UniformSize) => void;
+  updateUniformSize: (id: string, s: Partial<UniformSize>) => void;
+  deleteUniformSize: (id: string) => void;
+  uniformStock: StockRecord[];
+  addStockRecord: (s: StockRecord) => void;
+  updateStockRecord: (id: string, s: Partial<StockRecord>) => void;
+  deleteStockRecord: (id: string) => void;
+  stockTransactions: StockTransaction[];
+  recordStockTransaction: (t: StockTransaction) => void;
+  tailors: Tailor[];
+  addTailor: (t: Tailor) => void;
+  updateTailor: (id: string, t: Partial<Tailor>) => void;
+  deleteTailor: (id: string) => void;
+  uniformSuppliers: UniformSupplier[];
+  addUniformSupplier: (s: UniformSupplier) => void;
+  updateUniformSupplier: (id: string, s: Partial<UniformSupplier>) => void;
+  deleteUniformSupplier: (id: string) => void;
+  tailorOrders: TailorOrder[];
+  addTailorOrder: (o: TailorOrder) => void;
+  updateTailorOrder: (id: string, o: Partial<TailorOrder>) => void;
+  deleteTailorOrder: (id: string) => void;
+  studentMeasurements: StudentMeasurement[];
+  saveStudentMeasurement: (m: StudentMeasurement) => void;
+  deleteStudentMeasurement: (id: string) => void;
+  measurementHistory: MeasurementHistory[];
+  uniformIssues: UniformIssue[];
+  issueUniform: (issue: UniformIssue) => void;
+  uniformReturns: UniformReturn[];
+  returnUniform: (ret: UniformReturn) => void;
+  uniformSettings: UniformSettings;
+  updateUniformSettings: (s: Partial<UniformSettings>) => void;
   libraryBooks: LibraryBook[];
   addLibraryBook: (b: LibraryBook) => void;
   updateLibraryBook: (id: string, b: Partial<LibraryBook>) => void;
@@ -481,6 +654,27 @@ const INITIAL_OTHER_CHARGES: OtherCharge[] = [
   { id: 'charge-5', name: 'Assessment Tests', amount: '200', per: 'per term' }
 ];
 
+const DEFAULT_UNIFORM_SETTINGS: UniformSettings = {
+  itemCodePrefix: 'UNI',
+  colours: ['White', 'Navy', 'Grey', 'Maroon', 'Black', 'Green', 'Blue'],
+  seasons: ['All Year', 'Summer', 'Winter'],
+  materials: ['Cotton', 'Poly-cotton', 'Polyester', 'Fleece', 'Denim', 'Wool'],
+  defaultMinStock: 5,
+};
+
+const INITIAL_UNIFORM_CATEGORIES: UniformCategory[] = [
+  { id: 'ucat-1', name: 'Boys Shirts', group: 'Formal Uniform', active: true },
+  { id: 'ucat-2', name: 'Girls Shirts', group: 'Formal Uniform', active: true },
+  { id: 'ucat-3', name: 'Jerseys', group: 'Formal Uniform', active: true },
+  { id: 'ucat-4', name: 'Trousers', group: 'Formal Uniform', active: true },
+  { id: 'ucat-5', name: 'Skirts', group: 'Formal Uniform', active: true },
+  { id: 'ucat-6', name: 'Gym Dresses', group: 'Formal Uniform', active: true },
+  { id: 'ucat-7', name: 'PE Shirts', group: 'Sports Uniform', active: true },
+  { id: 'ucat-8', name: 'PE Shorts', group: 'Sports Uniform', active: true },
+  { id: 'ucat-9', name: 'Tracksuits', group: 'Winter Wear', active: true },
+  { id: 'ucat-10', name: 'Accessories', group: 'Accessories', active: true },
+];
+
 const INITIAL_UNIFORM_CATALOG: UniformCatalogItem[] = [
   { id: 'uc-1',  name: 'Girl Dress',                  price: 250, category: 'Girls', stock: 20 },
   { id: 'uc-2',  name: 'Girl Skirt',                  price: 200, category: 'Girls', stock: 20 },
@@ -522,6 +716,19 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [fundraiserParticipants, setFundraiserParticipants] = useState<FundraiserParticipant[]>(() => loadFromStorage('gha_fundraiser_participants', []));
   const [externalFundraiserPayments, setExternalFundraiserPayments] = useState<ExternalFundraiserPayment[]>(() => loadFromStorage('gha_external_fundraiser', []));
   const [uniformCatalog, setUniformCatalog] = useState<UniformCatalogItem[]>(() => loadFromStorage('gha_uniform_catalog', INITIAL_UNIFORM_CATALOG));
+  const [uniformCategories, setUniformCategories] = useState<UniformCategory[]>(() => loadFromStorage('gha_uniform_categories', INITIAL_UNIFORM_CATEGORIES));
+  const [uniformItems, setUniformItems] = useState<UniformItem[]>(() => loadFromStorage('gha_uniform_items', []));
+  const [uniformSizes, setUniformSizes] = useState<UniformSize[]>(() => loadFromStorage('gha_uniform_sizes', []));
+  const [uniformStock, setUniformStock] = useState<StockRecord[]>(() => loadFromStorage('gha_uniform_stock', []));
+  const [stockTransactions, setStockTransactions] = useState<StockTransaction[]>(() => loadFromStorage('gha_uniform_stock_txns', []));
+  const [tailors, setTailors] = useState<Tailor[]>(() => loadFromStorage('gha_uniform_tailors', []));
+  const [uniformSuppliers, setUniformSuppliers] = useState<UniformSupplier[]>(() => loadFromStorage('gha_uniform_suppliers', []));
+  const [tailorOrders, setTailorOrders] = useState<TailorOrder[]>(() => loadFromStorage('gha_tailor_orders', []));
+  const [studentMeasurements, setStudentMeasurements] = useState<StudentMeasurement[]>(() => loadFromStorage('gha_student_measurements', []));
+  const [measurementHistory, setMeasurementHistory] = useState<MeasurementHistory[]>(() => loadFromStorage('gha_measurement_history', []));
+  const [uniformIssues, setUniformIssues] = useState<UniformIssue[]>(() => loadFromStorage('gha_uniform_issues', []));
+  const [uniformReturns, setUniformReturns] = useState<UniformReturn[]>(() => loadFromStorage('gha_uniform_returns', []));
+  const [uniformSettings, setUniformSettings] = useState<UniformSettings>(() => loadFromStorage('gha_uniform_settings', DEFAULT_UNIFORM_SETTINGS));
   const [libraryBooks, setLibraryBooks] = useState<LibraryBook[]>(() => loadFromStorage('gha_library_books', []));
   const [bookLoans, setBookLoans] = useState<BookLoan[]>(() => loadFromStorage('gha_book_loans', []));
   const [debtors, setDebtors] = useState<Debtor[]>(() => loadFromStorage('gha_debtors', []));
@@ -573,6 +780,48 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => { localStorage.setItem('gha_fundraiser_participants', JSON.stringify(fundraiserParticipants)); queueLiveSync('gha_fundraiser_participants'); }, [fundraiserParticipants]);
   useEffect(() => { localStorage.setItem('gha_external_fundraiser', JSON.stringify(externalFundraiserPayments)); queueLiveSync('gha_external_fundraiser'); }, [externalFundraiserPayments]);
   useEffect(() => { localStorage.setItem('gha_uniform_catalog', JSON.stringify(uniformCatalog)); queueLiveSync('gha_uniform_catalog'); }, [uniformCatalog]);
+  useEffect(() => { localStorage.setItem('gha_uniform_categories', JSON.stringify(uniformCategories)); queueLiveSync('gha_uniform_categories'); }, [uniformCategories]);
+  useEffect(() => { localStorage.setItem('gha_uniform_items', JSON.stringify(uniformItems)); queueLiveSync('gha_uniform_items'); }, [uniformItems]);
+  useEffect(() => { localStorage.setItem('gha_uniform_sizes', JSON.stringify(uniformSizes)); queueLiveSync('gha_uniform_sizes'); }, [uniformSizes]);
+  useEffect(() => { localStorage.setItem('gha_uniform_stock', JSON.stringify(uniformStock)); queueLiveSync('gha_uniform_stock'); }, [uniformStock]);
+  useEffect(() => { localStorage.setItem('gha_uniform_stock_txns', JSON.stringify(stockTransactions)); queueLiveSync('gha_uniform_stock_txns'); }, [stockTransactions]);
+  useEffect(() => { localStorage.setItem('gha_uniform_tailors', JSON.stringify(tailors)); queueLiveSync('gha_uniform_tailors'); }, [tailors]);
+  useEffect(() => { localStorage.setItem('gha_uniform_suppliers', JSON.stringify(uniformSuppliers)); queueLiveSync('gha_uniform_suppliers'); }, [uniformSuppliers]);
+  useEffect(() => { localStorage.setItem('gha_tailor_orders', JSON.stringify(tailorOrders)); queueLiveSync('gha_tailor_orders'); }, [tailorOrders]);
+  useEffect(() => { localStorage.setItem('gha_student_measurements', JSON.stringify(studentMeasurements)); queueLiveSync('gha_student_measurements'); }, [studentMeasurements]);
+  useEffect(() => { localStorage.setItem('gha_measurement_history', JSON.stringify(measurementHistory)); queueLiveSync('gha_measurement_history'); }, [measurementHistory]);
+  useEffect(() => { localStorage.setItem('gha_uniform_issues', JSON.stringify(uniformIssues)); queueLiveSync('gha_uniform_issues'); }, [uniformIssues]);
+  useEffect(() => { localStorage.setItem('gha_uniform_returns', JSON.stringify(uniformReturns)); queueLiveSync('gha_uniform_returns'); }, [uniformReturns]);
+  useEffect(() => { localStorage.setItem('gha_uniform_settings', JSON.stringify(uniformSettings)); queueLiveSync('gha_uniform_settings'); }, [uniformSettings]);
+
+  // One-time migration: seed the richer Uniform Management catalogue from the
+  // legacy simple catalogue (gha_uniform_catalog) the first time the new module
+  // is used, so existing items/stock aren't lost.
+  useEffect(() => {
+    if (localStorage.getItem('gha_uniform_migrated') === '1') return;
+    if (uniformItems.length > 0) { localStorage.setItem('gha_uniform_migrated', '1'); return; }
+    if (uniformCatalog.length === 0) return;
+    const genderOf = (c: string): UniformGender => c === 'Girls' ? 'Girls' : c === 'Boys' ? 'Boys' : 'Unisex';
+    const items: UniformItem[] = uniformCatalog.map((uc, idx) => ({
+      id: `item-${uc.id}`,
+      itemCode: `${DEFAULT_UNIFORM_SETTINGS.itemCodePrefix}-${String(idx + 1).padStart(3, '0')}`,
+      name: uc.name,
+      categoryId: '',
+      gender: genderOf(uc.category),
+      grades: [],
+      images: uc.imageUrl ? { front: uc.imageUrl } : {},
+      status: 'active',
+      price: uc.price,
+    }));
+    const stock: StockRecord[] = uniformCatalog.map(uc => ({
+      id: `stk-${uc.id}`, itemId: `item-${uc.id}`, size: 'One Size', quantity: uc.stock,
+      minStock: DEFAULT_UNIFORM_SETTINGS.defaultMinStock, sellPrice: uc.price,
+    }));
+    setUniformItems(items);
+    setUniformStock(prev => prev.length ? prev : stock);
+    localStorage.setItem('gha_uniform_migrated', '1');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   useEffect(() => { localStorage.setItem('gha_library_books', JSON.stringify(libraryBooks)); queueLiveSync('gha_library_books'); }, [libraryBooks]);
   useEffect(() => { localStorage.setItem('gha_book_loans', JSON.stringify(bookLoans)); queueLiveSync('gha_book_loans'); }, [bookLoans]);
   useEffect(() => { localStorage.setItem('gha_debtors', JSON.stringify(debtors)); queueLiveSync('gha_debtors'); }, [debtors]);
@@ -698,6 +947,81 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     return true;
   };
 
+  // ---- Uniform Management module CRUD ----
+  const addUniformCategory = (c: UniformCategory) => setUniformCategories(prev => [...prev, c]);
+  const updateUniformCategory = (id: string, u: Partial<UniformCategory>) =>
+    setUniformCategories(prev => prev.map(c => c.id === id ? { ...c, ...u } : c));
+  const deleteUniformCategory = (id: string) => setUniformCategories(prev => prev.filter(c => c.id !== id));
+
+  const addUniformItem = (i: UniformItem) => { setUniformItems(prev => [...prev, i]); logAudit('uniform-item-added', `${i.itemCode} — ${i.name}`); };
+  const updateUniformItem = (id: string, u: Partial<UniformItem>) =>
+    setUniformItems(prev => prev.map(i => i.id === id ? { ...i, ...u } : i));
+  const deleteUniformItem = (id: string) => {
+    setUniformItems(prev => prev.filter(i => i.id !== id));
+    setUniformStock(prev => prev.filter(s => s.itemId !== id));
+  };
+
+  const addUniformSize = (s: UniformSize) => setUniformSizes(prev => [...prev, s]);
+  const updateUniformSize = (id: string, u: Partial<UniformSize>) =>
+    setUniformSizes(prev => prev.map(s => s.id === id ? { ...s, ...u } : s));
+  const deleteUniformSize = (id: string) => setUniformSizes(prev => prev.filter(s => s.id !== id));
+
+  const addStockRecord = (s: StockRecord) => setUniformStock(prev => [...prev, s]);
+  const updateStockRecord = (id: string, u: Partial<StockRecord>) =>
+    setUniformStock(prev => prev.map(s => s.id === id ? { ...s, ...u } : s));
+  const deleteStockRecord = (id: string) => setUniformStock(prev => prev.filter(s => s.id !== id));
+
+  // Record a stock movement AND adjust the matching stock record's quantity.
+  const recordStockTransaction = (t: StockTransaction) => {
+    setStockTransactions(prev => [t, ...prev]);
+    setUniformStock(prev => {
+      const match = prev.find(s => s.itemId === t.itemId && s.size === t.size && (s.colour || '') === (t.colour || ''));
+      if (match) return prev.map(s => s.id === match.id ? { ...s, quantity: Math.max(0, s.quantity + t.quantity) } : s);
+      // No stock row yet — create one when adding stock
+      if (t.quantity > 0) return [...prev, { id: `stk-${Date.now()}`, itemId: t.itemId, size: t.size, colour: t.colour, quantity: t.quantity, minStock: uniformSettings.defaultMinStock }];
+      return prev;
+    });
+    logAudit('stock-movement', `${t.type} ${t.quantity > 0 ? '+' : ''}${t.quantity} — item ${t.itemId} (${t.size})`);
+  };
+
+  const addTailor = (t: Tailor) => setTailors(prev => [...prev, t]);
+  const updateTailor = (id: string, u: Partial<Tailor>) => setTailors(prev => prev.map(t => t.id === id ? { ...t, ...u } : t));
+  const deleteTailor = (id: string) => setTailors(prev => prev.filter(t => t.id !== id));
+
+  const addUniformSupplier = (s: UniformSupplier) => setUniformSuppliers(prev => [...prev, s]);
+  const updateUniformSupplier = (id: string, u: Partial<UniformSupplier>) => setUniformSuppliers(prev => prev.map(s => s.id === id ? { ...s, ...u } : s));
+  const deleteUniformSupplier = (id: string) => setUniformSuppliers(prev => prev.filter(s => s.id !== id));
+
+  const addTailorOrder = (o: TailorOrder) => { setTailorOrders(prev => [o, ...prev]); logAudit('tailor-order-created', `${o.orderNo}`); };
+  const updateTailorOrder = (id: string, u: Partial<TailorOrder>) =>
+    setTailorOrders(prev => prev.map(o => o.id === id ? { ...o, ...u } : o));
+  const deleteTailorOrder = (id: string) => setTailorOrders(prev => prev.filter(o => o.id !== id));
+
+  // Save a measurement; if the student already had one, archive the old to history.
+  const saveStudentMeasurement = (m: StudentMeasurement) => {
+    setStudentMeasurements(prev => {
+      const existing = prev.find(x => x.studentId === m.studentId);
+      if (existing) {
+        setMeasurementHistory(h => [{ ...existing, archivedAt: new Date().toISOString() }, ...h]);
+        return prev.map(x => x.studentId === m.studentId ? { ...m, id: existing.id } : x);
+      }
+      return [m, ...prev];
+    });
+  };
+  const deleteStudentMeasurement = (id: string) => setStudentMeasurements(prev => prev.filter(m => m.id !== id));
+
+  // Issue a uniform to a student — records the issue and removes it from stock.
+  const issueUniform = (issue: UniformIssue) => {
+    setUniformIssues(prev => [issue, ...prev]);
+    recordStockTransaction({ id: `stx-${Date.now()}`, itemId: issue.itemId, size: issue.size, type: 'issue', quantity: -Math.abs(issue.quantity), date: issue.issueDate, user: issue.issuedBy, reason: 'Issued to student', reference: issue.studentId });
+  };
+  const returnUniform = (ret: UniformReturn) => {
+    setUniformReturns(prev => [ret, ...prev]);
+    recordStockTransaction({ id: `stx-${Date.now()}`, itemId: ret.itemId, size: ret.size, type: 'return', quantity: Math.abs(ret.quantity), date: ret.returnDate, reason: ret.reason || 'Returned', reference: ret.studentId });
+  };
+
+  const updateUniformSettings = (u: Partial<UniformSettings>) => setUniformSettings(prev => ({ ...prev, ...u }));
+
   const addLibraryBook = (b: LibraryBook) => setLibraryBooks(prev => [...prev, b]);
   const updateLibraryBook = (id: string, updated: Partial<LibraryBook>) =>
     setLibraryBooks(prev => prev.map(b => b.id === id ? { ...b, ...updated } : b));
@@ -784,6 +1108,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     'gha_terms', 'gha_todos', 'gha_salary_advances', 'gha_payroll', 'gha_groceries', 'gha_budgets', 'gha_documents',
     'gha_audit', 'gha_gallery', 'gha_library_books', 'gha_book_loans',
     'gha_msg_channels', 'gha_msg_telegram_channel',
+    'gha_uniform_categories', 'gha_uniform_items', 'gha_uniform_sizes', 'gha_uniform_stock',
+    'gha_uniform_stock_txns', 'gha_uniform_tailors', 'gha_uniform_suppliers', 'gha_tailor_orders',
+    'gha_student_measurements', 'gha_measurement_history', 'gha_uniform_issues', 'gha_uniform_returns',
+    'gha_uniform_settings',
   ];
 
   const exportAllData = (): string => {
@@ -813,7 +1141,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const SECTION_KEYS: Record<string, string[]> = {
     students: ['gha_students'],
     payments: ['gha_payments'],
-    uniforms: ['gha_uniforms', 'gha_uniform_catalog'],
+    uniforms: ['gha_uniforms', 'gha_uniform_catalog', 'gha_uniform_categories', 'gha_uniform_items',
+      'gha_uniform_sizes', 'gha_uniform_stock', 'gha_uniform_stock_txns', 'gha_uniform_tailors',
+      'gha_uniform_suppliers', 'gha_tailor_orders', 'gha_student_measurements', 'gha_measurement_history',
+      'gha_uniform_issues', 'gha_uniform_returns'],
     library: ['gha_library_books', 'gha_book_loans'],
     requirements: ['gha_requirements'],
     teachers: ['gha_teachers'],
@@ -864,6 +1195,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       gha_external_fundraiser: setExternalFundraiserPayments,
       gha_uniform_catalog: setUniformCatalog, gha_debtors: setDebtors,
       gha_library_books: setLibraryBooks, gha_book_loans: setBookLoans,
+      gha_uniform_categories: setUniformCategories, gha_uniform_items: setUniformItems,
+      gha_uniform_sizes: setUniformSizes, gha_uniform_stock: setUniformStock,
+      gha_uniform_stock_txns: setStockTransactions, gha_uniform_tailors: setTailors,
+      gha_uniform_suppliers: setUniformSuppliers, gha_tailor_orders: setTailorOrders,
+      gha_student_measurements: setStudentMeasurements, gha_measurement_history: setMeasurementHistory,
+      gha_uniform_issues: setUniformIssues, gha_uniform_returns: setUniformReturns,
+      gha_uniform_settings: setUniformSettings,
       gha_transport_routes: setTransportRoutes, gha_terms: setTerms, gha_todos: setTodos,
       gha_salary_advances: setSalaryAdvances, gha_payroll: setPayrollRecords,
       gha_groceries: setGroceries, gha_budgets: setBudgets, gha_documents: setDocuments,
@@ -968,6 +1306,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       externalFundraiserPayments, addExternalFundraiserPayment, deleteExternalFundraiserPayment,
       uniformCatalog, addUniformCatalogItem, updateUniformCatalogItem, deleteUniformCatalogItem, sellUniform,
       bulkUpdateStudents,
+      uniformCategories, addUniformCategory, updateUniformCategory, deleteUniformCategory,
+      uniformItems, addUniformItem, updateUniformItem, deleteUniformItem,
+      uniformSizes, addUniformSize, updateUniformSize, deleteUniformSize,
+      uniformStock, addStockRecord, updateStockRecord, deleteStockRecord,
+      stockTransactions, recordStockTransaction,
+      tailors, addTailor, updateTailor, deleteTailor,
+      uniformSuppliers, addUniformSupplier, updateUniformSupplier, deleteUniformSupplier,
+      tailorOrders, addTailorOrder, updateTailorOrder, deleteTailorOrder,
+      studentMeasurements, saveStudentMeasurement, deleteStudentMeasurement, measurementHistory,
+      uniformIssues, issueUniform, uniformReturns, returnUniform,
+      uniformSettings, updateUniformSettings,
       libraryBooks, addLibraryBook, updateLibraryBook, deleteLibraryBook,
       bookLoans, borrowBook, returnLoan, deleteLoan,
       debtors, addDebtor, updateDebtor, deleteDebtor,
