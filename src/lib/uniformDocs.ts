@@ -1,4 +1,4 @@
-import { UniformItem, UniformCategory, UniformSize, SchoolBranding } from '../context/AppContext';
+import { UniformItem, UniformCategory, UniformSize, SchoolBranding, StudentMeasurement, TailorOrder, Student } from '../context/AppContext';
 
 const esc = (s: string) => (s || '').replace(/[&<>"']/g, c =>
   ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c] as string));
@@ -101,4 +101,55 @@ export function printStockCount(items: { name: string; itemCode: string }[], bra
     <p style="font-size:12px;color:#6b7280;margin-bottom:6px">Date: ______________  Counted by: ______________</p>
     <table><thead><tr><th>Item Code</th><th>Item</th><th>Colour</th><th>Size</th><th>System Qty</th><th>Counted Qty</th></tr></thead><tbody>${rows}</tbody></table>
     <div class="sig"><div>Counted By</div><div>Verified By</div></div>`));
+}
+
+const MEASURE_ROWS = ['Height', 'Chest', 'Waist', 'Hip', 'Shoulder', 'Sleeve', 'Neck', 'Shirt Length', 'Trouser Length', 'Skirt Length', 'Foot Size', 'Head Size'];
+
+// Student measurement form — blank if no measurement given, otherwise filled.
+export function printMeasurementForm(student: Student | undefined, m: StudentMeasurement | undefined, branding: SchoolBranding) {
+  const v = (n?: number | string) => (n === undefined || n === '') ? '' : String(n);
+  const map: Record<string, number | string | undefined> = m ? {
+    'Height': m.height, 'Chest': m.chest, 'Waist': m.waist, 'Hip': m.hip, 'Shoulder': m.shoulder,
+    'Sleeve': m.sleeve, 'Neck': m.neck, 'Shirt Length': m.shirtLength, 'Trouser Length': m.trouserLength,
+    'Skirt Length': m.skirtLength, 'Foot Size': m.footSize, 'Head Size': m.headSize,
+  } : {};
+  const rows = MEASURE_ROWS.map(label => `<tr><td>${label}</td><td style="width:120px">${v(map[label])}</td><td></td></tr>`).join('');
+  open(shell('Student Measurement Form', branding, `
+    <div class="field"><b>Student Name</b><span>${esc(student?.name || '')}</span></div>
+    <div class="field"><b>Admission No.</b><span>${esc(student?.admissionNumber || '')}</span></div>
+    <div class="field"><b>Class</b><span>${esc(student?.grade || m?.className || '')}</span></div>
+    <div class="field"><b>Gender</b><span>${esc(student?.gender || m?.gender || '')}</span></div>
+    <div class="field"><b>Date Measured</b><span>${m?.dateMeasured ? new Date(m.dateMeasured).toLocaleDateString('en-GB') : ''}</span></div>
+    <div class="field"><b>Measured By</b><span>${esc(m?.measuredBy || '')}</span></div>
+    <table style="margin-top:10px"><thead><tr><th>Measurement</th><th>Value (cm)</th><th>Notes</th></tr></thead><tbody>${rows}</tbody></table>
+    <div class="field" style="margin-top:10px"><b>Recommended Size</b><span>${esc(m?.recommendedSize || '')}</span></div>
+    <div class="field"><b>Tailor Notes</b><span>${esc(m?.tailorNotes || '')}</span></div>
+    <div class="sig"><div>Measured By</div><div>Signature &amp; Date</div></div>`));
+}
+
+// Tailor production sheet for an order (rows pre-resolved by the caller).
+export function printProductionSheet(order: TailorOrder, tailorName: string, rows: { name: string; size: string; qty: number; material?: string; instructions?: string }[], branding: SchoolBranding) {
+  const body = rows.map(r => `<tr><td>${esc(r.name)}</td><td>${esc(r.size)}</td><td style="text-align:center">${r.qty}</td><td>${esc(r.material || '')}</td><td>${esc(r.instructions || '')}</td></tr>`).join('');
+  open(shell('Tailor Production Order', branding, `
+    <div class="field"><b>Order No.</b><span>${esc(order.orderNo)}</span></div>
+    <div class="field"><b>Tailor</b><span>${esc(tailorName)}</span></div>
+    <div class="field"><b>Order Date</b><span>${new Date(order.date).toLocaleDateString('en-GB')}</span></div>
+    <div class="field"><b>Due Date</b><span>${order.dueDate ? new Date(order.dueDate).toLocaleDateString('en-GB') : '—'}</span></div>
+    <div class="field"><b>Priority</b><span>${esc(order.priority)}</span></div>
+    <div class="field"><b>Status</b><span>${esc(order.status)}</span></div>
+    <table style="margin-top:10px"><thead><tr><th>Item</th><th>Size</th><th>Qty</th><th>Material</th><th>Special Instructions</th></tr></thead><tbody>${body || '<tr><td colspan="5" style="color:#9ca3af">No items</td></tr>'}</tbody></table>
+    ${order.notes ? `<p style="font-size:12px;color:#6b7280;margin-top:8px">Notes: ${esc(order.notes)}</p>` : ''}
+    <div class="sig"><div>Issued By (School)</div><div>Received By (Tailor)</div></div>`));
+}
+
+// Blank uniform issue / return form.
+export function printIssueForm(kind: 'Issue' | 'Return', branding: SchoolBranding) {
+  const rows = Array.from({ length: 6 }).map(() => '<tr class="blank"><td></td><td></td><td></td><td></td></tr>').join('');
+  open(shell(`Uniform ${kind} Form`, branding, `
+    <div class="field"><b>Student Name</b><span>&nbsp;</span></div>
+    <div class="field"><b>Admission No.</b><span>&nbsp;</span></div>
+    <div class="field"><b>Class</b><span>&nbsp;</span></div>
+    <div class="field"><b>Date</b><span>&nbsp;</span></div>
+    <table style="margin-top:10px"><thead><tr><th>Item</th><th>Size</th><th>Qty</th><th>Condition</th></tr></thead><tbody>${rows}</tbody></table>
+    <div class="sig"><div>${kind === 'Issue' ? 'Issued By' : 'Received By'}</div><div>Parent / Guardian Signature</div></div>`));
 }

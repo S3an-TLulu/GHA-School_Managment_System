@@ -2,17 +2,19 @@ import { useState } from 'react';
 import {
   LayoutDashboard, Shirt, Tags, Ruler, Package, ArrowLeftRight, BarChart3, Settings2,
   Plus, Pencil, Trash2, X, Printer, Download, AlertTriangle, Search, FileText, Image as ImageIcon,
+  Users, Scissors, ClipboardCheck,
 } from 'lucide-react';
 import {
   useAppContext, UniformCategory, UniformItem, UniformSize, StockRecord, StockTxnType, UniformGender,
+  TailorOrderItem, TailorOrderStatus,
 } from '../context/AppContext';
 import { useToast } from './ToastProvider';
 import { useThemeClasses } from '../hooks/useThemeClasses';
 import { compressImage } from '../lib/images';
 import { exportCSV } from '../lib/exports';
-import { printItemSpec, printBlankCatalogue, printSizeChart, printStockCount } from '../lib/uniformDocs';
+import { printItemSpec, printBlankCatalogue, printSizeChart, printStockCount, printMeasurementForm, printProductionSheet, printIssueForm } from '../lib/uniformDocs';
 
-type Tab = 'dashboard' | 'catalogue' | 'categories' | 'sizes' | 'inventory' | 'stock' | 'reports' | 'settings';
+type Tab = 'dashboard' | 'catalogue' | 'categories' | 'sizes' | 'measurements' | 'tailors' | 'issuing' | 'inventory' | 'stock' | 'reports' | 'settings';
 const GENDERS: UniformGender[] = ['Boys', 'Girls', 'Unisex'];
 const TXN_TYPES: StockTxnType[] = ['purchase', 'sale', 'issue', 'return', 'adjustment', 'transfer', 'damaged', 'lost'];
 
@@ -267,7 +269,8 @@ export function UniformManagement() {
 
   const TABS: [Tab, string, typeof LayoutDashboard][] = [
     ['dashboard', 'Dashboard', LayoutDashboard], ['catalogue', 'Catalogue', Shirt], ['categories', 'Categories', Tags],
-    ['sizes', 'Size Chart', Ruler], ['inventory', 'Inventory', Package], ['stock', 'Stock Movement', ArrowLeftRight],
+    ['sizes', 'Size Chart', Ruler], ['measurements', 'Measurements', Users], ['tailors', 'Tailor Orders', Scissors],
+    ['issuing', 'Issuing', ClipboardCheck], ['inventory', 'Inventory', Package], ['stock', 'Stock Movement', ArrowLeftRight],
     ['reports', 'Reports', BarChart3], ['settings', 'Settings', Settings2],
   ];
 
@@ -456,6 +459,15 @@ export function UniformManagement() {
             </div>
           )}
 
+          {/* MEASUREMENTS */}
+          {tab === 'measurements' && <MeasurementsTab />}
+
+          {/* TAILOR ORDERS */}
+          {tab === 'tailors' && <TailorOrdersTab />}
+
+          {/* ISSUING */}
+          {tab === 'issuing' && <IssuingTab />}
+
           {/* STOCK MOVEMENT */}
           {tab === 'stock' && <StockMovementTab />}
 
@@ -573,6 +585,203 @@ export function UniformManagement() {
             {uniformSuppliers.map(s => <div key={s.id} className="flex justify-between items-center px-3 py-1.5 bg-gray-50 rounded-lg mb-1 text-sm"><span>{s.name}</span><button onClick={() => deleteUniformSupplier(s.id)} className="text-red-500"><Trash2 className="h-3.5 w-3.5" /></button></div>)}
           </div>
         </div>
+      </div>
+    );
+  }
+
+  // ---- Measurements tab ----
+  function MeasurementsTab() {
+    const { students, uniformSizes, studentMeasurements, measurementHistory, saveStudentMeasurement, deleteStudentMeasurement } = ctx;
+    const activeStudents = students.filter(s => !s.status || s.status === 'active');
+    const [sid, setSid] = useState('');
+    const blank = { height: '', chest: '', waist: '', hip: '', shoulder: '', sleeve: '', neck: '', shirtLength: '', trouserLength: '', skirtLength: '', footSize: '', headSize: '', tailorNotes: '' };
+    const [f, setF] = useState<Record<string, string>>(blank);
+    const inp = 'w-full px-2.5 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent';
+    const N = (v: string) => v === '' ? undefined : parseFloat(v);
+    // Recommend a size by closest chest measurement in the master chart.
+    const recommend = (chest?: number): string | undefined => {
+      if (!chest || uniformSizes.length === 0) return undefined;
+      const withChest = uniformSizes.filter(s => s.chest !== undefined);
+      if (withChest.length === 0) return undefined;
+      return withChest.reduce((best, s) => Math.abs((s.chest as number) - chest) < Math.abs((best.chest as number) - chest) ? s : best).sizeCode;
+    };
+    const student = activeStudents.find(s => s.id === sid);
+    const save = () => {
+      if (!sid) { toast('Pick a student first.', 'warning'); return; }
+      const chest = N(f.chest);
+      saveStudentMeasurement({
+        id: `msr-${Date.now()}`, studentId: sid, className: student?.grade, gender: student?.gender,
+        dateMeasured: new Date().toISOString(), measuredBy: 'Admin',
+        height: N(f.height), chest, waist: N(f.waist), hip: N(f.hip), shoulder: N(f.shoulder), sleeve: N(f.sleeve),
+        neck: N(f.neck), shirtLength: N(f.shirtLength), trouserLength: N(f.trouserLength), skirtLength: N(f.skirtLength),
+        footSize: f.footSize || undefined, headSize: N(f.headSize), recommendedSize: recommend(chest), tailorNotes: f.tailorNotes || undefined,
+      });
+      toast(`Measurement saved${recommend(chest) ? ` — recommended size ${recommend(chest)}` : ''}.`, 'success');
+      setF(blank); setSid('');
+    };
+    const rec = recommend(N(f.chest));
+    const fields: [string, string][] = [['Height', 'height'], ['Chest', 'chest'], ['Waist', 'waist'], ['Hip', 'hip'], ['Shoulder', 'shoulder'], ['Sleeve', 'sleeve'], ['Neck', 'neck'], ['Shirt Length', 'shirtLength'], ['Trouser Length', 'trouserLength'], ['Skirt Length', 'skirtLength'], ['Foot Size', 'footSize'], ['Head Size', 'headSize']];
+    return (
+      <div className="space-y-5">
+        <div className="bg-white border border-gray-200 rounded-lg p-5">
+          <div className="flex items-center justify-between gap-2 flex-wrap mb-3">
+            <p className="font-semibold text-gray-900">Record measurement</p>
+            <button onClick={() => printMeasurementForm(undefined, undefined, branding)} className="flex items-center gap-1.5 border border-gray-300 text-gray-700 hover:bg-gray-50 px-3 py-1.5 rounded-lg text-sm"><FileText className="h-4 w-4" />Blank form</button>
+          </div>
+          <select className={`${inp} mb-3`} value={sid} onChange={e => setSid(e.target.value)}><option value="">— Select student —</option>{activeStudents.map(s => <option key={s.id} value={s.id}>{s.name} — {s.grade}</option>)}</select>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            {fields.map(([label, key]) => <div key={key}><label className="text-xs text-gray-500">{label}</label><input className={inp} value={f[key]} onChange={e => setF({ ...f, [key]: e.target.value })} /></div>)}
+          </div>
+          <input className={`${inp} mt-2`} placeholder="Tailor notes" value={f.tailorNotes} onChange={e => setF({ ...f, tailorNotes: e.target.value })} />
+          <div className="flex items-center justify-between mt-3">
+            <span className="text-sm text-gray-500">{rec ? <>Recommended size: <strong className="text-gray-900">{rec}</strong></> : 'Enter chest to get a size suggestion'}</span>
+            <button onClick={save} className={`${tc.btn} text-white px-4 py-2 rounded-lg text-sm font-medium`}>Save Measurement</button>
+          </div>
+        </div>
+        <div className="overflow-x-auto border border-gray-200 rounded-lg">
+          <table className="min-w-full text-sm divide-y divide-gray-100">
+            <thead className="bg-gray-50"><tr>{['Student', 'Class', 'Chest', 'Waist', 'Rec. Size', 'Measured', 'History', ''].map(h => <th key={h} className="px-3 py-2.5 text-left text-xs font-medium text-gray-500 uppercase">{h}</th>)}</tr></thead>
+            <tbody className="divide-y divide-gray-100">
+              {studentMeasurements.map(m => {
+                const st = students.find(s => s.id === m.studentId);
+                const hist = measurementHistory.filter(h => h.studentId === m.studentId).length;
+                return (
+                  <tr key={m.id} className="hover:bg-gray-50">
+                    <td className="px-3 py-2 font-medium text-gray-900">{st?.name || '—'}</td><td className="px-3 py-2 text-gray-500">{m.className || '—'}</td>
+                    <td className="px-3 py-2 text-gray-600">{m.chest ?? '—'}</td><td className="px-3 py-2 text-gray-600">{m.waist ?? '—'}</td>
+                    <td className="px-3 py-2"><span className="text-xs font-medium bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full">{m.recommendedSize || '—'}</span></td>
+                    <td className="px-3 py-2 text-gray-400 text-xs">{new Date(m.dateMeasured).toLocaleDateString('en-ZM', { day: 'numeric', month: 'short', year: 'numeric' })}</td>
+                    <td className="px-3 py-2 text-gray-400 text-xs">{hist} prior</td>
+                    <td className="px-3 py-2 text-right whitespace-nowrap"><button onClick={() => printMeasurementForm(st, m, branding)} className="p-1.5 text-gray-500 hover:bg-gray-100 rounded"><Printer className="h-3.5 w-3.5" /></button><button onClick={() => { deleteStudentMeasurement(m.id); toast('Measurement removed.', 'info'); }} className="p-1.5 text-red-600 hover:bg-red-50 rounded"><Trash2 className="h-3.5 w-3.5" /></button></td>
+                  </tr>
+                );
+              })}
+              {studentMeasurements.length === 0 && <tr><td colSpan={8} className="px-3 py-10 text-center text-gray-400">No measurements recorded yet.</td></tr>}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    );
+  }
+
+  // ---- Tailor Orders tab ----
+  function TailorOrdersTab() {
+    const { tailors, uniformItems, tailorOrders, addTailorOrder, updateTailorOrder, deleteTailorOrder } = ctx;
+    const [open, setOpen] = useState(false);
+    const [hdr, setHdr] = useState({ tailorId: '', dueDate: '', priority: 'normal' as 'low' | 'normal' | 'high', notes: '' });
+    const [lines, setLines] = useState<TailorOrderItem[]>([{ itemId: '', size: '', quantity: 1 }]);
+    const inp = 'px-2.5 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent';
+    const STATUSES: TailorOrderStatus[] = ['draft', 'sent', 'in_production', 'completed', 'collected', 'cancelled'];
+    const tailorName = (id: string) => tailors.find(t => t.id === id)?.name || '—';
+    const create = () => {
+      if (!hdr.tailorId) { toast('Select a tailor.', 'warning'); return; }
+      const valid = lines.filter(l => l.itemId && l.size && l.quantity > 0);
+      if (valid.length === 0) { toast('Add at least one line item.', 'warning'); return; }
+      addTailorOrder({ id: `to-${Date.now()}`, orderNo: `TO-${String(tailorOrders.length + 1).padStart(4, '0')}`, tailorId: hdr.tailorId, date: new Date().toISOString(), dueDate: hdr.dueDate ? new Date(hdr.dueDate).toISOString() : undefined, status: 'draft', priority: hdr.priority, notes: hdr.notes || undefined, items: valid });
+      toast('Tailor order created.', 'success');
+      setOpen(false); setHdr({ tailorId: '', dueDate: '', priority: 'normal', notes: '' }); setLines([{ itemId: '', size: '', quantity: 1 }]);
+    };
+    return (
+      <div className="space-y-4">
+        <div className="flex justify-between items-center flex-wrap gap-2">
+          <p className="text-sm text-gray-500">{tailorOrders.length} orders</p>
+          <div className="flex gap-2">
+            <button onClick={() => printIssueForm('Issue', branding)} className="flex items-center gap-1.5 border border-gray-300 text-gray-700 hover:bg-gray-50 px-3 py-2 rounded-lg text-sm"><FileText className="h-4 w-4" />Blank Issue Form</button>
+            <button onClick={() => { if (tailors.length === 0) { toast('Add a tailor in Settings first.', 'warning'); return; } setOpen(o => !o); }} className={`flex items-center gap-1.5 ${tc.btn} text-white px-3 py-2 rounded-lg text-sm`}><Plus className="h-4 w-4" />New Order</button>
+          </div>
+        </div>
+        {open && (
+          <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 space-y-3">
+            <div className="flex flex-wrap gap-2">
+              <select className={inp} value={hdr.tailorId} onChange={e => setHdr({ ...hdr, tailorId: e.target.value })}><option value="">Tailor…</option>{tailors.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select>
+              <input type="date" className={inp} value={hdr.dueDate} onChange={e => setHdr({ ...hdr, dueDate: e.target.value })} />
+              <select className={inp} value={hdr.priority} onChange={e => setHdr({ ...hdr, priority: e.target.value as 'low' | 'normal' | 'high' })}><option value="low">Low</option><option value="normal">Normal</option><option value="high">High</option></select>
+              <input className={`${inp} flex-1 min-w-[140px]`} placeholder="Notes" value={hdr.notes} onChange={e => setHdr({ ...hdr, notes: e.target.value })} />
+            </div>
+            {lines.map((l, idx) => (
+              <div key={idx} className="flex flex-wrap gap-2 items-center">
+                <select className={inp} value={l.itemId} onChange={e => setLines(prev => prev.map((x, i) => i === idx ? { ...x, itemId: e.target.value } : x))}><option value="">Item…</option>{uniformItems.map(i => <option key={i.id} value={i.id}>{i.name}</option>)}</select>
+                <input className={`${inp} w-24`} placeholder="Size" value={l.size} onChange={e => setLines(prev => prev.map((x, i) => i === idx ? { ...x, size: e.target.value } : x))} />
+                <input className={`${inp} w-20`} type="number" min="1" value={l.quantity} onChange={e => setLines(prev => prev.map((x, i) => i === idx ? { ...x, quantity: parseInt(e.target.value) || 1 } : x))} />
+                <input className={`${inp} w-32`} placeholder="Material" value={l.material || ''} onChange={e => setLines(prev => prev.map((x, i) => i === idx ? { ...x, material: e.target.value } : x))} />
+                <input className={`${inp} flex-1 min-w-[120px]`} placeholder="Instructions" value={l.instructions || ''} onChange={e => setLines(prev => prev.map((x, i) => i === idx ? { ...x, instructions: e.target.value } : x))} />
+                <button onClick={() => setLines(prev => prev.length > 1 ? prev.filter((_, i) => i !== idx) : prev)} className="text-red-500"><X className="h-4 w-4" /></button>
+              </div>
+            ))}
+            <div className="flex gap-2">
+              <button onClick={() => setLines(prev => [...prev, { itemId: '', size: '', quantity: 1 }])} className="text-sm text-blue-600">+ Add line</button>
+              <button onClick={create} className={`ml-auto ${tc.btn} text-white px-4 py-2 rounded-lg text-sm`}>Create Order</button>
+            </div>
+          </div>
+        )}
+        <div className="overflow-x-auto border border-gray-200 rounded-lg">
+          <table className="min-w-full text-sm divide-y divide-gray-100">
+            <thead className="bg-gray-50"><tr>{['Order', 'Tailor', 'Items', 'Due', 'Priority', 'Status', ''].map(h => <th key={h} className="px-3 py-2.5 text-left text-xs font-medium text-gray-500 uppercase">{h}</th>)}</tr></thead>
+            <tbody className="divide-y divide-gray-100">
+              {tailorOrders.map(o => (
+                <tr key={o.id} className="hover:bg-gray-50">
+                  <td className="px-3 py-2 font-medium text-gray-900">{o.orderNo}</td><td className="px-3 py-2 text-gray-600">{tailorName(o.tailorId)}</td>
+                  <td className="px-3 py-2 text-gray-500">{o.items.reduce((a, i) => a + i.quantity, 0)} pcs</td>
+                  <td className="px-3 py-2 text-gray-400 text-xs">{o.dueDate ? new Date(o.dueDate).toLocaleDateString('en-ZM', { day: 'numeric', month: 'short' }) : '—'}</td>
+                  <td className="px-3 py-2"><span className={`text-xs px-2 py-0.5 rounded-full ${o.priority === 'high' ? 'bg-red-100 text-red-700' : o.priority === 'low' ? 'bg-gray-100 text-gray-500' : 'bg-blue-50 text-blue-700'}`}>{o.priority}</span></td>
+                  <td className="px-3 py-2"><select value={o.status} onChange={e => updateTailorOrder(o.id, { status: e.target.value as TailorOrderStatus })} className="text-xs border border-gray-200 rounded px-1.5 py-1 capitalize">{STATUSES.map(s => <option key={s} value={s}>{s.replace('_', ' ')}</option>)}</select></td>
+                  <td className="px-3 py-2 text-right whitespace-nowrap">
+                    <button onClick={() => printProductionSheet(o, tailorName(o.tailorId), o.items.map(it => ({ name: uniformItems.find(u => u.id === it.itemId)?.name || it.itemId, size: it.size, qty: it.quantity, material: it.material, instructions: it.instructions })), branding)} className="p-1.5 text-gray-500 hover:bg-gray-100 rounded"><Printer className="h-3.5 w-3.5" /></button>
+                    <button onClick={() => { deleteTailorOrder(o.id); toast('Order removed.', 'info'); }} className="p-1.5 text-red-600 hover:bg-red-50 rounded"><Trash2 className="h-3.5 w-3.5" /></button>
+                  </td>
+                </tr>
+              ))}
+              {tailorOrders.length === 0 && <tr><td colSpan={7} className="px-3 py-10 text-center text-gray-400">No tailor orders yet.</td></tr>}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    );
+  }
+
+  // ---- Issuing tab ----
+  function IssuingTab() {
+    const { students, uniformItems, uniformIssues, uniformReturns, issueUniform, returnUniform } = ctx;
+    const activeStudents = students.filter(s => !s.status || s.status === 'active');
+    const [f, setF] = useState({ studentId: '', itemId: '', size: '', quantity: '1', condition: 'New' });
+    const inp = 'px-2.5 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent';
+    const nameOf = (id: string) => students.find(s => s.id === id)?.name || '—';
+    const itemOf = (id: string) => uniformItems.find(i => i.id === id)?.name || '—';
+    const submit = (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!f.studentId || !f.itemId || !f.size.trim()) { toast('Student, item and size are required.', 'warning'); return; }
+      issueUniform({ id: `iss-${Date.now()}`, studentId: f.studentId, itemId: f.itemId, size: f.size.trim(), quantity: parseInt(f.quantity) || 1, issueDate: new Date().toISOString(), issuedBy: 'Admin', condition: f.condition });
+      toast('Uniform issued and stock updated.', 'success');
+      setF({ ...f, size: '', quantity: '1' });
+    };
+    return (
+      <div className="space-y-4">
+        <form className="flex flex-wrap gap-2 items-end bg-gray-50 border border-gray-200 rounded-lg p-3" onSubmit={submit}>
+          <select className={inp} value={f.studentId} onChange={e => setF({ ...f, studentId: e.target.value })}><option value="">Student…</option>{activeStudents.map(s => <option key={s.id} value={s.id}>{s.name} — {s.grade}</option>)}</select>
+          <select className={inp} value={f.itemId} onChange={e => setF({ ...f, itemId: e.target.value })}><option value="">Item…</option>{uniformItems.map(i => <option key={i.id} value={i.id}>{i.name}</option>)}</select>
+          <input className={`${inp} w-24`} placeholder="Size" value={f.size} onChange={e => setF({ ...f, size: e.target.value })} />
+          <input className={`${inp} w-20`} type="number" min="1" value={f.quantity} onChange={e => setF({ ...f, quantity: e.target.value })} />
+          <select className={inp} value={f.condition} onChange={e => setF({ ...f, condition: e.target.value })}><option>New</option><option>Good</option><option>Fair</option></select>
+          <button type="submit" className={`${tc.btn} text-white px-3 py-2 rounded-lg text-sm`}>Issue</button>
+          <button type="button" onClick={() => printIssueForm('Return', branding)} className="border border-gray-300 text-gray-700 hover:bg-gray-50 px-3 py-2 rounded-lg text-sm">Blank Return Form</button>
+        </form>
+        <div className="overflow-x-auto border border-gray-200 rounded-lg">
+          <table className="min-w-full text-sm divide-y divide-gray-100">
+            <thead className="bg-gray-50"><tr>{['Student', 'Item', 'Size', 'Qty', 'Condition', 'Issued', ''].map(h => <th key={h} className="px-3 py-2.5 text-left text-xs font-medium text-gray-500 uppercase">{h}</th>)}</tr></thead>
+            <tbody className="divide-y divide-gray-100">
+              {uniformIssues.map(i => (
+                <tr key={i.id} className="hover:bg-gray-50">
+                  <td className="px-3 py-2 font-medium text-gray-900">{nameOf(i.studentId)}</td><td className="px-3 py-2 text-gray-600">{itemOf(i.itemId)}</td>
+                  <td className="px-3 py-2 text-gray-600">{i.size}</td><td className="px-3 py-2 text-gray-600">{i.quantity}</td><td className="px-3 py-2 text-gray-500">{i.condition || '—'}</td>
+                  <td className="px-3 py-2 text-gray-400 text-xs">{new Date(i.issueDate).toLocaleDateString('en-ZM', { day: 'numeric', month: 'short', year: 'numeric' })}</td>
+                  <td className="px-3 py-2 text-right"><button onClick={() => returnUniform({ id: `ret-${Date.now()}`, studentId: i.studentId, itemId: i.itemId, size: i.size, quantity: i.quantity, returnDate: new Date().toISOString(), reason: 'Returned' })} className="text-xs text-blue-600 border border-blue-200 hover:bg-blue-50 rounded px-2 py-1">Return</button></td>
+                </tr>
+              ))}
+              {uniformIssues.length === 0 && <tr><td colSpan={7} className="px-3 py-10 text-center text-gray-400">No uniforms issued yet.</td></tr>}
+            </tbody>
+          </table>
+        </div>
+        {uniformReturns.length > 0 && <p className="text-xs text-gray-400">{uniformReturns.length} return(s) recorded — stock restored automatically.</p>}
       </div>
     );
   }
