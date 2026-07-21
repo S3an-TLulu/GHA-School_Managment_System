@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import { Plus, Pencil, Trash2, X, UserX, DollarSign, Search, CheckCircle2, MessageCircle } from 'lucide-react';
+import { Plus, Pencil, Trash2, X, UserX, DollarSign, Search, CheckCircle2, MessageCircle, Download } from 'lucide-react';
 import { useAppContext, Debtor } from '../context/AppContext';
 import { useToast } from './ToastProvider';
 import { useThemeClasses } from '../hooks/useThemeClasses';
 import { waLink, buildFeeReminder } from '../lib/notify';
+import { exportCSV } from '../lib/exports';
 
 function DebtorModal({ debtor, onSave, onClose }: {
   debtor: Debtor | null;
@@ -165,10 +166,24 @@ export function Debtors() {
           <h1 className="text-2xl font-bold text-gray-900">Debtors</h1>
           <p className="text-gray-600">Products and services owed to the school</p>
         </div>
-        <button onClick={() => { setEditing(null); setModalOpen(true); }}
-          className={`flex items-center space-x-2 ${tc.btn} text-white px-4 py-2 rounded-lg`}>
-          <Plus className="h-5 w-5" /><span>Add Debtor</span>
-        </button>
+        <div className="flex items-center gap-2">
+          <button onClick={() => {
+            if (debtors.length === 0) { toast('No debtors to export.', 'warning'); return; }
+            exportCSV('GHA_Debtors',
+              ['Name', 'Phone', 'Owed For', 'Amount', 'Paid', 'Balance', 'Date Incurred', 'Due Date', 'Notes'],
+              debtors.map(d => [d.name, d.phone || '', d.description, d.amount, d.amountPaid,
+                Math.max(0, d.amount - d.amountPaid), d.dateIncurred?.split('T')[0] || '',
+                d.dueDate?.split('T')[0] || '', d.notes || '']));
+            toast(`Exported ${debtors.length} debtors.`, 'success');
+          }}
+            className="flex items-center gap-2 border border-gray-300 text-gray-700 hover:bg-gray-50 px-3 py-2 rounded-lg text-sm font-medium">
+            <Download className="h-4 w-4" /><span className="hidden sm:inline">Export</span>
+          </button>
+          <button onClick={() => { setEditing(null); setModalOpen(true); }}
+            className={`flex items-center space-x-2 ${tc.btn} text-white px-4 py-2 rounded-lg`}>
+            <Plus className="h-5 w-5" /><span>Add Debtor</span>
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

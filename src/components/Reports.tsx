@@ -606,6 +606,98 @@ export function Reports() {
     );
   };
 
+  // Arrears aging: for each student, bucket their unpaid fees by how long ago
+  // they fell due. Uses the term filter like the other reports.
+  const agingRows = (() => {
+    const now = Date.now();
+    const DAY = 86_400_000;
+    const src = (termFilter ? payments.filter(p => p.term === termFilter) : payments)
+      .filter(p => p.status === 'pending' || p.status === 'overdue');
+    const byStudent = new Map<string, { current: number; d30: number; d60: number; d90: number; d90plus: number; total: number }>();
+    for (const p of src) {
+      const daysOver = p.dueDate ? Math.floor((now - new Date(p.dueDate).getTime()) / DAY) : 0;
+      const b = byStudent.get(p.studentId) || { current: 0, d30: 0, d60: 0, d90: 0, d90plus: 0, total: 0 };
+      if (daysOver <= 0) b.current += p.amount;
+      else if (daysOver <= 30) b.d30 += p.amount;
+      else if (daysOver <= 60) b.d60 += p.amount;
+      else if (daysOver <= 90) b.d90 += p.amount;
+      else b.d90plus += p.amount;
+      b.total += p.amount;
+      byStudent.set(p.studentId, b);
+    }
+    return [...byStudent.entries()]
+      .map(([sid, b]) => ({ student: students.find(s => s.id === sid), ...b }))
+      .filter(r => r.student && r.total > 0)
+      .sort((a, b) => b.total - a.total);
+  })();
+
+  const agingTotals = agingRows.reduce((acc, r) => {
+    acc.current += r.current; acc.d30 += r.d30; acc.d60 += r.d60; acc.d90 += r.d90; acc.d90plus += r.d90plus; acc.total += r.total;
+    return acc;
+  }, { current: 0, d30: 0, d60: 0, d90: 0, d90plus: 0, total: 0 });
+
+  const exportArrears = () => downloadCSV([
+    ['Student', 'Grade', 'Guardian', 'Phone', 'Not due', '1-30 days', '31-60 days', '61-90 days', '90+ days', 'Total owing'],
+    ...agingRows.map(r => [r.student!.name, r.student!.grade, r.student!.guardianName || '', r.student!.guardianPhone || '',
+      r.current, r.d30, r.d60, r.d90, r.d90plus, r.total].map(String)),
+    ['TOTAL', '', '', '', agingTotals.current, agingTotals.d30, agingTotals.d60, agingTotals.d90, agingTotals.d90plus, agingTotals.total].map(String),
+  ], `GHA_Arrears_Aging_${new Date().toISOString().split('T')[0]}.csv`);
+
+  const renderArrearsReport = () => (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+        {[
+          { label: 'Not yet due', value: agingTotals.current, cls: 'bg-gray-50 text-gray-700' },
+          { label: '1–30 days', value: agingTotals.d30, cls: 'bg-yellow-50 text-yellow-700' },
+          { label: '31–60 days', value: agingTotals.d60, cls: 'bg-amber-50 text-amber-700' },
+          { label: '61–90 days', value: agingTotals.d90, cls: 'bg-orange-50 text-orange-700' },
+          { label: '90+ days', value: agingTotals.d90plus, cls: 'bg-red-50 text-red-700' },
+        ].map(c => (
+          <div key={c.label} className={`rounded-lg p-3 ${c.cls}`}>
+            <p className="text-xs">{c.label}</p>
+            <p className="text-lg font-bold">K{c.value.toLocaleString()}</p>
+          </div>
+        ))}
+      </div>
+      <div className="flex justify-between items-center">
+        <p className="text-sm text-gray-500">{agingRows.length} student{agingRows.length !== 1 ? 's' : ''} with outstanding fees{termFilter ? ` — ${termFilter}` : ''}</p>
+        <button onClick={exportArrears} disabled={agingRows.length === 0}
+          className="flex items-center gap-1.5 px-3 py-1.5 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 disabled:opacity-50">
+          <Download className="h-4 w-4" /> Export
+        </button>
+      </div>
+      <div className="overflow-x-auto border border-gray-200 rounded-lg">
+        <table className="min-w-full text-sm divide-y divide-gray-100">
+          <thead className="bg-gray-50">
+            <tr>{['Student', 'Class', 'Not due', '1–30', '31–60', '61–90', '90+', 'Total'].map(h =>
+              <th key={h} className="px-4 py-2.5 text-left text-xs font-medium text-gray-500 uppercase">{h}</th>)}
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-100">
+            {agingRows.map(r => (
+              <tr key={r.student!.id} className="hover:bg-gray-50">
+                <td className="px-4 py-2.5">
+                  <p className="font-medium text-gray-900">{r.student!.name}</p>
+                  {r.student!.guardianPhone && <p className="text-xs text-gray-400">{r.student!.guardianPhone}</p>}
+                </td>
+                <td className="px-4 py-2.5 text-gray-500">{r.student!.grade}</td>
+                <td className="px-4 py-2.5 text-gray-600">{r.current ? `K${r.current.toLocaleString()}` : '—'}</td>
+                <td className="px-4 py-2.5 text-yellow-700">{r.d30 ? `K${r.d30.toLocaleString()}` : '—'}</td>
+                <td className="px-4 py-2.5 text-amber-700">{r.d60 ? `K${r.d60.toLocaleString()}` : '—'}</td>
+                <td className="px-4 py-2.5 text-orange-700">{r.d90 ? `K${r.d90.toLocaleString()}` : '—'}</td>
+                <td className="px-4 py-2.5 text-red-700 font-medium">{r.d90plus ? `K${r.d90plus.toLocaleString()}` : '—'}</td>
+                <td className="px-4 py-2.5 font-bold text-gray-900">K{r.total.toLocaleString()}</td>
+              </tr>
+            ))}
+            {agingRows.length === 0 && (
+              <tr><td colSpan={8} className="px-4 py-12 text-center text-gray-400">No outstanding fees{termFilter ? ` for ${termFilter}` : ''}. 🎉</td></tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-4">
@@ -642,6 +734,7 @@ export function Reports() {
           <div className="flex space-x-1">
             {[
               { id: 'financial', label: 'Financial Summary', icon: DollarSign },
+              { id: 'arrears', label: 'Arrears Aging', icon: TrendingDown },
               { id: 'class', label: 'Class Summary', icon: BarChart3 },
               { id: 'student', label: 'Student Report', icon: FileText },
               { id: 'academic', label: 'Academic Results', icon: GraduationCap },
@@ -659,6 +752,7 @@ export function Reports() {
         </div>
         <div className="p-6">
           {selectedReport === 'financial' && renderFinancialReport()}
+          {selectedReport === 'arrears' && renderArrearsReport()}
           {selectedReport === 'class' && renderClassReport()}
           {selectedReport === 'student' && renderStudentReport()}
           {selectedReport === 'academic' && renderAcademicReport()}

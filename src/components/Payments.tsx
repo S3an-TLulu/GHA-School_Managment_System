@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Plus, Search, Check, X, Clock, Trash2, Printer, Banknote, Smartphone, Building2, FileText, MoreHorizontal } from 'lucide-react';
+import { Plus, Search, Check, X, Clock, Trash2, Printer, Banknote, Smartphone, Building2, FileText, MoreHorizontal, Download } from 'lucide-react';
+import { exportCSV } from '../lib/exports';
 import { useAppContext, Payment, Student, PaymentMethod, SchoolBranding } from '../context/AppContext';
 import { PaymentModal } from './PaymentModal';
 import { useToast } from './ToastProvider';
@@ -188,11 +189,27 @@ export function Payments() {
           <h1 className="text-2xl font-bold text-gray-900">Fees & Payments</h1>
           <p className="text-gray-600">Track student payments and outstanding fees</p>
         </div>
-        <button onClick={() => setIsModalOpen(true)}
-          className={`flex items-center space-x-2 ${tc.btn} text-white px-4 py-2 rounded-lg transition-colors text-sm font-medium`}>
-          <Plus className="h-5 w-5" />
-          <span>Record Payment</span>
-        </button>
+        <div className="flex items-center gap-2">
+          <button onClick={() => {
+            if (payments.length === 0) { toast('No payments to export.', 'warning'); return; }
+            exportCSV('GHA_Payments',
+              ['Student', 'Type', 'Amount', 'Method', 'Term', 'Status', 'Due Date', 'Paid Date', 'Receipt'],
+              payments.map(p => {
+                const s = students.find(st => st.id === p.studentId);
+                return [s?.name || p.studentId, p.type, p.amount, p.paymentMethod || 'Cash', p.term || '',
+                  p.status, p.dueDate?.split('T')[0] || '', p.paidDate?.split('T')[0] || '', p.receiptNumber || ''];
+              }));
+            toast(`Exported ${payments.length} payments.`, 'success');
+          }}
+            className="flex items-center gap-2 border border-gray-300 text-gray-700 hover:bg-gray-50 px-3 py-2 rounded-lg text-sm font-medium">
+            <Download className="h-4 w-4" /><span className="hidden sm:inline">Export</span>
+          </button>
+          <button onClick={() => setIsModalOpen(true)}
+            className={`flex items-center space-x-2 ${tc.btn} text-white px-4 py-2 rounded-lg transition-colors text-sm font-medium`}>
+            <Plus className="h-5 w-5" />
+            <span>Record Payment</span>
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
