@@ -32,6 +32,7 @@ import { Kitchen } from './components/Kitchen';
 import { Gallery } from './components/Gallery';
 import { Profile } from './components/Profile';
 import { Library } from './components/Library';
+import { Messaging } from './components/Messaging';
 import { Results } from './components/Results';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { useAppContext } from './context/AppContext';
@@ -91,6 +92,7 @@ function AppContent() {
       case 'kitchen':      return <Kitchen />;
       case 'gallery':      return <Gallery />;
       case 'library':      return <Library />;
+      case 'messaging':    return <Messaging />;
       case 'profile':      return <Profile />;
       default:             return <Dashboard />;
     }
