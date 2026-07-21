@@ -777,6 +777,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     'gha_uniform_catalog', 'gha_debtors', 'gha_transport_routes', 'gha_users', 'gha_claims', 'gha_master_code',
     'gha_terms', 'gha_todos', 'gha_salary_advances', 'gha_payroll', 'gha_groceries', 'gha_budgets', 'gha_documents',
     'gha_audit', 'gha_gallery', 'gha_library_books', 'gha_book_loans',
+    'gha_msg_channels', 'gha_msg_telegram_channel',
   ];
 
   const exportAllData = (): string => {

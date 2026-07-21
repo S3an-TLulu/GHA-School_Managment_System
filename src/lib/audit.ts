@@ -79,4 +79,6 @@ export const AUDIT_LABELS: Record<string, string> = {
   'data-imported': 'Restored data from backup',
   'data-wiped': 'Wiped data',
   'data-exported': 'Exported a backup',
+  'message-queued': 'Queued a message',
+  'message-broadcast': 'Sent a broadcast',
 };
