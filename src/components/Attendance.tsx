@@ -1,8 +1,9 @@
 import { useState, useMemo } from 'react';
-import { CheckCircle, XCircle, Clock, AlertCircle, Printer, ChevronLeft, ChevronRight, BarChart2 } from 'lucide-react';
+import { CheckCircle, XCircle, Clock, AlertCircle, Printer, ChevronLeft, ChevronRight, BarChart2, Download } from 'lucide-react';
 import { useAppContext, AttendanceRecord } from '../context/AppContext';
 import { useToast } from './ToastProvider';
 import { useThemeClasses } from '../hooks/useThemeClasses';
+import { exportCSV } from '../lib/exports';
 
 const GRADES = ['Baby Class', 'Middle Class', 'Reception', 'Grade 1', 'Grade 2', 'Grade 3', 'Grade 4', 'Grade 5', 'Grade 6', 'Grade 7'];
 
@@ -332,9 +333,20 @@ export function Attendance() {
       {/* Summary Tab */}
       {activeTab === 'summary' && (
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
-          <div className="p-5 border-b border-gray-100 flex items-center space-x-2">
-            <BarChart2 className="h-4 w-4 text-blue-600" />
-            <p className="font-semibold text-gray-900">{selectedGrade} — Student Attendance Summary</p>
+          <div className="p-5 border-b border-gray-100 flex items-center justify-between gap-2">
+            <div className="flex items-center space-x-2">
+              <BarChart2 className="h-4 w-4 text-blue-600" />
+              <p className="font-semibold text-gray-900">{selectedGrade} — Student Attendance Summary</p>
+            </div>
+            <button onClick={() => {
+              if (summaryData.every(s => s.total === 0)) { toast('No attendance data to export.', 'warning'); return; }
+              exportCSV(`GHA_Attendance_${selectedGrade.replace(/\s+/g, '')}`,
+                ['Student', 'Admission No', 'Days Recorded', 'Present', 'Absent', 'Late', 'Excused', 'Rate %'],
+                summaryData.map(s => [s.student.name, s.student.admissionNumber || '', s.total, s.present, s.absent, s.late, s.excused, s.rate ?? '']));
+            }}
+              className="flex items-center gap-1.5 border border-gray-300 text-gray-700 hover:bg-gray-50 px-3 py-1.5 rounded-lg text-xs font-medium">
+              <Download className="h-3.5 w-3.5" /> Export
+            </button>
           </div>
           {summaryData.every(s => s.total === 0) ? (
             <div className="p-10 text-center text-gray-400">No attendance data yet for {selectedGrade}.</div>
