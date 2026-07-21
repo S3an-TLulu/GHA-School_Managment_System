@@ -409,6 +409,7 @@ interface AppContextType {
   savePayrollRecord: (r: PayrollRecord) => void;
   deletePayrollRecord: (id: string) => void;
   addStudentsBulk: (list: Student[]) => void;
+  bulkUpdateStudents: (changes: { id: string; patch: Partial<Student> }[]) => void;
   groceries: GroceryItem[];
   addGrocery: (g: GroceryItem) => void;
   updateGrocery: (id: string, g: Partial<GroceryItem>) => void;
@@ -733,6 +734,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const deletePayrollRecord = (id: string) => setPayrollRecords(prev => prev.filter(p => p.id !== id));
 
   const addStudentsBulk = (list: Student[]) => setStudents(prev => [...prev, ...list]);
+  // Apply many student edits in a single state update (used by year-end promotion).
+  const bulkUpdateStudents = (changes: { id: string; patch: Partial<Student> }[]) => {
+    const map = new Map(changes.map(c => [c.id, c.patch]));
+    setStudents(prev => prev.map(s => map.has(s.id) ? { ...s, ...map.get(s.id) } : s));
+  };
 
   const addGrocery = (g: GroceryItem) => setGroceries(prev => [...prev, g]);
   const updateGrocery = (id: string, updated: Partial<GroceryItem>) =>
@@ -961,6 +967,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       fundraiserParticipants, toggleFundraiserParticipant,
       externalFundraiserPayments, addExternalFundraiserPayment, deleteExternalFundraiserPayment,
       uniformCatalog, addUniformCatalogItem, updateUniformCatalogItem, deleteUniformCatalogItem, sellUniform,
+      bulkUpdateStudents,
       libraryBooks, addLibraryBook, updateLibraryBook, deleteLibraryBook,
       bookLoans, borrowBook, returnLoan, deleteLoan,
       debtors, addDebtor, updateDebtor, deleteDebtor,

@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react';
-import { Plus, Search, Pencil, Trash2, Eye, Users, Download, Upload } from 'lucide-react';
+import { Plus, Search, Pencil, Trash2, Eye, Users, Download, Upload, CreditCard } from 'lucide-react';
 import { useAppContext, Student } from '../context/AppContext';
 import { StudentModal } from './StudentModal';
 import { StudentProfile } from './StudentProfile';
@@ -7,6 +7,7 @@ import { useToast } from './ToastProvider';
 import { useThemeClasses } from '../hooks/useThemeClasses';
 import { exportCSV } from '../lib/exports';
 import { parseCSVObjects } from '../lib/exports';
+import { printIdCards } from '../lib/idcard';
 
 const STATUS_BADGE: Record<string, string> = {
   active:      'bg-green-100 text-green-700',
@@ -15,7 +16,7 @@ const STATUS_BADGE: Record<string, string> = {
 };
 
 export function Students() {
-  const { students, addStudent, updateStudent, deleteStudent, addStudentsBulk } = useAppContext();
+  const { students, branding, addStudent, updateStudent, deleteStudent, addStudentsBulk } = useAppContext();
   const { toast } = useToast();
   const tc = useThemeClasses();
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -125,6 +126,13 @@ export function Students() {
             className="flex items-center gap-2 border border-gray-300 text-gray-700 hover:bg-gray-50 px-3 py-2 rounded-lg text-sm font-medium">
             <Download className="h-4 w-4" /><span className="hidden sm:inline">Export</span>
           </button>
+          <button onClick={() => {
+            if (filteredStudents.length === 0) { toast('No students to print.', 'warning'); return; }
+            printIdCards(filteredStudents, branding);
+          }}
+            className="flex items-center gap-2 border border-gray-300 text-gray-700 hover:bg-gray-50 px-3 py-2 rounded-lg text-sm font-medium">
+            <CreditCard className="h-4 w-4" /><span className="hidden sm:inline">ID Cards</span>
+          </button>
           <button
             onClick={() => setIsModalOpen(true)}
             className={`flex items-center space-x-2 ${tc.btn} text-white px-4 py-2 rounded-lg transition-colors text-sm font-medium focus:outline-none focus:ring-2 focus:ring-offset-1`}
@@ -206,6 +214,10 @@ export function Students() {
                       <button onClick={() => setProfileStudent(student)} title="View Profile"
                         className="p-1.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors">
                         <Eye className="h-4 w-4" />
+                      </button>
+                      <button onClick={() => printIdCards([student], branding)} title="Print ID Card"
+                        className="p-1.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors">
+                        <CreditCard className="h-4 w-4" />
                       </button>
                       <button onClick={() => handleEdit(student)} title="Edit"
                         className={`p-1.5 rounded-lg ${tc.text} hover:${tc.light} transition-colors`}>
