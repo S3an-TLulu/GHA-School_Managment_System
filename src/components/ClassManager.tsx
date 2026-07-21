@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { GraduationCap, Users, UserCheck, ArrowRight, Check, Search, UserPlus, Plus, Trash2, ArrowUpRight, X } from 'lucide-react';
+import { GraduationCap, Users, UserCheck, ArrowRight, Check, Search, UserPlus, Plus, Trash2, ArrowUpRight, X, Printer } from 'lucide-react';
 import { useAppContext, Student } from '../context/AppContext';
 import { useToast } from './ToastProvider';
 import { useThemeClasses } from '../hooks/useThemeClasses';
+import { printClassRegister } from '../lib/register';
 
 const GRADES = ['Baby Class', 'Middle Class', 'Reception', 'Grade 1', 'Grade 2', 'Grade 3', 'Grade 4', 'Grade 5', 'Grade 6', 'Grade 7'];
 
@@ -10,7 +11,7 @@ interface BulkRow { name: string; gender: 'Male' | 'Female'; guardianName: strin
 const EMPTY_ROW: BulkRow = { name: '', gender: 'Female', guardianName: '', guardianPhone: '' };
 
 export function ClassManager() {
-  const { students, teachers, updateStudent, updateTeacher, addStudentsBulk, bulkUpdateStudents } = useAppContext();
+  const { students, teachers, branding, updateStudent, updateTeacher, addStudentsBulk, bulkUpdateStudents } = useAppContext();
   const { toast } = useToast();
   const tc = useThemeClasses();
   const [promoteOpen, setPromoteOpen] = useState(false);
@@ -109,10 +110,21 @@ export function ClassManager() {
           <h1 className="text-2xl font-bold text-gray-900">Class Manager</h1>
           <p className="text-gray-600">Assign children and teachers to classes</p>
         </div>
-        <button onClick={() => setPromoteOpen(true)}
-          className="flex items-center gap-2 border border-gray-300 text-gray-700 hover:bg-gray-50 px-4 py-2 rounded-lg text-sm font-medium">
-          <ArrowUpRight className="h-4 w-4" /> End of Year Promotion
-        </button>
+        <div className="flex items-center gap-2">
+          <button onClick={() => {
+            const cls = activeStudents.filter(s => s.grade === selectedClass);
+            if (cls.length === 0) { toast('No students in this class to print.', 'warning'); return; }
+            printClassRegister(selectedClass, cls, branding,
+              new Date().toLocaleDateString('en-GB', { month: 'long', year: 'numeric' }));
+          }}
+            className="flex items-center gap-2 border border-gray-300 text-gray-700 hover:bg-gray-50 px-4 py-2 rounded-lg text-sm font-medium">
+            <Printer className="h-4 w-4" /> Print Register
+          </button>
+          <button onClick={() => setPromoteOpen(true)}
+            className="flex items-center gap-2 border border-gray-300 text-gray-700 hover:bg-gray-50 px-4 py-2 rounded-lg text-sm font-medium">
+            <ArrowUpRight className="h-4 w-4" /> End of Year Promotion
+          </button>
+        </div>
       </div>
 
       {/* Class picker */}
