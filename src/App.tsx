@@ -119,7 +119,8 @@ function AppContent() {
       <div className="flex-1 flex flex-col min-w-0">
         <Header onMenuClick={() => setMobileNavOpen(true)}
           onGoToUsers={() => setActiveSection('settings')}
-          onGoToProfile={() => setActiveSection('profile')} />
+          onGoToProfile={() => setActiveSection('profile')}
+          onNavigate={setActiveSection} />
         <main className="flex-1 p-4 sm:p-6 overflow-y-auto">
           {/* Per-section boundary: a crash in one screen won't take out the
               whole shell, and navigating away (new key) clears it. */}

@@ -1,0 +1,15 @@
+{
+  "name": "Great Highway Academy — School System",
+  "short_name": "GHA School",
+  "description": "Manage students, fees, staff, results and more — works offline.",
+  "start_url": ".",
+  "scope": ".",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#ffffff",
+  "theme_color": "#1d4ed8",
+  "icons": [
+    { "src": "./gha-logo.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "./gha-logo.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}
