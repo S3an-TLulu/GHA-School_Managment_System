@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { Plus, Pencil, Trash2, X, Bell, AlertTriangle, AlertCircle, Info } from 'lucide-react';
+import { Plus, Pencil, Trash2, X, Bell, AlertTriangle, AlertCircle, Info, Send } from 'lucide-react';
 import { useAppContext, Announcement } from '../context/AppContext';
 import { useToast } from './ToastProvider';
 import { useThemeClasses } from '../hooks/useThemeClasses';
+import { queueMany, getEnabledChannels, isMessagingReady, OutboxMessage, MsgChannel } from '../lib/messaging';
 
 const PRIORITIES = ['normal', 'important', 'urgent'] as const;
 const AUDIENCES = ['All', 'Students', 'Teachers', 'Parents'] as const;
@@ -96,8 +97,29 @@ const priorityConfig = {
 };
 
 export function Announcements() {
-  const { announcements, addAnnouncement, updateAnnouncement, deleteAnnouncement } = useAppContext();
+  const { announcements, addAnnouncement, updateAnnouncement, deleteAnnouncement, students, branding } = useAppContext();
   const { toast } = useToast();
+
+  // Queue an announcement to parents through the messaging outbox. Uses email
+  // where a guardian has one (if that channel is on), otherwise a phone channel.
+  const sendToParents = async (ann: Announcement) => {
+    if (!isMessagingReady()) { toast('Set up Cloud Sync first (Settings → Cloud Sync) to send messages.', 'warning'); return; }
+    const ch = getEnabledChannels();
+    const enabled = (Object.keys(ch) as MsgChannel[]).filter(c => ch[c]);
+    if (enabled.length === 0) { toast('Enable a channel first in Messaging → Setup.', 'warning'); return; }
+    const phoneChannel = (['whatsapp', 'sms', 'telegram'] as MsgChannel[]).find(c => ch[c]);
+    const active = students.filter(s => !s.status || s.status === 'active');
+    const body = `${ann.title}\n\n${ann.message}\n\n— ${branding.schoolName}`;
+    const msgs: OutboxMessage[] = [];
+    active.forEach(s => {
+      if (ch.email && s.guardianEmail) msgs.push({ channel: 'email', recipient: s.guardianEmail, recipient_name: s.guardianName || s.name, subject: ann.title, body, meta: { kind: 'announcement' } });
+      else if (phoneChannel && s.guardianPhone) msgs.push({ channel: phoneChannel, recipient: s.guardianPhone, recipient_name: s.guardianName || s.name, body, meta: { kind: 'announcement' } });
+    });
+    if (msgs.length === 0) { toast('No guardians have a contact for the enabled channels.', 'warning'); return; }
+    const res = await queueMany(msgs);
+    if (res.ok) toast(`Queued to ${res.count} parent${res.count !== 1 ? 's' : ''} — see Messaging → Outbox.`, 'success');
+    else toast(res.error || 'Could not queue.', 'error');
+  };
   const tc = useThemeClasses();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingAnn, setEditingAnn] = useState<Announcement | null>(null);
@@ -230,6 +252,9 @@ export function Announcements() {
                       </div>
                     </div>
                     <div className="flex space-x-1 ml-4 flex-shrink-0">
+                      <button onClick={() => sendToParents(ann)} title="Send to parents" className="p-1.5 text-green-600 hover:bg-green-50 rounded">
+                        <Send className="h-4 w-4" />
+                      </button>
                       <button onClick={() => handleEdit(ann)} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded">
                         <Pencil className="h-4 w-4" />
                       </button>
