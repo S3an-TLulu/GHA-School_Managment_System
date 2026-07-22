@@ -485,6 +485,41 @@ export interface CompetitionEntry {
   rawPoints?: number;  // points mode
 }
 
+// ---- Tools: project builder ----
+export interface ProjectTask { id: string; text: string; done: boolean; }
+export interface SchoolProject {
+  id: string;
+  title: string;
+  category?: string;
+  owner?: string;
+  description?: string;
+  status: 'idea' | 'planning' | 'active' | 'done';
+  dueDate?: string;
+  tasks: ProjectTask[];
+  createdAt: string;
+}
+
+// ---- Tools: quiz / test builder + question bank ----
+export interface QuizQuestion {
+  id: string;
+  subject: string;
+  grade?: string;
+  question: string;
+  options: string[];        // empty for short-answer questions
+  correctIndex?: number;    // index into options for MCQ
+  marks?: number;
+  difficulty?: 'easy' | 'medium' | 'hard';
+}
+export interface Quiz {
+  id: string;
+  title: string;
+  subject: string;
+  grade?: string;
+  date: string;
+  questionIds: string[];
+  instructions?: string;
+}
+
 interface AppContextType {
   students: Student[];
   payments: Payment[];
@@ -585,6 +620,18 @@ interface AppContextType {
   addCompetitionEntry: (e: CompetitionEntry) => void;
   updateCompetitionEntry: (id: string, e: Partial<CompetitionEntry>) => void;
   deleteCompetitionEntry: (id: string) => void;
+  projects: SchoolProject[];
+  addProject: (p: SchoolProject) => void;
+  updateProject: (id: string, p: Partial<SchoolProject>) => void;
+  deleteProject: (id: string) => void;
+  quizQuestions: QuizQuestion[];
+  addQuizQuestion: (q: QuizQuestion) => void;
+  updateQuizQuestion: (id: string, q: Partial<QuizQuestion>) => void;
+  deleteQuizQuestion: (id: string) => void;
+  quizzes: Quiz[];
+  addQuiz: (q: Quiz) => void;
+  updateQuiz: (id: string, q: Partial<Quiz>) => void;
+  deleteQuiz: (id: string) => void;
   libraryBooks: LibraryBook[];
   addLibraryBook: (b: LibraryBook) => void;
   updateLibraryBook: (id: string, b: Partial<LibraryBook>) => void;
@@ -775,6 +822,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [houses, setHouses] = useState<House[]>(() => loadFromStorage('gha_houses', INITIAL_HOUSES));
   const [competitions, setCompetitions] = useState<Competition[]>(() => loadFromStorage('gha_competitions', []));
   const [competitionEntries, setCompetitionEntries] = useState<CompetitionEntry[]>(() => loadFromStorage('gha_competition_entries', []));
+  const [projects, setProjects] = useState<SchoolProject[]>(() => loadFromStorage('gha_projects', []));
+  const [quizQuestions, setQuizQuestions] = useState<QuizQuestion[]>(() => loadFromStorage('gha_quiz_questions', []));
+  const [quizzes, setQuizzes] = useState<Quiz[]>(() => loadFromStorage('gha_quizzes', []));
   const [libraryBooks, setLibraryBooks] = useState<LibraryBook[]>(() => loadFromStorage('gha_library_books', []));
   const [bookLoans, setBookLoans] = useState<BookLoan[]>(() => loadFromStorage('gha_book_loans', []));
   const [debtors, setDebtors] = useState<Debtor[]>(() => loadFromStorage('gha_debtors', []));
@@ -842,6 +892,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => { localStorage.setItem('gha_houses', JSON.stringify(houses)); queueLiveSync('gha_houses'); }, [houses]);
   useEffect(() => { localStorage.setItem('gha_competitions', JSON.stringify(competitions)); queueLiveSync('gha_competitions'); }, [competitions]);
   useEffect(() => { localStorage.setItem('gha_competition_entries', JSON.stringify(competitionEntries)); queueLiveSync('gha_competition_entries'); }, [competitionEntries]);
+  useEffect(() => { localStorage.setItem('gha_projects', JSON.stringify(projects)); queueLiveSync('gha_projects'); }, [projects]);
+  useEffect(() => { localStorage.setItem('gha_quiz_questions', JSON.stringify(quizQuestions)); queueLiveSync('gha_quiz_questions'); }, [quizQuestions]);
+  useEffect(() => { localStorage.setItem('gha_quizzes', JSON.stringify(quizzes)); queueLiveSync('gha_quizzes'); }, [quizzes]);
 
   // One-time migration: seed the richer Uniform Management catalogue from the
   // legacy simple catalogue (gha_uniform_catalog) the first time the new module
@@ -1091,6 +1144,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const addCompetitionEntry = (e: CompetitionEntry) => setCompetitionEntries(prev => [...prev, e]);
   const updateCompetitionEntry = (id: string, u: Partial<CompetitionEntry>) => setCompetitionEntries(prev => prev.map(e => e.id === id ? { ...e, ...u } : e));
   const deleteCompetitionEntry = (id: string) => setCompetitionEntries(prev => prev.filter(e => e.id !== id));
+  const addProject = (p: SchoolProject) => setProjects(prev => [p, ...prev]);
+  const updateProject = (id: string, u: Partial<SchoolProject>) => setProjects(prev => prev.map(p => p.id === id ? { ...p, ...u } : p));
+  const deleteProject = (id: string) => setProjects(prev => prev.filter(p => p.id !== id));
+  const addQuizQuestion = (q: QuizQuestion) => setQuizQuestions(prev => [q, ...prev]);
+  const updateQuizQuestion = (id: string, u: Partial<QuizQuestion>) => setQuizQuestions(prev => prev.map(q => q.id === id ? { ...q, ...u } : q));
+  const deleteQuizQuestion = (id: string) => setQuizQuestions(prev => prev.filter(q => q.id !== id));
+  const addQuiz = (q: Quiz) => setQuizzes(prev => [q, ...prev]);
+  const updateQuiz = (id: string, u: Partial<Quiz>) => setQuizzes(prev => prev.map(q => q.id === id ? { ...q, ...u } : q));
+  const deleteQuiz = (id: string) => setQuizzes(prev => prev.filter(q => q.id !== id));
 
   const addLibraryBook = (b: LibraryBook) => setLibraryBooks(prev => [...prev, b]);
   const updateLibraryBook = (id: string, updated: Partial<LibraryBook>) =>
@@ -1183,6 +1245,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     'gha_student_measurements', 'gha_measurement_history', 'gha_uniform_issues', 'gha_uniform_returns',
     'gha_uniform_settings',
     'gha_houses', 'gha_competitions', 'gha_competition_entries',
+    'gha_projects', 'gha_quiz_questions', 'gha_quizzes',
   ];
 
   const exportAllData = (): string => {
@@ -1217,7 +1280,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       'gha_uniform_suppliers', 'gha_tailor_orders', 'gha_student_measurements', 'gha_measurement_history',
       'gha_uniform_issues', 'gha_uniform_returns'],
     library: ['gha_library_books', 'gha_book_loans'],
-    tools: ['gha_competitions', 'gha_competition_entries'],
+    tools: ['gha_competitions', 'gha_competition_entries', 'gha_projects', 'gha_quiz_questions', 'gha_quizzes'],
     requirements: ['gha_requirements'],
     teachers: ['gha_teachers'],
     expenses: ['gha_expenses'],
@@ -1275,6 +1338,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       gha_uniform_issues: setUniformIssues, gha_uniform_returns: setUniformReturns,
       gha_uniform_settings: setUniformSettings,
       gha_houses: setHouses, gha_competitions: setCompetitions, gha_competition_entries: setCompetitionEntries,
+      gha_projects: setProjects, gha_quiz_questions: setQuizQuestions, gha_quizzes: setQuizzes,
       gha_transport_routes: setTransportRoutes, gha_terms: setTerms, gha_todos: setTodos,
       gha_salary_advances: setSalaryAdvances, gha_payroll: setPayrollRecords,
       gha_groceries: setGroceries, gha_budgets: setBudgets, gha_documents: setDocuments,
@@ -1393,6 +1457,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       houses, addHouse, updateHouse, deleteHouse,
       competitions, addCompetition, updateCompetition, deleteCompetition,
       competitionEntries, addCompetitionEntry, updateCompetitionEntry, deleteCompetitionEntry,
+      projects, addProject, updateProject, deleteProject,
+      quizQuestions, addQuizQuestion, updateQuizQuestion, deleteQuizQuestion,
+      quizzes, addQuiz, updateQuiz, deleteQuiz,
       libraryBooks, addLibraryBook, updateLibraryBook, deleteLibraryBook,
       bookLoans, borrowBook, returnLoan, deleteLoan,
       debtors, addDebtor, updateDebtor, deleteDebtor,
