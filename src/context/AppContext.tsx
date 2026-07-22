@@ -463,6 +463,28 @@ export interface StudentResult {
   date: string;
 }
 
+// ---- Tools: houses & competition scoreboard ----
+export interface House { id: string; name: string; colour: string; }
+export interface Competition {
+  id: string;
+  name: string;
+  type: 'Sports' | 'Quiz' | 'Debate' | 'Spelling Bee' | 'Other';
+  date: string;
+  scoringMode: 'position' | 'points';
+  places: { label: string; points: number }[]; // position mode
+  status: 'active' | 'final';
+  notes?: string;
+}
+export interface CompetitionEntry {
+  id: string;
+  competitionId: string;
+  name?: string;   // participant name; blank = whole-house entry
+  grade?: string;
+  houseId: string;
+  position?: number;   // position mode (1 = 1st, ties allowed)
+  rawPoints?: number;  // points mode
+}
+
 interface AppContextType {
   students: Student[];
   payments: Payment[];
@@ -550,6 +572,19 @@ interface AppContextType {
   returnUniform: (ret: UniformReturn) => void;
   uniformSettings: UniformSettings;
   updateUniformSettings: (s: Partial<UniformSettings>) => void;
+  // Tools: houses & competitions
+  houses: House[];
+  addHouse: (h: House) => void;
+  updateHouse: (id: string, h: Partial<House>) => void;
+  deleteHouse: (id: string) => void;
+  competitions: Competition[];
+  addCompetition: (c: Competition) => void;
+  updateCompetition: (id: string, c: Partial<Competition>) => void;
+  deleteCompetition: (id: string) => void;
+  competitionEntries: CompetitionEntry[];
+  addCompetitionEntry: (e: CompetitionEntry) => void;
+  updateCompetitionEntry: (id: string, e: Partial<CompetitionEntry>) => void;
+  deleteCompetitionEntry: (id: string) => void;
   libraryBooks: LibraryBook[];
   addLibraryBook: (b: LibraryBook) => void;
   updateLibraryBook: (id: string, b: Partial<LibraryBook>) => void;
@@ -655,6 +690,13 @@ const INITIAL_OTHER_CHARGES: OtherCharge[] = [
   { id: 'charge-5', name: 'Assessment Tests', amount: '200', per: 'per term' }
 ];
 
+const INITIAL_HOUSES: House[] = [
+  { id: 'house-red', name: 'Red', colour: '#dc2626' },
+  { id: 'house-blue', name: 'Blue', colour: '#2563eb' },
+  { id: 'house-yellow', name: 'Yellow', colour: '#eab308' },
+  { id: 'house-orange', name: 'Orange', colour: '#ea580c' },
+];
+
 const DEFAULT_UNIFORM_SETTINGS: UniformSettings = {
   itemCodePrefix: 'UNI',
   colours: ['White', 'Navy', 'Grey', 'Maroon', 'Black', 'Green', 'Blue'],
@@ -730,6 +772,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [uniformIssues, setUniformIssues] = useState<UniformIssue[]>(() => loadFromStorage('gha_uniform_issues', []));
   const [uniformReturns, setUniformReturns] = useState<UniformReturn[]>(() => loadFromStorage('gha_uniform_returns', []));
   const [uniformSettings, setUniformSettings] = useState<UniformSettings>(() => loadFromStorage('gha_uniform_settings', DEFAULT_UNIFORM_SETTINGS));
+  const [houses, setHouses] = useState<House[]>(() => loadFromStorage('gha_houses', INITIAL_HOUSES));
+  const [competitions, setCompetitions] = useState<Competition[]>(() => loadFromStorage('gha_competitions', []));
+  const [competitionEntries, setCompetitionEntries] = useState<CompetitionEntry[]>(() => loadFromStorage('gha_competition_entries', []));
   const [libraryBooks, setLibraryBooks] = useState<LibraryBook[]>(() => loadFromStorage('gha_library_books', []));
   const [bookLoans, setBookLoans] = useState<BookLoan[]>(() => loadFromStorage('gha_book_loans', []));
   const [debtors, setDebtors] = useState<Debtor[]>(() => loadFromStorage('gha_debtors', []));
@@ -794,6 +839,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => { localStorage.setItem('gha_uniform_issues', JSON.stringify(uniformIssues)); queueLiveSync('gha_uniform_issues'); }, [uniformIssues]);
   useEffect(() => { localStorage.setItem('gha_uniform_returns', JSON.stringify(uniformReturns)); queueLiveSync('gha_uniform_returns'); }, [uniformReturns]);
   useEffect(() => { localStorage.setItem('gha_uniform_settings', JSON.stringify(uniformSettings)); queueLiveSync('gha_uniform_settings'); }, [uniformSettings]);
+  useEffect(() => { localStorage.setItem('gha_houses', JSON.stringify(houses)); queueLiveSync('gha_houses'); }, [houses]);
+  useEffect(() => { localStorage.setItem('gha_competitions', JSON.stringify(competitions)); queueLiveSync('gha_competitions'); }, [competitions]);
+  useEffect(() => { localStorage.setItem('gha_competition_entries', JSON.stringify(competitionEntries)); queueLiveSync('gha_competition_entries'); }, [competitionEntries]);
 
   // One-time migration: seed the richer Uniform Management catalogue from the
   // legacy simple catalogue (gha_uniform_catalog) the first time the new module
@@ -1030,6 +1078,20 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const updateUniformSettings = (u: Partial<UniformSettings>) => setUniformSettings(prev => ({ ...prev, ...u }));
 
+  // ---- Tools: houses & competitions ----
+  const addHouse = (h: House) => setHouses(prev => [...prev, h]);
+  const updateHouse = (id: string, u: Partial<House>) => setHouses(prev => prev.map(h => h.id === id ? { ...h, ...u } : h));
+  const deleteHouse = (id: string) => setHouses(prev => prev.filter(h => h.id !== id));
+  const addCompetition = (c: Competition) => setCompetitions(prev => [c, ...prev]);
+  const updateCompetition = (id: string, u: Partial<Competition>) => setCompetitions(prev => prev.map(c => c.id === id ? { ...c, ...u } : c));
+  const deleteCompetition = (id: string) => {
+    setCompetitions(prev => prev.filter(c => c.id !== id));
+    setCompetitionEntries(prev => prev.filter(e => e.competitionId !== id));
+  };
+  const addCompetitionEntry = (e: CompetitionEntry) => setCompetitionEntries(prev => [...prev, e]);
+  const updateCompetitionEntry = (id: string, u: Partial<CompetitionEntry>) => setCompetitionEntries(prev => prev.map(e => e.id === id ? { ...e, ...u } : e));
+  const deleteCompetitionEntry = (id: string) => setCompetitionEntries(prev => prev.filter(e => e.id !== id));
+
   const addLibraryBook = (b: LibraryBook) => setLibraryBooks(prev => [...prev, b]);
   const updateLibraryBook = (id: string, updated: Partial<LibraryBook>) =>
     setLibraryBooks(prev => prev.map(b => b.id === id ? { ...b, ...updated } : b));
@@ -1120,6 +1182,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     'gha_uniform_stock_txns', 'gha_uniform_tailors', 'gha_uniform_suppliers', 'gha_tailor_orders',
     'gha_student_measurements', 'gha_measurement_history', 'gha_uniform_issues', 'gha_uniform_returns',
     'gha_uniform_settings',
+    'gha_houses', 'gha_competitions', 'gha_competition_entries',
   ];
 
   const exportAllData = (): string => {
@@ -1154,6 +1217,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       'gha_uniform_suppliers', 'gha_tailor_orders', 'gha_student_measurements', 'gha_measurement_history',
       'gha_uniform_issues', 'gha_uniform_returns'],
     library: ['gha_library_books', 'gha_book_loans'],
+    tools: ['gha_competitions', 'gha_competition_entries'],
     requirements: ['gha_requirements'],
     teachers: ['gha_teachers'],
     expenses: ['gha_expenses'],
@@ -1210,6 +1274,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       gha_student_measurements: setStudentMeasurements, gha_measurement_history: setMeasurementHistory,
       gha_uniform_issues: setUniformIssues, gha_uniform_returns: setUniformReturns,
       gha_uniform_settings: setUniformSettings,
+      gha_houses: setHouses, gha_competitions: setCompetitions, gha_competition_entries: setCompetitionEntries,
       gha_transport_routes: setTransportRoutes, gha_terms: setTerms, gha_todos: setTodos,
       gha_salary_advances: setSalaryAdvances, gha_payroll: setPayrollRecords,
       gha_groceries: setGroceries, gha_budgets: setBudgets, gha_documents: setDocuments,
@@ -1325,6 +1390,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       studentMeasurements, saveStudentMeasurement, deleteStudentMeasurement, measurementHistory,
       uniformIssues, issueUniform, removeUniformIssue, uniformReturns, returnUniform,
       uniformSettings, updateUniformSettings,
+      houses, addHouse, updateHouse, deleteHouse,
+      competitions, addCompetition, updateCompetition, deleteCompetition,
+      competitionEntries, addCompetitionEntry, updateCompetitionEntry, deleteCompetitionEntry,
       libraryBooks, addLibraryBook, updateLibraryBook, deleteLibraryBook,
       bookLoans, borrowBook, returnLoan, deleteLoan,
       debtors, addDebtor, updateDebtor, deleteDebtor,
