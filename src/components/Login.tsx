@@ -4,9 +4,10 @@ import { useAuth } from '../context/AuthContext';
 
 interface LoginProps {
   onBack?: () => void;
+  onPortal?: () => void;
 }
 
-export function Login({ onBack }: LoginProps) {
+export function Login({ onBack, onPortal }: LoginProps) {
   const [credentials, setCredentials] = useState({ username: '', password: '' });
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
@@ -101,6 +102,12 @@ export function Login({ onBack }: LoginProps) {
             <HelpCircle className="h-4 w-4" /> Forgot password?
           </button>
         </div>
+        {onPortal && (
+          <div className="mt-4 pt-4 border-t border-gray-100 text-center">
+            <p className="text-xs text-gray-400 mb-1">Are you a parent or guardian?</p>
+            <button onClick={onPortal} className="text-sm font-medium text-blue-600 hover:underline">Check your child's account →</button>
+          </div>
+        )}
       </div>
 
       {/* Forgot-password claim modal */}
