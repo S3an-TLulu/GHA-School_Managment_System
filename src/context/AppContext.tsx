@@ -545,6 +545,7 @@ interface AppContextType {
   measurementHistory: MeasurementHistory[];
   uniformIssues: UniformIssue[];
   issueUniform: (issue: UniformIssue) => void;
+  removeUniformIssue: (id: string) => void;
   uniformReturns: UniformReturn[];
   returnUniform: (ret: UniformReturn) => void;
   uniformSettings: UniformSettings;
@@ -1019,6 +1020,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setUniformReturns(prev => [ret, ...prev]);
     recordStockTransaction({ id: `stx-${Date.now()}`, itemId: ret.itemId, size: ret.size, type: 'return', quantity: Math.abs(ret.quantity), date: ret.returnDate, reason: ret.reason || 'Returned', reference: ret.studentId });
   };
+  // Take an item off a student's account (store "remove") — deletes the issue
+  // record and restores the stock it had drawn.
+  const removeUniformIssue = (id: string) => setUniformIssues(prev => {
+    const iss = prev.find(i => i.id === id);
+    if (iss) recordStockTransaction({ id: `stx-${Date.now()}`, itemId: iss.itemId, size: iss.size, type: 'return', quantity: Math.abs(iss.quantity), date: new Date().toISOString(), reason: 'Removed from account', reference: iss.studentId });
+    return prev.filter(i => i.id !== id);
+  });
 
   const updateUniformSettings = (u: Partial<UniformSettings>) => setUniformSettings(prev => ({ ...prev, ...u }));
 
@@ -1315,7 +1323,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       uniformSuppliers, addUniformSupplier, updateUniformSupplier, deleteUniformSupplier,
       tailorOrders, addTailorOrder, updateTailorOrder, deleteTailorOrder,
       studentMeasurements, saveStudentMeasurement, deleteStudentMeasurement, measurementHistory,
-      uniformIssues, issueUniform, uniformReturns, returnUniform,
+      uniformIssues, issueUniform, removeUniformIssue, uniformReturns, returnUniform,
       uniformSettings, updateUniformSettings,
       libraryBooks, addLibraryBook, updateLibraryBook, deleteLibraryBook,
       bookLoans, borrowBook, returnLoan, deleteLoan,

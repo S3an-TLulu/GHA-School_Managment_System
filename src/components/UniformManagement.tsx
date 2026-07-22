@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import {
   LayoutDashboard, Shirt, Tags, Ruler, Package, ArrowLeftRight, BarChart3, Settings2,
   Plus, Pencil, Trash2, X, Printer, Download, AlertTriangle, Search, FileText, Image as ImageIcon,
-  Users, Scissors, ClipboardCheck, QrCode,
+  Users, Scissors, ClipboardCheck, QrCode, ShoppingCart,
 } from 'lucide-react';
 import {
   useAppContext, UniformCategory, UniformItem, UniformSize, StockRecord, StockTxnType, UniformGender,
@@ -16,7 +16,7 @@ import { printItemSpec, printBlankCatalogue, printSizeChart, printStockCount, pr
 import { suggestSize, growthHint } from '../lib/sizeSuggest';
 import { qrDataUrl, itemDeepLink } from '../lib/qr';
 
-type Tab = 'dashboard' | 'catalogue' | 'categories' | 'sizes' | 'measurements' | 'tailors' | 'issuing' | 'inventory' | 'stock' | 'reports' | 'settings';
+type Tab = 'dashboard' | 'store' | 'catalogue' | 'categories' | 'sizes' | 'measurements' | 'tailors' | 'issuing' | 'inventory' | 'stock' | 'reports' | 'settings';
 const GENDERS: UniformGender[] = ['Boys', 'Girls', 'Unisex'];
 const TXN_TYPES: StockTxnType[] = ['purchase', 'sale', 'issue', 'return', 'adjustment', 'transfer', 'damaged', 'lost'];
 
@@ -292,7 +292,7 @@ export function UniformManagement() {
   const stockValuation = uniformStock.reduce((a, s) => a + s.quantity * (s.cost ?? 0), 0);
 
   const TABS: [Tab, string, typeof LayoutDashboard][] = [
-    ['dashboard', 'Dashboard', LayoutDashboard], ['catalogue', 'Catalogue', Shirt], ['categories', 'Categories', Tags],
+    ['dashboard', 'Dashboard', LayoutDashboard], ['store', 'Store', ShoppingCart], ['catalogue', 'Catalogue', Shirt], ['categories', 'Categories', Tags],
     ['sizes', 'Size Chart', Ruler], ['measurements', 'Measurements', Users], ['tailors', 'Tailor Orders', Scissors],
     ['issuing', 'Issuing', ClipboardCheck], ['inventory', 'Inventory', Package], ['stock', 'Stock Movement', ArrowLeftRight],
     ['reports', 'Reports', BarChart3], ['settings', 'Settings', Settings2],
@@ -493,6 +493,9 @@ export function UniformManagement() {
             </div>
           )}
 
+          {/* STORE */}
+          {tab === 'store' && <StoreTab />}
+
           {/* MEASUREMENTS */}
           {tab === 'measurements' && <MeasurementsTab />}
 
@@ -636,6 +639,90 @@ export function UniformManagement() {
             </form>
             {uniformSuppliers.map(s => <div key={s.id} className="flex justify-between items-center px-3 py-1.5 bg-gray-50 rounded-lg mb-1 text-sm"><span>{s.name}{s.phone ? <span className="text-xs text-gray-400 ml-2">{s.phone}</span> : null}</span><button onClick={() => deleteUniformSupplier(s.id)} className="text-red-500"><Trash2 className="h-3.5 w-3.5" /></button></div>)}
           </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ---- Store tab (classic point-of-sale: pick a student, add/remove items) ----
+  function StoreTab() {
+    const { students, uniformItems, uniformStock, uniformIssues, issueUniform, removeUniformIssue, addPayment, currentTerm } = ctx;
+    const activeStudents = students.filter(s => !s.status || s.status === 'active');
+    const [sid, setSid] = useState('');
+    const [bill, setBill] = useState(true);
+    const student = activeStudents.find(s => s.id === sid);
+    const stockOf = (itemId: string) => uniformStock.filter(s => s.itemId === itemId).reduce((a, s) => a + s.quantity, 0);
+    const firstSize = (itemId: string) => uniformStock.find(s => s.itemId === itemId && s.quantity > 0)?.size || 'One Size';
+    const sellPrice = (itemId: string) => { const st = uniformStock.find(s => s.itemId === itemId && s.sellPrice); return st?.sellPrice ?? uniformItems.find(i => i.id === itemId)?.price ?? 0; };
+    const onAccount = uniformIssues.filter(i => i.studentId === sid);
+    const accountTotal = onAccount.reduce((a, i) => a + sellPrice(i.itemId) * i.quantity, 0);
+
+    const add = (item: UniformItem) => {
+      if (!sid) { toast('Select a student first.', 'warning'); return; }
+      if (stockOf(item.id) <= 0) { toast(`${item.name} is out of stock.`, 'error'); return; }
+      const size = firstSize(item.id);
+      issueUniform({ id: `iss-${Date.now()}`, studentId: sid, itemId: item.id, size, quantity: 1, issueDate: new Date().toISOString(), issuedBy: 'Admin', condition: 'New' });
+      if (bill) {
+        const amount = sellPrice(item.id);
+        if (amount > 0) addPayment({ id: `pay-${Date.now()}`, studentId: sid, type: `Uniform: ${item.name}`, amount, dueDate: new Date().toISOString(), status: 'pending', createdDate: new Date().toISOString(), term: currentTerm, notes: `Store · ${size}` });
+      }
+      toast(`${item.name} added to ${student?.name}'s account.`, 'success');
+    };
+
+    return (
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2 space-y-4">
+          <div className="flex items-center gap-3 flex-wrap">
+            <select value={sid} onChange={e => setSid(e.target.value)} className="flex-1 min-w-[220px] px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+              <option value="">Select a student…</option>
+              {activeStudents.map(s => <option key={s.id} value={s.id}>{s.name} — {s.grade}</option>)}
+            </select>
+            <label className="flex items-center gap-1.5 text-sm text-gray-700"><input type="checkbox" checked={bill} onChange={e => setBill(e.target.checked)} />Bill to account</label>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {uniformItems.filter(i => i.status === 'active').map(item => {
+              const stock = stockOf(item.id);
+              return (
+                <div key={item.id} className={`border rounded-lg p-3 flex items-center gap-3 ${stock === 0 ? 'border-red-200 bg-red-50/40' : 'border-gray-200'}`}>
+                  {item.images.front ? <img src={item.images.front} alt="" className="w-12 h-12 rounded object-cover border border-gray-200 flex-shrink-0" /> : <div className="w-12 h-12 rounded bg-gray-100 flex items-center justify-center flex-shrink-0"><Shirt className="h-5 w-5 text-gray-300" /></div>}
+                  <div className="min-w-0 flex-1">
+                    <p className="font-medium text-gray-900 truncate">{item.name}</p>
+                    <p className={`text-xs ${stock === 0 ? 'text-red-600' : stock <= 5 ? 'text-amber-600' : 'text-gray-500'}`}>{stock === 0 ? 'Out of stock' : `${stock} in stock`}</p>
+                  </div>
+                  <div className="text-right flex-shrink-0">
+                    <p className={`font-bold ${tc.text}`}>K{sellPrice(item.id).toLocaleString()}</p>
+                    <button onClick={() => add(item)} disabled={!sid || stock === 0} className={`mt-1 px-3 py-1 ${tc.btn} text-white text-xs rounded disabled:opacity-40 disabled:cursor-not-allowed`}>Add</button>
+                  </div>
+                </div>
+              );
+            })}
+            {uniformItems.length === 0 && <p className="text-sm text-gray-400 col-span-2 text-center py-8">No items in the catalogue yet.</p>}
+          </div>
+        </div>
+
+        <div className="bg-white border border-gray-200 rounded-lg shadow-sm p-5 h-fit">
+          <p className="font-semibold text-gray-900 mb-1">On {student ? `${student.name}'s` : 'the'} account</p>
+          {!sid ? <p className="text-sm text-gray-400 py-6 text-center">Select a student to see and manage their uniforms.</p> : (
+            <>
+              <div className={`text-center p-3 ${tc.light} rounded-lg mb-3`}>
+                <p className="text-xs text-gray-600">{student?.grade}</p>
+                <p className={`text-lg font-bold ${tc.text}`}>Total: K{accountTotal.toLocaleString()}</p>
+              </div>
+              {onAccount.length === 0 ? <p className="text-sm text-gray-400 text-center py-4">No uniforms on this account yet.</p> : (
+                <div className="space-y-1.5">
+                  {onAccount.map(i => (
+                    <div key={i.id} className="flex items-center justify-between px-3 py-2 bg-gray-50 rounded-lg text-sm">
+                      <span className="text-gray-900 min-w-0 truncate">{itemName(i.itemId)} <span className="text-xs text-gray-400">· {i.size}</span></span>
+                      <span className="flex items-center gap-2 flex-shrink-0">
+                        <span className="text-gray-700">K{sellPrice(i.itemId).toLocaleString()}</span>
+                        <button onClick={() => { removeUniformIssue(i.id); toast('Removed from account (stock restored).', 'info'); }} title="Remove" className="p-1 text-red-500 hover:bg-red-50 rounded"><Trash2 className="h-3.5 w-3.5" /></button>
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
         </div>
       </div>
     );

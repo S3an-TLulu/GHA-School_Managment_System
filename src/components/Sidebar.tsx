@@ -4,7 +4,7 @@ import {
   BarChart3, UserCheck, TrendingDown, Package, Calendar, FileText,
   DollarSign, Bell, MonitorCheck, ClipboardCheck, CalendarDays,
   Palette, Building2, LayoutTemplate, Clock, Layers, GraduationCap,
-  ChevronDown, ChevronsLeft, ChevronsRight, Heart, Bus, UserX, Settings as SettingsIcon, Briefcase, ChefHat, UserCircle, Camera, BookOpen, MessageSquare
+  ChevronDown, ChevronsLeft, ChevronsRight, Heart, Bus, UserX, Settings as SettingsIcon, Briefcase, ChefHat, UserCircle, Camera, BookOpen, MessageSquare, HelpCircle
 } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
@@ -22,6 +22,7 @@ const menuGroups = [
     items: [
       { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
       { id: 'profile', label: 'My Profile', icon: UserCircle },
+      { id: 'help', label: 'Help & Guide', icon: HelpCircle },
     ]
   },
   {
