@@ -220,6 +220,42 @@ export function Results() {
     setTimeout(() => w.print(), 300);
   };
 
+  // Print every student's full report card in one document (one card per page).
+  const printAllCards = () => {
+    const withResults = classStudents.filter(s => getStudentResult(s.id));
+    if (withResults.length === 0) { toast.toast?.('No results recorded for this class yet.', 'warning'); return; }
+    const card = (student: typeof classStudents[number]) => {
+      const result = getStudentResult(student.id)!;
+      const avg = calcAverage(result.subjects);
+      const { letter } = getGrade(avg);
+      const passed = avg >= 50;
+      const rank = classRank(student.id);
+      const rows = subjects.map(sub => {
+        const mark = result.subjects[sub] ?? '—';
+        const g = typeof mark === 'number' ? getGrade(mark) : { letter: '—' };
+        return `<tr><td style="padding:6px 10px;border:1px solid #e5e7eb">${sub}</td><td style="padding:6px 10px;border:1px solid #e5e7eb;text-align:center;font-weight:600">${mark}${typeof mark === 'number' ? '%' : ''}</td><td style="padding:6px 10px;border:1px solid #e5e7eb;text-align:center;font-weight:700">${g.letter}</td></tr>`;
+      }).join('');
+      return `<div style="page-break-after:always;max-width:600px;margin:0 auto 20px">
+        <div style="text-align:center;border-bottom:2px solid #1d4ed8;padding-bottom:12px;margin-bottom:12px">
+          ${branding.logoUrl ? `<img src="${branding.logoUrl}" style="height:44px;width:44px;object-fit:cover;border-radius:8px" />` : ''}
+          <h2 style="margin:0;color:#1d4ed8">${branding.schoolName || 'School'}</h2>
+          <p style="margin:2px 0;color:#6b7280;font-size:12px">${branding.motto || ''}</p>
+          <h3 style="margin:6px 0 0">Academic Report Card</h3>
+        </div>
+        <table style="width:100%;margin-bottom:10px;font-size:13px"><tr><td style="color:#6b7280;width:110px">Student</td><td style="font-weight:600">${student.name}</td><td style="color:#6b7280;width:70px">Class</td><td style="font-weight:600">${selectedClass}</td></tr>
+        <tr><td style="color:#6b7280">Adm No.</td><td>${student.admissionNumber ?? '—'}</td><td style="color:#6b7280">Term</td><td>${selectedTerm}</td></tr>
+        ${rank ? `<tr><td style="color:#6b7280">Position</td><td style="font-weight:600">${ordinal(rank.rank)} of ${rank.total}</td><td style="color:#6b7280">Average</td><td style="font-weight:700;color:${passed ? '#16a34a' : '#dc2626'}">${avg}% (${letter})</td></tr>` : ''}</table>
+        <table style="width:100%;border-collapse:collapse"><thead><tr><th style="background:#1d4ed8;color:#fff;padding:6px 10px;text-align:left">Subject</th><th style="background:#1d4ed8;color:#fff;padding:6px 10px">Mark</th><th style="background:#1d4ed8;color:#fff;padding:6px 10px">Grade</th></tr></thead><tbody>${rows}</tbody></table>
+        <div style="margin-top:14px;padding:10px;background:${passed ? '#f0fdf4' : '#fef2f2'};border-radius:8px;border:1px solid ${passed ? '#bbf7d0' : '#fecaca'}"><strong style="color:${passed ? '#16a34a' : '#dc2626'}">${passed ? 'PASSED' : 'FAILED'}</strong> — Overall ${avg}% (${letter})</div>
+        <div style="margin-top:26px;display:grid;grid-template-columns:1fr 1fr;gap:24px"><div style="border-top:1px solid #374151;padding-top:4px;text-align:center;font-size:11px;color:#6b7280">Class Teacher</div><div style="border-top:1px solid #374151;padding-top:4px;text-align:center;font-size:11px;color:#6b7280">Head Teacher</div></div>
+      </div>`;
+    };
+    const w = window.open('', '_blank');
+    if (!w) return;
+    w.document.write(`<!DOCTYPE html><html><head><title>Report Cards — ${selectedClass} — ${selectedTerm}</title><style>@media print{button{display:none}}body{font-family:Arial,sans-serif;padding:16px}</style></head><body>${withResults.map(card).join('')}<script>window.onload=function(){setTimeout(function(){window.print()},300)}</script></body></html>`);
+    w.document.close();
+  };
+
   const viewResult = viewStudent ? getStudentResult(viewStudent) : null;
   const viewStudentInfo = viewStudent ? students.find(s => s.id === viewStudent) : null;
 
@@ -236,6 +272,10 @@ export function Results() {
               <button onClick={printClassReport} className="flex items-center space-x-2 border border-gray-300 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-50">
                 <Printer className="h-4 w-4" />
                 <span>Print Class</span>
+              </button>
+              <button onClick={printAllCards} className="flex items-center space-x-2 border border-gray-300 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-50">
+                <Printer className="h-4 w-4" />
+                <span>All Cards</span>
               </button>
               <button onClick={startEditing} className={`flex items-center space-x-2 ${tc.btn} text-white px-4 py-2 rounded-lg text-sm font-medium`}>
                 <Plus className="h-4 w-4" />

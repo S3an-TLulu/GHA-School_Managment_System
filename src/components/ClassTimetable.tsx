@@ -92,6 +92,25 @@ export function ClassTimetable() {
     setTimeout(() => w.print(), 300);
   };
 
+  // Clash detection: the same teacher booked in two classes in the same slot.
+  const clashes = (() => {
+    const bySlotTeacher: Record<string, Record<string, string[]>> = {};
+    timetables.forEach(tt => {
+      Object.entries(tt.slots).forEach(([key, cell]) => {
+        const name = cell.teacherName?.trim();
+        if (!name) return;
+        ((bySlotTeacher[key] ||= {})[name] ||= []).push(tt.classGrade);
+      });
+    });
+    const out: { slot: string; teacher: string; classes: string[] }[] = [];
+    Object.entries(bySlotTeacher).forEach(([slot, teachersMap]) => {
+      Object.entries(teachersMap).forEach(([teacher, classes]) => {
+        if (classes.length > 1) out.push({ slot: slot.replace('_', ' · ').replace(/\n.*/, ''), teacher, classes });
+      });
+    });
+    return out;
+  })();
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
@@ -104,6 +123,17 @@ export function ClassTimetable() {
           <span>Print Timetable</span>
         </button>
       </div>
+
+      {clashes.length > 0 && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-800">
+          <p className="font-semibold mb-1">⚠ {clashes.length} timetable clash{clashes.length !== 1 ? 'es' : ''} — a teacher is booked in two classes at once:</p>
+          <ul className="list-disc list-inside space-y-0.5">
+            {clashes.slice(0, 8).map((c, i) => (
+              <li key={i}><strong>{c.teacher}</strong> — {c.slot} — {c.classes.join(' & ')}</li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {/* Class selector */}
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
