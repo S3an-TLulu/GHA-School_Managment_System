@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import {
   Trophy, Users2, Plus, Trash2, Printer, Download, ArrowLeft, Check, Lock, Pencil,
+  Shuffle, ListChecks, Medal,
 } from 'lucide-react';
 import { useAppContext, Competition, CompetitionEntry, House } from '../context/AppContext';
 import { useToast } from './ToastProvider';
@@ -19,7 +20,7 @@ export function Tools() {
   const { houses, competitions, competitionEntries, branding, addCompetition, deleteCompetition } = ctx;
   const { toast } = useToast();
   const tc = useThemeClasses();
-  const [tab, setTab] = useState<'scoreboard' | 'houses'>('scoreboard');
+  const [tab, setTab] = useState<'scoreboard' | 'standings' | 'namepicker' | 'houses'>('scoreboard');
   const [openId, setOpenId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [form, setForm] = useState({ name: '', type: 'Sports' as Competition['type'], date: new Date().toISOString().split('T')[0], scoringMode: 'position' as 'position' | 'points' });
@@ -43,7 +44,7 @@ export function Tools() {
 
       <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
         <div className="px-3 py-3 border-b border-gray-200 flex gap-1">
-          {([['scoreboard', 'Competition Scoreboard', Trophy], ['houses', 'Houses', Users2]] as const).map(([id, label, Icon]) => (
+          {([['scoreboard', 'Scoreboard', Trophy], ['standings', 'Overall Standings', Medal], ['namepicker', 'Name Picker', Shuffle], ['houses', 'Houses', Users2]] as const).map(([id, label, Icon]) => (
             <button key={id} onClick={() => { setTab(id); setOpenId(null); }}
               className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium ${tab === id ? `${tc.light} ${tc.text}` : 'text-gray-600 hover:bg-gray-50'}`}>
               <Icon className="h-4 w-4" />{label}
@@ -53,6 +54,8 @@ export function Tools() {
 
         <div className="p-5">
           {tab === 'houses' && <HousesTab />}
+          {tab === 'standings' && <StandingsTab />}
+          {tab === 'namepicker' && <NamePickerTab />}
 
           {tab === 'scoreboard' && !openComp && (
             <div className="space-y-4">
@@ -118,6 +121,89 @@ export function Tools() {
           ))}
           {houses.length === 0 && <p className="text-sm text-gray-400 text-center py-4">No houses — add your team colours above.</p>}
         </div>
+      </div>
+    );
+  }
+
+  // ---------- Overall standings (all competitions added together) ----------
+  function StandingsTab() {
+    const [typeFilter, setTypeFilter] = useState('');
+    const comps = competitions.filter(c => !typeFilter || c.type === typeFilter);
+    const totals = houses.map(h => {
+      let points = 0, wins = 0;
+      comps.forEach(c => {
+        const row = leaderboard(competitionEntries.filter(e => e.competitionId === c.id), houses, c).find(x => x.house.id === h.id);
+        if (row) { points += row.total; if (row.winner && row.total > 0) wins++; }
+      });
+      return { house: h, points: Math.round(points * 100) / 100, wins };
+    }).sort((a, b) => b.points - a.points || b.wins - a.wins);
+    const top = totals[0]?.points || 0;
+    return (
+      <div className="space-y-4 max-w-2xl">
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <p className="text-sm text-gray-500">Points from all {comps.length} competition{comps.length !== 1 ? 's' : ''} added together</p>
+          <div className="flex gap-2">
+            <select value={typeFilter} onChange={e => setTypeFilter(e.target.value)} className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm"><option value="">All types</option>{TYPES.map(t => <option key={t} value={t}>{t}</option>)}</select>
+            <button onClick={() => exportCSV('GHA_Overall_Standings', ['Rank', 'House', 'Total Points', 'Competitions Won'], totals.map((t, i) => [i + 1, t.house.name, t.points, t.wins]))} className="flex items-center gap-1.5 border border-gray-300 text-gray-700 hover:bg-gray-50 px-3 py-1.5 rounded-lg text-sm"><Download className="h-4 w-4" />CSV</button>
+          </div>
+        </div>
+        <div className="space-y-2">
+          {totals.map((t, i) => (
+            <div key={t.house.id} className={`flex items-center justify-between px-4 py-3 rounded-lg bg-gray-50 ${i === 0 && t.points > 0 ? 'ring-2 ring-amber-400' : ''}`}>
+              <span className="flex items-center gap-3 min-w-0">
+                <span className="w-6 text-center text-lg font-extrabold text-gray-400">{i + 1}</span>
+                <span className="w-4 h-4 rounded flex-shrink-0" style={{ background: t.house.colour }} />
+                <span className="font-semibold text-gray-900">{t.house.name}{i === 0 && t.points > 0 ? ' 🏆' : ''}</span>
+                {t.wins > 0 && <span className="text-xs text-gray-400">· {t.wins} win{t.wins !== 1 ? 's' : ''}</span>}
+              </span>
+              <div className="flex items-center gap-3 flex-shrink-0">
+                <div className="w-28 h-2 bg-gray-200 rounded-full hidden sm:block"><div className="h-2 rounded-full" style={{ width: `${top > 0 ? (t.points / top) * 100 : 0}%`, background: t.house.colour }} /></div>
+                <span className="text-xl font-extrabold text-gray-900 tabular-nums w-14 text-right">{t.points}</span>
+              </div>
+            </div>
+          ))}
+          {houses.length === 0 && <p className="text-sm text-gray-400 text-center py-6">Add houses first.</p>}
+          {houses.length > 0 && comps.length === 0 && <p className="text-sm text-gray-400 text-center py-6">No competitions to total yet.</p>}
+        </div>
+      </div>
+    );
+  }
+
+  // ---------- Random name picker ----------
+  function NamePickerTab() {
+    const { students } = ctx;
+    const active = students.filter(s => !s.status || s.status === 'active');
+    const grades = Array.from(new Set(active.map(s => s.grade))).sort();
+    const [grade, setGrade] = useState('');
+    const [gender, setGender] = useState('');
+    const [picked, setPicked] = useState<string | null>(null);
+    const [used, setUsed] = useState<Set<string>>(new Set());
+    const [noRepeat, setNoRepeat] = useState(true);
+
+    const pool = active.filter(s => (!grade || s.grade === grade) && (!gender || s.gender === gender) && (!noRepeat || !used.has(s.id)));
+    const pick = () => {
+      if (pool.length === 0) { toast(noRepeat && used.size > 0 ? 'Everyone has been picked — reset to go again.' : 'No students match the filters.', 'warning'); return; }
+      const chosen = pool[Math.floor(Math.random() * pool.length)];
+      setPicked(chosen.name);
+      if (noRepeat) setUsed(prev => new Set(prev).add(chosen.id));
+    };
+    const inp = 'px-3 py-2 border border-gray-300 rounded-lg text-sm';
+    return (
+      <div className="max-w-xl mx-auto space-y-4 text-center">
+        <p className="text-sm text-gray-500">Randomly pick a pupil — great for cold-calling, teams or prizes.</p>
+        <div className="flex items-center justify-center gap-2 flex-wrap">
+          <select value={grade} onChange={e => setGrade(e.target.value)} className={inp}><option value="">All classes</option>{grades.map(g => <option key={g} value={g}>{g}</option>)}</select>
+          <select value={gender} onChange={e => setGender(e.target.value)} className={inp}><option value="">Any gender</option><option value="Male">Boys</option><option value="Female">Girls</option></select>
+          <label className="flex items-center gap-1.5 text-sm text-gray-600"><input type="checkbox" checked={noRepeat} onChange={e => setNoRepeat(e.target.checked)} />No repeats</label>
+        </div>
+        <div className={`rounded-2xl border-2 border-dashed ${picked ? 'border-blue-300' : 'border-gray-200'} py-12 px-4`}>
+          {picked ? <p className="text-3xl font-extrabold text-gray-900">{picked}</p> : <p className="text-gray-400">Press pick to choose someone</p>}
+        </div>
+        <div className="flex items-center justify-center gap-2">
+          <button onClick={pick} className={`flex items-center gap-2 ${tc.btn} text-white px-6 py-2.5 rounded-lg font-medium`}><Shuffle className="h-4 w-4" />Pick random</button>
+          {used.size > 0 && <button onClick={() => { setUsed(new Set()); setPicked(null); }} className="px-4 py-2.5 border border-gray-300 rounded-lg text-sm text-gray-600">Reset ({used.size})</button>}
+        </div>
+        <p className="text-xs text-gray-400">{pool.length} candidate{pool.length !== 1 ? 's' : ''} available{noRepeat && used.size > 0 ? ` · ${used.size} already picked` : ''}</p>
       </div>
     );
   }
@@ -222,14 +308,14 @@ export function Tools() {
             <p className="font-semibold text-gray-900 mb-3 flex items-center gap-2"><Trophy className={`h-4 w-4 ${tc.text}`} />Live Leaderboard</p>
             <div className="space-y-2">
               {board.map(b => (
-                <div key={b.house.id} className={`flex items-center justify-between px-3 py-2 rounded-lg ${b.winner && b.total > 0 ? 'bg-amber-50 border border-amber-200' : 'bg-gray-50'}`}>
-                  <span className="flex items-center gap-2 text-sm">
-                    <span className="w-5 text-center font-bold text-gray-400">{b.rank}</span>
-                    <span className="w-3 h-3 rounded-sm" style={{ background: b.house.colour }} />
-                    <span className="font-medium text-gray-900">{b.house.name}</span>
-                    {b.winner && b.total > 0 && <span>🏆</span>}
+                <div key={b.house.id} className={`flex items-center justify-between px-3 py-2.5 rounded-lg bg-gray-50 ${b.winner && b.total > 0 ? 'ring-2 ring-amber-400' : ''}`}>
+                  <span className="flex items-center gap-2.5 text-sm min-w-0">
+                    <span className="w-5 text-center font-bold text-gray-500">{b.rank}</span>
+                    <span className="w-3.5 h-3.5 rounded-sm flex-shrink-0" style={{ background: b.house.colour }} />
+                    <span className="font-semibold text-gray-900 truncate">{b.house.name}</span>
+                    {b.winner && b.total > 0 && <span className="flex-shrink-0">🏆</span>}
                   </span>
-                  <span className="font-bold text-gray-900">{b.total}</span>
+                  <span className="text-lg font-extrabold text-gray-900 flex-shrink-0 tabular-nums">{b.total}</span>
                 </div>
               ))}
               {houses.length === 0 && <p className="text-sm text-gray-400 text-center py-2">Add houses in the Houses tab.</p>}
