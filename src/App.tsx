@@ -34,6 +34,8 @@ import { Profile } from './components/Profile';
 import { Library } from './components/Library';
 import { Messaging } from './components/Messaging';
 import { HelpGuide } from './components/HelpGuide';
+import { CashBook } from './components/CashBook';
+import { ParentPortal } from './components/ParentPortal';
 import { Results } from './components/Results';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { useAppContext } from './context/AppContext';
@@ -48,6 +50,7 @@ function AppContent() {
   const [activeSection, setActiveSection] = useState('dashboard');
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [showLogin, setShowLogin] = useState(false);
+  const [showPortal, setShowPortal] = useState(false);
   const { isAuthenticated } = useAuth();
   const { theme } = useAppContext();
 
@@ -65,8 +68,11 @@ function AppContent() {
   }, [isAuthenticated]);
 
   if (!isAuthenticated) {
+    if (showPortal || location.hash === '#portal') {
+      return <ParentPortal onBack={() => { setShowPortal(false); if (location.hash) history.replaceState(null, '', location.pathname); }} />;
+    }
     if (showLogin) {
-      return <Login onBack={() => setShowLogin(false)} />;
+      return <Login onBack={() => setShowLogin(false)} onPortal={() => { setShowLogin(false); setShowPortal(true); }} />;
     }
     return <LandingPage onLoginClick={() => setShowLogin(true)} />;
   }
@@ -107,6 +113,7 @@ function AppContent() {
       case 'messaging':    return <Messaging />;
       case 'profile':      return <Profile />;
       case 'help':         return <HelpGuide />;
+      case 'cashbook':     return <CashBook />;
       default:             return <Dashboard />;
     }
   };

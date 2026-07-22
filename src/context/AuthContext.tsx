@@ -43,7 +43,7 @@ export interface AuthClaim {
 
 export const ROLE_PERMISSIONS: Record<UserRole, string[] | 'all'> = {
   Admin: 'all',
-  Cashier: ['dashboard', 'profile', 'help', 'students', 'cashier', 'payments', 'bulkfees', 'expenses', 'statements', 'uniforms', 'library', 'debtors', 'transport', 'fundraisers', 'kitchen', 'feestructure', 'reports', 'templates', 'gallery', 'messaging'],
+  Cashier: ['dashboard', 'profile', 'help', 'students', 'cashier', 'cashbook', 'payments', 'bulkfees', 'expenses', 'statements', 'uniforms', 'library', 'debtors', 'transport', 'fundraisers', 'kitchen', 'feestructure', 'reports', 'templates', 'gallery', 'messaging'],
   Teacher: ['dashboard', 'profile', 'help', 'students', 'classes', 'attendance', 'results', 'timetable', 'calendar', 'events', 'announcements', 'requirements', 'library', 'reports', 'gallery'],
   Viewer: ['dashboard', 'profile', 'help', 'calendar', 'events', 'announcements', 'gallery'],
 };

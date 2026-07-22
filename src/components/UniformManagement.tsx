@@ -12,7 +12,7 @@ import { useToast } from './ToastProvider';
 import { useThemeClasses } from '../hooks/useThemeClasses';
 import { compressImage } from '../lib/images';
 import { exportCSV } from '../lib/exports';
-import { printItemSpec, printBlankCatalogue, printSizeChart, printStockCount, printMeasurementForm, printProductionSheet, printIssueForm, printPurchaseOrder } from '../lib/uniformDocs';
+import { printItemSpec, printBlankCatalogue, printSizeChart, printStockCount, printMeasurementForm, printProductionSheet, printIssueForm, printPurchaseOrder, printUniformReceipt } from '../lib/uniformDocs';
 import { suggestSize, growthHint } from '../lib/sizeSuggest';
 import { qrDataUrl, itemDeepLink } from '../lib/qr';
 
@@ -701,7 +701,13 @@ export function UniformManagement() {
         </div>
 
         <div className="bg-white border border-gray-200 rounded-lg shadow-sm p-5 h-fit">
-          <p className="font-semibold text-gray-900 mb-1">On {student ? `${student.name}'s` : 'the'} account</p>
+          <div className="flex items-center justify-between mb-1">
+            <p className="font-semibold text-gray-900">On {student ? `${student.name}'s` : 'the'} account</p>
+            {sid && onAccount.length > 0 && (
+              <button onClick={() => printUniformReceipt(student, onAccount.map(i => ({ name: itemName(i.itemId), size: i.size, qty: i.quantity, price: sellPrice(i.itemId) })), branding)}
+                title="Print receipt" className="flex items-center gap-1 text-xs text-gray-600 border border-gray-200 hover:bg-gray-50 rounded px-2 py-1"><Printer className="h-3.5 w-3.5" />Receipt</button>
+            )}
+          </div>
           {!sid ? <p className="text-sm text-gray-400 py-6 text-center">Select a student to see and manage their uniforms.</p> : (
             <>
               <div className={`text-center p-3 ${tc.light} rounded-lg mb-3`}>
