@@ -33,6 +33,7 @@ import { Gallery } from './components/Gallery';
 import { Profile } from './components/Profile';
 import { Library } from './components/Library';
 import { Messaging } from './components/Messaging';
+import { HelpGuide } from './components/HelpGuide';
 import { Results } from './components/Results';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { useAppContext } from './context/AppContext';
@@ -105,6 +106,7 @@ function AppContent() {
       case 'library':      return <Library />;
       case 'messaging':    return <Messaging />;
       case 'profile':      return <Profile />;
+      case 'help':         return <HelpGuide />;
       default:             return <Dashboard />;
     }
   };
