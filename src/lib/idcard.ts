@@ -1,12 +1,9 @@
 import { Student, SchoolBranding } from '../context/AppContext';
-
-// Escape user text before injecting into the printable HTML.
-const esc = (s: string) => (s || '').replace(/[&<>"']/g, c =>
-  ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c] as string));
+import { esc, printHtml, exportPdf } from './print';
 
 // Open a print window with one or more student ID cards (two per row). No
 // external dependencies — a clean, branded card the school can laminate.
-export function printIdCards(students: Student[], branding: SchoolBranding) {
+export function printIdCards(students: Student[], branding: SchoolBranding, opts?: { pdf?: boolean }) {
   if (students.length === 0) return;
   const year = new Date().getFullYear();
   const card = (s: Student) => `
@@ -59,8 +56,6 @@ export function printIdCards(students: Student[], branding: SchoolBranding) {
     <script>window.onload=function(){setTimeout(function(){window.print()},250)}</script>
   </body></html>`;
 
-  const win = window.open('', '_blank');
-  if (!win) return;
-  win.document.write(html);
-  win.document.close();
+  if (opts?.pdf) exportPdf(html, students.length === 1 ? `ID_Card_${students[0].name}` : 'Student_ID_Cards');
+  else printHtml(html);
 }

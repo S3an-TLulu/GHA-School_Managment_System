@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Wallet, HandCoins, Baby, Trash2, Printer, Check, Search, CalendarClock, Eye, EyeOff, ListChecks, Landmark, Banknote, Smartphone } from 'lucide-react';
+import { Wallet, HandCoins, Baby, Trash2, Printer, Check, Search, CalendarClock, Eye, EyeOff, ListChecks, Landmark, Banknote, Smartphone, FileDown } from 'lucide-react';
+import { printHtml, exportPdf } from '../lib/print';
 import { useAppContext, Teacher, PayrollRecord } from '../context/AppContext';
 import { useToast } from './ToastProvider';
 import { useThemeClasses } from '../hooks/useThemeClasses';
@@ -100,7 +101,7 @@ export function HR() {
   const netPay = (r: PayrollRecord) =>
     r.baseSalary + r.allowances - r.advancesDeducted - r.feeDeduction - r.otherDeductions;
 
-  const printPayslip = (t: Teacher) => {
+  const printPayslip = (t: Teacher, pdf = false) => {
     const r = buildRecord(t, false);
     const rows = [
       ['Basic Salary', r.baseSalary, false],
@@ -109,9 +110,7 @@ export function HR() {
       ['School Fees (own children)', -r.feeDeduction, true],
       ['Other Deductions', -r.otherDeductions, true],
     ] as [string, number, boolean][];
-    const win = window.open('', '_blank');
-    if (!win) return;
-    win.document.write(`<!DOCTYPE html><html><head><title>Payslip — ${t.name} — ${month}</title>
+    const html = `<!DOCTYPE html><html><head><title>Payslip — ${t.name} — ${month}</title>
       <style>
         body { font-family: Arial, sans-serif; color: #1a2332; max-width: 560px; margin: 24px auto; }
         .doc { border: 2px solid #12274a; border-radius: 10px; padding: 26px 30px; }
@@ -146,8 +145,9 @@ export function HR() {
       </table>
       ${r.notes ? `<p style="font-size:11.5px;color:#5a6b85;margin-top:10px">Notes: ${r.notes}</p>` : ''}
       <div class="sig"><div>Employee Signature</div><div>${branding.principalName} — Principal</div></div>
-      </div><script>window.onload=function(){setTimeout(function(){window.print()},250)}</script></body></html>`);
-    win.document.close();
+      </div><script>window.onload=function(){setTimeout(function(){window.print()},250)}</script></body></html>`;
+    if (pdf) exportPdf(html, `Payslip_${t.name}_${month}`);
+    else printHtml(html);
   };
 
   const totalNetForMonth = activeTeachers.reduce((sum, t) => sum + netPay(buildRecord(t, false)), 0);
@@ -224,6 +224,10 @@ export function HR() {
                       <button onClick={() => printPayslip(t)}
                         className="flex items-center gap-1 text-xs text-gray-600 border border-gray-300 hover:bg-gray-100 rounded-lg px-2.5 py-1.5">
                         <Printer className="h-3.5 w-3.5" />Payslip
+                      </button>
+                      <button onClick={() => printPayslip(t, true)} title="Export payslip to PDF"
+                        className="flex items-center gap-1 text-xs text-gray-600 border border-gray-300 hover:bg-gray-100 rounded-lg px-2 py-1.5">
+                        <FileDown className="h-3.5 w-3.5" />
                       </button>
                       <button onClick={() => { savePayrollRecord(buildRecord(t, false)); toast(`Payroll saved for ${t.name}.`, 'success'); }}
                         className="text-xs text-blue-600 border border-blue-200 hover:bg-blue-50 rounded-lg px-2.5 py-1.5">

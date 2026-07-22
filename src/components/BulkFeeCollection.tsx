@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Users, CheckCircle2, Circle, Printer, CreditCard, AlertCircle, Banknote, Smartphone, Building2, FileText } from 'lucide-react';
+import { Users, CheckCircle2, Circle, Printer, CreditCard, AlertCircle, Banknote, Smartphone, Building2, FileText, FileDown } from 'lucide-react';
+import { printHtml, exportPdf } from '../lib/print';
 import { useAppContext, Payment, PaymentMethod } from '../context/AppContext';
 
 const CLASSES = ['Baby Class', 'Middle Class', 'Reception', 'Grade 1', 'Grade 2', 'Grade 3', 'Grade 4', 'Grade 5', 'Grade 6', 'Grade 7'];
@@ -108,7 +109,7 @@ export function BulkFeeCollection() {
     setSelectedIds(new Set());
   };
 
-  const printReceipts = () => {
+  const printReceipts = (pdf = false) => {
     if (lastBatch.length === 0) return;
     const receiptHtml = lastBatch.map(p => {
       const student = students.find(s => s.id === p.studentId);
@@ -132,19 +133,16 @@ export function BulkFeeCollection() {
         </div>`;
     }).join('');
 
-    const w = window.open('', '_blank');
-    if (!w) return;
-    w.document.write(`<!DOCTYPE html><html><head><title>Bulk Receipts</title>
+    const html = `<!DOCTYPE html><html><head><title>Bulk Receipts</title>
     <style>body{font-family:Arial,sans-serif;padding:20px;max-width:600px;margin:0 auto;} @media print{button{display:none;}}</style></head>
     <body>
     <h2 style="text-align:center;margin-bottom:4px;">Payment Receipts</h2>
     <p style="text-align:center;color:#6b7280;margin-bottom:20px;">${selectedClass} · ${feeType} · ${currentTerm}</p>
     ${receiptHtml}
-    <button onclick="window.print()" style="display:block;margin:16px auto;padding:8px 24px;background:#1d4ed8;color:white;border:none;border-radius:6px;cursor:pointer;font-size:14px;">Print All Receipts</button>
-    </body></html>`);
-    w.document.close();
-    w.focus();
-    setTimeout(() => w.print(), 300);
+    <script>window.onload=function(){setTimeout(function(){window.print()},300)}</script>
+    </body></html>`;
+    if (pdf) exportPdf(html, `Receipts_${selectedClass}_${feeType}`);
+    else printHtml(html);
   };
 
   const totalAmount = selectedIds.size * Number(amount || 0);
@@ -297,11 +295,18 @@ export function BulkFeeCollection() {
 
           <div className="flex gap-3">
             {saved && lastBatch.length > 0 && (
-              <button onClick={printReceipts}
-                className="flex items-center space-x-2 border border-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50 text-sm font-medium">
-                <Printer className="h-4 w-4" />
-                <span>Print {lastBatch.length} Receipts</span>
-              </button>
+              <>
+                <button onClick={() => printReceipts()}
+                  className="flex items-center space-x-2 border border-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50 text-sm font-medium">
+                  <Printer className="h-4 w-4" />
+                  <span>Print {lastBatch.length} Receipts</span>
+                </button>
+                <button onClick={() => printReceipts(true)} title="Export receipts to PDF"
+                  className="flex items-center space-x-2 border border-gray-300 text-gray-700 px-3 py-2 rounded-lg hover:bg-gray-50 text-sm font-medium">
+                  <FileDown className="h-4 w-4" />
+                  <span>PDF</span>
+                </button>
+              </>
             )}
             <button
               onClick={recordPayments}

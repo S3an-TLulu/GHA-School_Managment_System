@@ -1,11 +1,9 @@
 import { Student, SchoolBranding } from '../context/AppContext';
-
-const esc = (s: string) => (s || '').replace(/[&<>"']/g, c =>
-  ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c] as string));
+import { esc, printHtml, exportPdf } from './print';
 
 // Print a blank monthly attendance register for a class — a grid of student
 // names down the side and day columns across, ready to tick by hand. Landscape.
-export function printClassRegister(className: string, students: Student[], branding: SchoolBranding, monthLabel: string) {
+export function printClassRegister(className: string, students: Student[], branding: SchoolBranding, monthLabel: string, opts?: { pdf?: boolean }) {
   const days = Array.from({ length: 31 }, (_, i) => i + 1);
   const rows = students.map((s, i) => `
     <tr>
@@ -53,8 +51,6 @@ export function printClassRegister(className: string, students: Student[], brand
     <script>window.onload=function(){setTimeout(function(){window.print()},250)}</script>
   </body></html>`;
 
-  const win = window.open('', '_blank');
-  if (!win) return;
-  win.document.write(html);
-  win.document.close();
+  if (opts?.pdf) exportPdf(html, `Register_${className}_${monthLabel}`);
+  else printHtml(html);
 }

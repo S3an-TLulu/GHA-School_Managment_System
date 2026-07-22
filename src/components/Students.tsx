@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react';
-import { Plus, Search, Pencil, Trash2, Eye, Users, Download, Upload, CreditCard } from 'lucide-react';
+import { Plus, Search, Pencil, Trash2, Eye, Users, Download, Upload, CreditCard, FileDown } from 'lucide-react';
 import { useAppContext, Student } from '../context/AppContext';
 import { StudentModal } from './StudentModal';
 import { StudentProfile } from './StudentProfile';
@@ -133,6 +133,13 @@ export function Students() {
             className="flex items-center gap-2 border border-gray-300 text-gray-700 hover:bg-gray-50 px-3 py-2 rounded-lg text-sm font-medium">
             <CreditCard className="h-4 w-4" /><span className="hidden sm:inline">ID Cards</span>
           </button>
+          <button title="Export ID cards to PDF" onClick={() => {
+            if (filteredStudents.length === 0) { toast('No students to export.', 'warning'); return; }
+            printIdCards(filteredStudents, branding, { pdf: true });
+          }}
+            className="flex items-center gap-2 border border-gray-300 text-gray-700 hover:bg-gray-50 px-3 py-2 rounded-lg text-sm font-medium">
+            <FileDown className="h-4 w-4" /><span className="hidden sm:inline">ID PDF</span>
+          </button>
           <button
             onClick={() => setIsModalOpen(true)}
             className={`flex items-center space-x-2 ${tc.btn} text-white px-4 py-2 rounded-lg transition-colors text-sm font-medium focus:outline-none focus:ring-2 focus:ring-offset-1`}
@@ -218,6 +225,10 @@ export function Students() {
                       <button onClick={() => printIdCards([student], branding)} title="Print ID Card"
                         className="p-1.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors">
                         <CreditCard className="h-4 w-4" />
+                      </button>
+                      <button onClick={() => printIdCards([student], branding, { pdf: true })} title="Export ID Card to PDF"
+                        className="p-1.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors">
+                        <FileDown className="h-4 w-4" />
                       </button>
                       <button onClick={() => handleEdit(student)} title="Edit"
                         className={`p-1.5 rounded-lg ${tc.text} hover:${tc.light} transition-colors`}>

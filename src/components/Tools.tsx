@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import {
   Trophy, Users2, Plus, Trash2, Printer, Download, ArrowLeft, Check, Lock, Pencil,
-  Shuffle, Medal, Lightbulb, FileQuestion, X,
+  Shuffle, Medal, Lightbulb, FileQuestion, X, FileDown,
 } from 'lucide-react';
 import { useAppContext, Competition, CompetitionEntry, House, SchoolProject, ProjectTask, QuizQuestion } from '../context/AppContext';
 import { useToast } from './ToastProvider';
@@ -320,10 +320,10 @@ export function Tools() {
     };
     const toggleSel = (id: string) => setSel(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
     const chosen = () => quizQuestions.filter(x => sel.has(x.id));
-    const print = (withAnswers: boolean) => {
+    const print = (withAnswers: boolean, pdf = false) => {
       const qs = chosen().length > 0 ? chosen() : filtered;
       if (qs.length === 0) { toast('Add or select some questions first.', 'warning'); return; }
-      printTestPaper({ title: paper.title || 'Test', subject: paper.subject || qs[0].subject, grade: paper.grade || undefined, instructions: paper.instructions || undefined, questions: qs, branding, withAnswers });
+      printTestPaper({ title: paper.title || 'Test', subject: paper.subject || qs[0].subject, grade: paper.grade || undefined, instructions: paper.instructions || undefined, questions: qs, branding, withAnswers, pdf });
     };
 
     return (
@@ -364,9 +364,11 @@ export function Tools() {
             <div className="flex gap-2"><input className={`${inp} flex-1`} placeholder="Paper title" value={paper.title} onChange={e => setPaper({ ...paper, title: e.target.value })} /><input className={`${inp} w-28`} placeholder="Grade" value={paper.grade} onChange={e => setPaper({ ...paper, grade: e.target.value })} /></div>
             <input className={`${inp} w-full`} placeholder="Instructions (optional)" value={paper.instructions} onChange={e => setPaper({ ...paper, instructions: e.target.value })} />
             <p className="text-xs text-gray-400">{sel.size > 0 ? `${sel.size} selected` : `Using all ${filtered.length} filtered`} question(s).</p>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               <button onClick={() => print(false)} className="flex items-center gap-1.5 border border-gray-300 text-gray-700 hover:bg-white px-3 py-1.5 rounded-lg text-sm"><Printer className="h-4 w-4" />Test Paper</button>
+              <button title="Export test paper to PDF" onClick={() => print(false, true)} className="flex items-center border border-gray-300 text-gray-700 hover:bg-white px-2 py-1.5 rounded-lg text-sm"><FileDown className="h-4 w-4" /></button>
               <button onClick={() => print(true)} className="flex items-center gap-1.5 border border-gray-300 text-gray-700 hover:bg-white px-3 py-1.5 rounded-lg text-sm"><Printer className="h-4 w-4" />Answer Key</button>
+              <button title="Export answer key to PDF" onClick={() => print(true, true)} className="flex items-center border border-gray-300 text-gray-700 hover:bg-white px-2 py-1.5 rounded-lg text-sm"><FileDown className="h-4 w-4" /></button>
             </div>
           </div>
         </div>
@@ -402,7 +404,9 @@ export function Tools() {
           <button onClick={onBack} className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-800"><ArrowLeft className="h-4 w-4" />All competitions</button>
           <div className="flex gap-2">
             <button onClick={() => printJudgesSheet(comp, houses, branding)} className="flex items-center gap-1.5 border border-gray-300 text-gray-700 hover:bg-gray-50 px-3 py-1.5 rounded-lg text-sm"><Printer className="h-4 w-4" />Blank Sheet</button>
+            <button title="Export blank sheet to PDF" onClick={() => printJudgesSheet(comp, houses, branding, { pdf: true })} className="flex items-center border border-gray-300 text-gray-700 hover:bg-gray-50 px-2 py-1.5 rounded-lg text-sm"><FileDown className="h-4 w-4" /></button>
             <button onClick={() => printResults(comp, houses, entries, branding)} className="flex items-center gap-1.5 border border-gray-300 text-gray-700 hover:bg-gray-50 px-3 py-1.5 rounded-lg text-sm"><Printer className="h-4 w-4" />Results</button>
+            <button title="Export results to PDF" onClick={() => printResults(comp, houses, entries, branding, { pdf: true })} className="flex items-center border border-gray-300 text-gray-700 hover:bg-gray-50 px-2 py-1.5 rounded-lg text-sm"><FileDown className="h-4 w-4" /></button>
             <button onClick={() => exportCSV(`GHA_${comp.name.replace(/\s+/g, '_')}`, ['Participant', 'Grade', 'House', comp.scoringMode === 'points' ? 'Points' : 'Position', 'Earned'], entries.map(e => [e.name || `${houseName(e.houseId)} (team)`, e.grade || '', houseName(e.houseId), comp.scoringMode === 'points' ? (e.rawPoints ?? '') : (e.position ?? ''), entryPoints(e, entries, comp)]))} className="flex items-center gap-1.5 border border-gray-300 text-gray-700 hover:bg-gray-50 px-3 py-1.5 rounded-lg text-sm"><Download className="h-4 w-4" />CSV</button>
             <button onClick={() => updateCompetition(comp.id, { status: locked ? 'active' : 'final' })} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm ${locked ? 'border border-gray-300 text-gray-600' : 'bg-green-600 text-white'}`}>{locked ? <><Pencil className="h-4 w-4" />Reopen</> : <><Lock className="h-4 w-4" />Mark Final</>}</button>
             <button onClick={() => { if (window.confirm('Delete this competition and its entries?')) onDelete(); }} className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg"><Trash2 className="h-4 w-4" /></button>

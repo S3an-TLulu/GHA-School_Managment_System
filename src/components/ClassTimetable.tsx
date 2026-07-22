@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Clock, Printer, Save, Plus, X, Edit2 } from 'lucide-react';
+import { Clock, Printer, Save, Plus, X, Edit2, FileDown } from 'lucide-react';
+import { printHtml, exportPdf } from '../lib/print';
 import { useAppContext, Timetable, TimetableCell } from '../context/AppContext';
 import { useThemeClasses } from '../hooks/useThemeClasses';
 
@@ -56,7 +57,7 @@ export function ClassTimetable() {
     saveTimetable({ ...currentTimetable, slots: newSlots });
   };
 
-  const printTimetable = () => {
+  const printTimetable = (pdf = false) => {
     const rows = PERIOD_KEYS.map((pk, i) => {
       const label = PERIODS[i].replace('\n', ' ');
       const isBreak = BREAK_SLOTS.includes(pk);
@@ -71,9 +72,7 @@ export function ClassTimetable() {
       return `<tr><td style="padding:6px 8px;font-size:11px;font-weight:500;white-space:nowrap;border:1px solid #e5e7eb;background:#f9fafb;">${label}</td>${cells}</tr>`;
     }).join('');
 
-    const w = window.open('', '_blank');
-    if (!w) return;
-    w.document.write(`<!DOCTYPE html><html><head><title>Timetable – ${selectedClass}</title>
+    const html = `<!DOCTYPE html><html><head><title>Timetable – ${selectedClass}</title>
     <style>body{font-family:Arial,sans-serif;padding:20px;} table{border-collapse:collapse;width:100%;} th{background:#1d4ed8;color:white;padding:8px;font-size:12px;} @media print{button{display:none;}}</style></head>
     <body>
     <div style="text-align:center;margin-bottom:16px;">
@@ -85,11 +84,10 @@ export function ClassTimetable() {
       <tbody>${rows}</tbody>
     </table>
     <p style="margin-top:16px;font-size:11px;color:#9ca3af;text-align:center;">Printed: ${new Date().toLocaleDateString()}</p>
-    <button onclick="window.print()" style="margin-top:8px;padding:8px 16px;background:#1d4ed8;color:white;border:none;border-radius:6px;cursor:pointer;">Print</button>
-    </body></html>`);
-    w.document.close();
-    w.focus();
-    setTimeout(() => w.print(), 300);
+    <script>window.onload=function(){setTimeout(function(){window.print()},300)}</script>
+    </body></html>`;
+    if (pdf) exportPdf(html, `Timetable_${selectedClass}`);
+    else printHtml(html);
   };
 
   // Clash detection: the same teacher booked in two classes in the same slot.
@@ -118,9 +116,13 @@ export function ClassTimetable() {
           <h1 className="text-2xl font-bold text-gray-900">Class Timetable</h1>
           <p className="text-gray-600">Weekly schedule per class with teacher assignments</p>
         </div>
-        <button onClick={printTimetable} className={`flex items-center space-x-2 ${tc.btn} text-white px-4 py-2 rounded-lg text-sm font-medium`}>
+        <button onClick={() => printTimetable()} className={`flex items-center space-x-2 ${tc.btn} text-white px-4 py-2 rounded-lg text-sm font-medium`}>
           <Printer className="h-4 w-4" />
           <span>Print Timetable</span>
+        </button>
+        <button onClick={() => printTimetable(true)} title="Export timetable to PDF" className="flex items-center space-x-2 border border-gray-300 text-gray-700 hover:bg-gray-50 px-3 py-2 rounded-lg text-sm font-medium">
+          <FileDown className="h-4 w-4" />
+          <span>PDF</span>
         </button>
       </div>
 
