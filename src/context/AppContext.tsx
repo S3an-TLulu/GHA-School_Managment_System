@@ -520,6 +520,33 @@ export interface Quiz {
   instructions?: string;
 }
 
+// ---- Subjects hub (Academics) ----
+// A canonical subject the teaching tools key off (question bank, topics, lesson
+// plans, group work). Seeded from the default list previously stranded in
+// Results.tsx.
+export interface Subject { id: string; name: string; code?: string; grades?: string[]; active?: boolean; }
+// Topic / syllabus content for a subject.
+export interface SubjectTopic { id: string; subject: string; grade?: string; title: string; content: string; order: number; }
+// A lesson plan with a checkable list of steps (reuses the ProjectTask shape).
+export interface LessonPlan {
+  id: string; subject: string; grade?: string; title: string; date?: string;
+  objectives?: string; steps: ProjectTask[]; resources?: string; notes?: string;
+}
+// A working group of pupils for a subject/class.
+export interface WorkGroup { id: string; subject: string; grade?: string; name: string; members: string[]; task?: string; notes?: string; }
+// Class-level management, keyed by class/grade string (the GRADES values).
+export interface ClassRule { id: string; classGrade: string; text: string; order: number; }
+export interface ClassRole { id: string; classGrade: string; role: string; studentName?: string; duties: string; }
+// A class inventory item; when bookId is set it links a Library book.
+export interface ClassInventoryItem { id: string; classGrade: string; name: string; quantity: number; bookId?: string; notes?: string; }
+// A priority-ordered request the class makes to admin.
+export interface WishlistItem {
+  id: string; classGrade: string; item: string; reason?: string;
+  priority: 'low' | 'medium' | 'high';
+  status: 'requested' | 'approved' | 'declined' | 'fulfilled';
+  createdAt: string;
+}
+
 interface AppContextType {
   students: Student[];
   payments: Payment[];
@@ -632,6 +659,38 @@ interface AppContextType {
   addQuiz: (q: Quiz) => void;
   updateQuiz: (id: string, q: Partial<Quiz>) => void;
   deleteQuiz: (id: string) => void;
+  subjects: Subject[];
+  addSubject: (s: Subject) => void;
+  updateSubject: (id: string, s: Partial<Subject>) => void;
+  deleteSubject: (id: string) => void;
+  subjectTopics: SubjectTopic[];
+  addSubjectTopic: (t: SubjectTopic) => void;
+  updateSubjectTopic: (id: string, t: Partial<SubjectTopic>) => void;
+  deleteSubjectTopic: (id: string) => void;
+  lessonPlans: LessonPlan[];
+  addLessonPlan: (p: LessonPlan) => void;
+  updateLessonPlan: (id: string, p: Partial<LessonPlan>) => void;
+  deleteLessonPlan: (id: string) => void;
+  workGroups: WorkGroup[];
+  addWorkGroup: (g: WorkGroup) => void;
+  updateWorkGroup: (id: string, g: Partial<WorkGroup>) => void;
+  deleteWorkGroup: (id: string) => void;
+  classRules: ClassRule[];
+  addClassRule: (r: ClassRule) => void;
+  updateClassRule: (id: string, r: Partial<ClassRule>) => void;
+  deleteClassRule: (id: string) => void;
+  classRoles: ClassRole[];
+  addClassRole: (r: ClassRole) => void;
+  updateClassRole: (id: string, r: Partial<ClassRole>) => void;
+  deleteClassRole: (id: string) => void;
+  classInventory: ClassInventoryItem[];
+  addClassInventoryItem: (i: ClassInventoryItem) => void;
+  updateClassInventoryItem: (id: string, i: Partial<ClassInventoryItem>) => void;
+  deleteClassInventoryItem: (id: string) => void;
+  classWishlist: WishlistItem[];
+  addWishlistItem: (i: WishlistItem) => void;
+  updateWishlistItem: (id: string, i: Partial<WishlistItem>) => void;
+  deleteWishlistItem: (id: string) => void;
   libraryBooks: LibraryBook[];
   addLibraryBook: (b: LibraryBook) => void;
   updateLibraryBook: (id: string, b: Partial<LibraryBook>) => void;
@@ -825,6 +884,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [projects, setProjects] = useState<SchoolProject[]>(() => loadFromStorage('gha_projects', []));
   const [quizQuestions, setQuizQuestions] = useState<QuizQuestion[]>(() => loadFromStorage('gha_quiz_questions', []));
   const [quizzes, setQuizzes] = useState<Quiz[]>(() => loadFromStorage('gha_quizzes', []));
+  // Subjects hub (Academics). Subjects seed from the school's standard list.
+  const [subjects, setSubjects] = useState<Subject[]>(() => loadFromStorage('gha_subjects',
+    ['English', 'Mathematics', 'Science', 'Social Studies', 'Religious Education', 'Creative Arts', 'Physical Education']
+      .map((name, i) => ({ id: `subj-${i + 1}`, name, active: true }))));
+  const [subjectTopics, setSubjectTopics] = useState<SubjectTopic[]>(() => loadFromStorage('gha_subject_topics', []));
+  const [lessonPlans, setLessonPlans] = useState<LessonPlan[]>(() => loadFromStorage('gha_lesson_plans', []));
+  const [workGroups, setWorkGroups] = useState<WorkGroup[]>(() => loadFromStorage('gha_work_groups', []));
+  const [classRules, setClassRules] = useState<ClassRule[]>(() => loadFromStorage('gha_class_rules', []));
+  const [classRoles, setClassRoles] = useState<ClassRole[]>(() => loadFromStorage('gha_class_roles', []));
+  const [classInventory, setClassInventory] = useState<ClassInventoryItem[]>(() => loadFromStorage('gha_class_inventory', []));
+  const [classWishlist, setClassWishlist] = useState<WishlistItem[]>(() => loadFromStorage('gha_class_wishlist', []));
   const [libraryBooks, setLibraryBooks] = useState<LibraryBook[]>(() => loadFromStorage('gha_library_books', []));
   const [bookLoans, setBookLoans] = useState<BookLoan[]>(() => loadFromStorage('gha_book_loans', []));
   const [debtors, setDebtors] = useState<Debtor[]>(() => loadFromStorage('gha_debtors', []));
@@ -895,6 +965,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => { localStorage.setItem('gha_projects', JSON.stringify(projects)); queueLiveSync('gha_projects'); }, [projects]);
   useEffect(() => { localStorage.setItem('gha_quiz_questions', JSON.stringify(quizQuestions)); queueLiveSync('gha_quiz_questions'); }, [quizQuestions]);
   useEffect(() => { localStorage.setItem('gha_quizzes', JSON.stringify(quizzes)); queueLiveSync('gha_quizzes'); }, [quizzes]);
+  useEffect(() => { localStorage.setItem('gha_subjects', JSON.stringify(subjects)); queueLiveSync('gha_subjects'); }, [subjects]);
+  useEffect(() => { localStorage.setItem('gha_subject_topics', JSON.stringify(subjectTopics)); queueLiveSync('gha_subject_topics'); }, [subjectTopics]);
+  useEffect(() => { localStorage.setItem('gha_lesson_plans', JSON.stringify(lessonPlans)); queueLiveSync('gha_lesson_plans'); }, [lessonPlans]);
+  useEffect(() => { localStorage.setItem('gha_work_groups', JSON.stringify(workGroups)); queueLiveSync('gha_work_groups'); }, [workGroups]);
+  useEffect(() => { localStorage.setItem('gha_class_rules', JSON.stringify(classRules)); queueLiveSync('gha_class_rules'); }, [classRules]);
+  useEffect(() => { localStorage.setItem('gha_class_roles', JSON.stringify(classRoles)); queueLiveSync('gha_class_roles'); }, [classRoles]);
+  useEffect(() => { localStorage.setItem('gha_class_inventory', JSON.stringify(classInventory)); queueLiveSync('gha_class_inventory'); }, [classInventory]);
+  useEffect(() => { localStorage.setItem('gha_class_wishlist', JSON.stringify(classWishlist)); queueLiveSync('gha_class_wishlist'); }, [classWishlist]);
 
   // One-time migration: seed the richer Uniform Management catalogue from the
   // legacy simple catalogue (gha_uniform_catalog) the first time the new module
@@ -1153,6 +1231,30 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const addQuiz = (q: Quiz) => setQuizzes(prev => [q, ...prev]);
   const updateQuiz = (id: string, u: Partial<Quiz>) => setQuizzes(prev => prev.map(q => q.id === id ? { ...q, ...u } : q));
   const deleteQuiz = (id: string) => setQuizzes(prev => prev.filter(q => q.id !== id));
+  const addSubject = (s: Subject) => setSubjects(prev => [...prev, s]);
+  const updateSubject = (id: string, u: Partial<Subject>) => setSubjects(prev => prev.map(s => s.id === id ? { ...s, ...u } : s));
+  const deleteSubject = (id: string) => setSubjects(prev => prev.filter(s => s.id !== id));
+  const addSubjectTopic = (t: SubjectTopic) => setSubjectTopics(prev => [...prev, t]);
+  const updateSubjectTopic = (id: string, u: Partial<SubjectTopic>) => setSubjectTopics(prev => prev.map(t => t.id === id ? { ...t, ...u } : t));
+  const deleteSubjectTopic = (id: string) => setSubjectTopics(prev => prev.filter(t => t.id !== id));
+  const addLessonPlan = (p: LessonPlan) => setLessonPlans(prev => [p, ...prev]);
+  const updateLessonPlan = (id: string, u: Partial<LessonPlan>) => setLessonPlans(prev => prev.map(p => p.id === id ? { ...p, ...u } : p));
+  const deleteLessonPlan = (id: string) => setLessonPlans(prev => prev.filter(p => p.id !== id));
+  const addWorkGroup = (g: WorkGroup) => setWorkGroups(prev => [...prev, g]);
+  const updateWorkGroup = (id: string, u: Partial<WorkGroup>) => setWorkGroups(prev => prev.map(g => g.id === id ? { ...g, ...u } : g));
+  const deleteWorkGroup = (id: string) => setWorkGroups(prev => prev.filter(g => g.id !== id));
+  const addClassRule = (r: ClassRule) => setClassRules(prev => [...prev, r]);
+  const updateClassRule = (id: string, u: Partial<ClassRule>) => setClassRules(prev => prev.map(r => r.id === id ? { ...r, ...u } : r));
+  const deleteClassRule = (id: string) => setClassRules(prev => prev.filter(r => r.id !== id));
+  const addClassRole = (r: ClassRole) => setClassRoles(prev => [...prev, r]);
+  const updateClassRole = (id: string, u: Partial<ClassRole>) => setClassRoles(prev => prev.map(r => r.id === id ? { ...r, ...u } : r));
+  const deleteClassRole = (id: string) => setClassRoles(prev => prev.filter(r => r.id !== id));
+  const addClassInventoryItem = (i: ClassInventoryItem) => setClassInventory(prev => [...prev, i]);
+  const updateClassInventoryItem = (id: string, u: Partial<ClassInventoryItem>) => setClassInventory(prev => prev.map(i => i.id === id ? { ...i, ...u } : i));
+  const deleteClassInventoryItem = (id: string) => setClassInventory(prev => prev.filter(i => i.id !== id));
+  const addWishlistItem = (i: WishlistItem) => setClassWishlist(prev => [...prev, i]);
+  const updateWishlistItem = (id: string, u: Partial<WishlistItem>) => setClassWishlist(prev => prev.map(i => i.id === id ? { ...i, ...u } : i));
+  const deleteWishlistItem = (id: string) => setClassWishlist(prev => prev.filter(i => i.id !== id));
 
   const addLibraryBook = (b: LibraryBook) => setLibraryBooks(prev => [...prev, b]);
   const updateLibraryBook = (id: string, updated: Partial<LibraryBook>) =>
@@ -1246,6 +1348,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     'gha_uniform_settings',
     'gha_houses', 'gha_competitions', 'gha_competition_entries',
     'gha_projects', 'gha_quiz_questions', 'gha_quizzes',
+    'gha_subjects', 'gha_subject_topics', 'gha_lesson_plans', 'gha_work_groups',
+    'gha_class_rules', 'gha_class_roles', 'gha_class_inventory', 'gha_class_wishlist',
   ];
 
   const exportAllData = (): string => {
@@ -1281,6 +1385,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       'gha_uniform_issues', 'gha_uniform_returns'],
     library: ['gha_library_books', 'gha_book_loans'],
     tools: ['gha_competitions', 'gha_competition_entries', 'gha_projects', 'gha_quiz_questions', 'gha_quizzes'],
+    subjects: ['gha_subjects', 'gha_subject_topics', 'gha_lesson_plans', 'gha_work_groups', 'gha_class_rules', 'gha_class_roles', 'gha_class_inventory', 'gha_class_wishlist'],
     requirements: ['gha_requirements'],
     teachers: ['gha_teachers'],
     expenses: ['gha_expenses'],
@@ -1314,7 +1419,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       feeStructure, otherCharges, announcements, attendance, results, timetables, branding,
       currentTerm, fundraiserParticipants, externalFundraiserPayments, uniformCatalog,
       debtors, transportRoutes, salaryAdvances, payrollRecords, terms, todos, groceries, budgets, documents,
-      galleryPhotos, libraryBooks, bookLoans]);
+      galleryPhotos, libraryBooks, bookLoans,
+      subjects, subjectTopics, lessonPlans, workGroups, classRules, classRoles, classInventory, classWishlist]);
 
   // Apply changes arriving from other devices in real time
   useEffect(() => {
@@ -1339,6 +1445,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       gha_uniform_settings: setUniformSettings,
       gha_houses: setHouses, gha_competitions: setCompetitions, gha_competition_entries: setCompetitionEntries,
       gha_projects: setProjects, gha_quiz_questions: setQuizQuestions, gha_quizzes: setQuizzes,
+      gha_subjects: setSubjects, gha_subject_topics: setSubjectTopics, gha_lesson_plans: setLessonPlans,
+      gha_work_groups: setWorkGroups, gha_class_rules: setClassRules, gha_class_roles: setClassRoles,
+      gha_class_inventory: setClassInventory, gha_class_wishlist: setClassWishlist,
       gha_transport_routes: setTransportRoutes, gha_terms: setTerms, gha_todos: setTodos,
       gha_salary_advances: setSalaryAdvances, gha_payroll: setPayrollRecords,
       gha_groceries: setGroceries, gha_budgets: setBudgets, gha_documents: setDocuments,
@@ -1460,6 +1569,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       projects, addProject, updateProject, deleteProject,
       quizQuestions, addQuizQuestion, updateQuizQuestion, deleteQuizQuestion,
       quizzes, addQuiz, updateQuiz, deleteQuiz,
+      subjects, addSubject, updateSubject, deleteSubject,
+      subjectTopics, addSubjectTopic, updateSubjectTopic, deleteSubjectTopic,
+      lessonPlans, addLessonPlan, updateLessonPlan, deleteLessonPlan,
+      workGroups, addWorkGroup, updateWorkGroup, deleteWorkGroup,
+      classRules, addClassRule, updateClassRule, deleteClassRule,
+      classRoles, addClassRole, updateClassRole, deleteClassRole,
+      classInventory, addClassInventoryItem, updateClassInventoryItem, deleteClassInventoryItem,
+      classWishlist, addWishlistItem, updateWishlistItem, deleteWishlistItem,
       libraryBooks, addLibraryBook, updateLibraryBook, deleteLibraryBook,
       bookLoans, borrowBook, returnLoan, deleteLoan,
       debtors, addDebtor, updateDebtor, deleteDebtor,
