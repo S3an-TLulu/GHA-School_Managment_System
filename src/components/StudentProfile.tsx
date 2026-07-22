@@ -1,5 +1,6 @@
 import { Student, useAppContext } from '../context/AppContext';
-import { X, User, Printer, GraduationCap } from 'lucide-react';
+import { X, User, Printer, GraduationCap, FileDown } from 'lucide-react';
+import { printHtml, exportPdf } from '../lib/print';
 import { useThemeClasses } from '../hooks/useThemeClasses';
 import { PersonDocuments } from './PersonDocs';
 
@@ -45,7 +46,7 @@ export function StudentProfile({ student, onClose }: StudentProfileProps) {
     overdue: 'bg-red-100 text-red-800'
   };
 
-  const handlePrint = () => {
+  const handlePrint = (pdf = false) => {
     const printContent = `
       <!DOCTYPE html>
       <html>
@@ -146,15 +147,12 @@ export function StudentProfile({ student, onClose }: StudentProfileProps) {
           <div><div class="sig-line">Prepared By / Signature</div></div>
           <div><div class="sig-line">Date: ${new Date().toLocaleDateString()}</div></div>
         </div>
+      <script>window.onload=function(){setTimeout(function(){window.print()},250)}</script>
       </body>
       </html>
     `;
-    const win = window.open('', '_blank');
-    if (win) {
-      win.document.write(printContent);
-      win.document.close();
-      win.print();
-    }
+    if (pdf) exportPdf(printContent, `Student_Profile_${student.name}`);
+    else printHtml(printContent);
   };
 
   return (
@@ -179,10 +177,15 @@ export function StudentProfile({ student, onClose }: StudentProfileProps) {
             </div>
           </div>
           <div className="flex items-center space-x-2">
-            <button onClick={handlePrint}
+            <button onClick={() => handlePrint()}
               className="flex items-center space-x-2 bg-gray-100 text-gray-700 px-3 py-2 rounded-lg hover:bg-gray-200 transition-colors text-sm">
               <Printer className="h-4 w-4" />
               <span>Print Profile</span>
+            </button>
+            <button onClick={() => handlePrint(true)} title="Export profile to PDF"
+              className="flex items-center space-x-2 bg-gray-100 text-gray-700 px-3 py-2 rounded-lg hover:bg-gray-200 transition-colors text-sm">
+              <FileDown className="h-4 w-4" />
+              <span>PDF</span>
             </button>
             <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-lg">
               <X className="h-5 w-5 text-gray-500" />

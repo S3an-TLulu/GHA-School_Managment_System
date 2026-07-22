@@ -1,8 +1,12 @@
 import { useState } from 'react';
-import { GraduationCap, Printer, Save, Plus, Trash2, ChevronDown } from 'lucide-react';
+import { GraduationCap, Printer, Save, Plus, Trash2, ChevronDown, FileDown } from 'lucide-react';
 import { useAppContext, StudentResult } from '../context/AppContext';
 import { useThemeClasses } from '../hooks/useThemeClasses';
 import { useToast } from './ToastProvider';
+import { printHtml, exportPdf } from '../lib/print';
+
+// Send a finished document HTML to the print dialog, or to Save-as-PDF.
+const emitDoc = (html: string, filename: string, pdf: boolean) => pdf ? exportPdf(html, filename) : printHtml(html);
 
 const CLASSES = ['Baby Class', 'Middle Class', 'Reception', 'Grade 1', 'Grade 2', 'Grade 3', 'Grade 4', 'Grade 5', 'Grade 6', 'Grade 7'];
 const DEFAULT_SUBJECTS = ['English', 'Mathematics', 'Science', 'Social Studies', 'Religious Education', 'Creative Arts', 'Physical Education'];
@@ -114,7 +118,7 @@ export function Results() {
     }
   };
 
-  const printSlip = (studentId: string) => {
+  const printSlip = (studentId: string, pdf = false) => {
     const student = students.find(s => s.id === studentId);
     const result = getStudentResult(studentId);
     if (!student || !result) return;
@@ -133,9 +137,7 @@ export function Results() {
       </tr>`;
     }).join('');
 
-    const w = window.open('', '_blank');
-    if (!w) return;
-    w.document.write(`<!DOCTYPE html><html><head><title>Report Card – ${student.name}</title>
+    const html = `<!DOCTYPE html><html><head><title>Report Card – ${student.name}</title>
     <style>body{font-family:Arial,sans-serif;padding:24px;max-width:600px;margin:auto;} table{border-collapse:collapse;width:100%;margin-top:12px;} th{background:#1d4ed8;color:white;padding:8px 12px;text-align:left;} @media print{button{display:none;}}</style></head>
     <body>
     <div style="text-align:center;border-bottom:2px solid #1d4ed8;padding-bottom:16px;margin-bottom:16px;">
@@ -169,14 +171,12 @@ export function Results() {
       <div style="border-top:1px solid #374151;padding-top:4px;text-align:center;font-size:12px;color:#6b7280;">Head Teacher</div>
     </div>
     <p style="margin-top:20px;font-size:11px;color:#9ca3af;text-align:center;">Printed: ${new Date().toLocaleDateString()}</p>
-    <button onclick="window.print()" style="margin-top:8px;padding:8px 16px;background:#1d4ed8;color:white;border:none;border-radius:6px;cursor:pointer;">Print</button>
-    </body></html>`);
-    w.document.close();
-    w.focus();
-    setTimeout(() => w.print(), 300);
+    <script>window.onload=function(){setTimeout(function(){window.print()},300)}</script>
+    </body></html>`;
+    emitDoc(html, `Report_Card_${student.name}_${selectedTerm}`, pdf);
   };
 
-  const printClassReport = () => {
+  const printClassReport = (pdf = false) => {
     const headerCols = subjects.map(s => `<th style="padding:6px 8px;background:#1d4ed8;color:white;font-size:11px;">${s}</th>`).join('');
     const rows = classStudents.map(s => {
       const result = getStudentResult(s.id);
@@ -194,9 +194,7 @@ export function Results() {
       </tr>`;
     }).join('');
 
-    const w = window.open('', '_blank');
-    if (!w) return;
-    w.document.write(`<!DOCTYPE html><html><head><title>Class Results – ${selectedClass}</title>
+    const html = `<!DOCTYPE html><html><head><title>Class Results – ${selectedClass}</title>
     <style>body{font-family:Arial,sans-serif;padding:20px;} table{border-collapse:collapse;width:100%;} @media print{button{display:none;}}</style></head>
     <body>
     <div style="text-align:center;margin-bottom:16px;">
@@ -213,15 +211,13 @@ export function Results() {
       <tbody>${rows}</tbody>
     </table>
     <p style="margin-top:16px;font-size:11px;color:#9ca3af;text-align:center;">Printed: ${new Date().toLocaleDateString()}</p>
-    <button onclick="window.print()" style="margin-top:8px;padding:8px 16px;background:#1d4ed8;color:white;border:none;border-radius:6px;cursor:pointer;">Print</button>
-    </body></html>`);
-    w.document.close();
-    w.focus();
-    setTimeout(() => w.print(), 300);
+    <script>window.onload=function(){setTimeout(function(){window.print()},300)}</script>
+    </body></html>`;
+    emitDoc(html, `Class_Results_${selectedClass}_${selectedTerm}`, pdf);
   };
 
   // Print every student's full report card in one document (one card per page).
-  const printAllCards = () => {
+  const printAllCards = (pdf = false) => {
     const withResults = classStudents.filter(s => getStudentResult(s.id));
     if (withResults.length === 0) { toast.toast?.('No results recorded for this class yet.', 'warning'); return; }
     const card = (student: typeof classStudents[number]) => {
@@ -250,10 +246,8 @@ export function Results() {
         <div style="margin-top:26px;display:grid;grid-template-columns:1fr 1fr;gap:24px"><div style="border-top:1px solid #374151;padding-top:4px;text-align:center;font-size:11px;color:#6b7280">Class Teacher</div><div style="border-top:1px solid #374151;padding-top:4px;text-align:center;font-size:11px;color:#6b7280">Head Teacher</div></div>
       </div>`;
     };
-    const w = window.open('', '_blank');
-    if (!w) return;
-    w.document.write(`<!DOCTYPE html><html><head><title>Report Cards — ${selectedClass} — ${selectedTerm}</title><style>@media print{button{display:none}}body{font-family:Arial,sans-serif;padding:16px}</style></head><body>${withResults.map(card).join('')}<script>window.onload=function(){setTimeout(function(){window.print()},300)}</script></body></html>`);
-    w.document.close();
+    const html = `<!DOCTYPE html><html><head><title>Report Cards — ${selectedClass} — ${selectedTerm}</title><style>@media print{button{display:none}}body{font-family:Arial,sans-serif;padding:16px}</style></head><body>${withResults.map(card).join('')}<script>window.onload=function(){setTimeout(function(){window.print()},300)}</script></body></html>`;
+    emitDoc(html, `Report_Cards_${selectedClass}_${selectedTerm}`, pdf);
   };
 
   const viewResult = viewStudent ? getStudentResult(viewStudent) : null;
@@ -269,13 +263,19 @@ export function Results() {
         <div className="flex gap-2">
           {!isEditing ? (
             <>
-              <button onClick={printClassReport} className="flex items-center space-x-2 border border-gray-300 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-50">
+              <button onClick={() => printClassReport()} className="flex items-center space-x-2 border border-gray-300 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-50">
                 <Printer className="h-4 w-4" />
                 <span>Print Class</span>
               </button>
-              <button onClick={printAllCards} className="flex items-center space-x-2 border border-gray-300 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-50">
+              <button title="Export class results to PDF" onClick={() => printClassReport(true)} className="flex items-center border border-gray-300 text-gray-700 px-2 py-2 rounded-lg text-sm font-medium hover:bg-gray-50">
+                <FileDown className="h-4 w-4" />
+              </button>
+              <button onClick={() => printAllCards()} className="flex items-center space-x-2 border border-gray-300 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-50">
                 <Printer className="h-4 w-4" />
                 <span>All Cards</span>
+              </button>
+              <button title="Export all report cards to PDF" onClick={() => printAllCards(true)} className="flex items-center border border-gray-300 text-gray-700 px-2 py-2 rounded-lg text-sm font-medium hover:bg-gray-50">
+                <FileDown className="h-4 w-4" />
               </button>
               <button onClick={startEditing} className={`flex items-center space-x-2 ${tc.btn} text-white px-4 py-2 rounded-lg text-sm font-medium`}>
                 <Plus className="h-4 w-4" />
@@ -413,10 +413,16 @@ export function Results() {
                       {!isEditing && (
                         <td className="py-2 px-3 text-center">
                           {result && (
-                            <button onClick={() => printSlip(student.id)}
-                              className="text-gray-400 hover:text-blue-600 transition-colors">
-                              <Printer className="h-4 w-4" />
-                            </button>
+                            <div className="flex items-center justify-center gap-1">
+                              <button onClick={() => printSlip(student.id)} title="Print report card"
+                                className="text-gray-400 hover:text-blue-600 transition-colors">
+                                <Printer className="h-4 w-4" />
+                              </button>
+                              <button onClick={() => printSlip(student.id, true)} title="Export report card to PDF"
+                                className="text-gray-400 hover:text-blue-600 transition-colors">
+                                <FileDown className="h-4 w-4" />
+                              </button>
+                            </div>
                           )}
                         </td>
                       )}

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import {
   LayoutDashboard, Shirt, Tags, Ruler, Package, ArrowLeftRight, BarChart3, Settings2,
   Plus, Pencil, Trash2, X, Printer, Download, AlertTriangle, Search, FileText, Image as ImageIcon,
-  Users, Scissors, ClipboardCheck, QrCode, ShoppingCart,
+  Users, Scissors, ClipboardCheck, QrCode, ShoppingCart, FileDown,
 } from 'lucide-react';
 import {
   useAppContext, UniformCategory, UniformItem, UniformSize, StockRecord, StockTxnType, UniformGender,
@@ -270,10 +270,10 @@ export function UniformManagement() {
     try { setQrModal({ item, url: await qrDataUrl(itemDeepLink(item.id)) }); }
     catch { toast('Could not generate QR code.', 'error'); }
   };
-  const printSpec = async (item: UniformItem) => {
+  const printSpec = async (item: UniformItem, pdf = false) => {
     let qr: string | undefined;
     try { qr = await qrDataUrl(itemDeepLink(item.id)); } catch { /* spec still prints without QR */ }
-    printItemSpec(item, uniformCategories.find(c => c.id === item.categoryId), branding, qr);
+    printItemSpec(item, uniformCategories.find(c => c.id === item.categoryId), branding, qr, { pdf });
   };
 
   // ---- derived ----
@@ -370,6 +370,7 @@ export function UniformManagement() {
                 <select value={genderFilter} onChange={e => setGenderFilter(e.target.value)} className="px-3 py-2 border border-gray-300 rounded-lg text-sm"><option value="">All genders</option>{GENDERS.map(g => <option key={g} value={g}>{g}</option>)}</select>
                 <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="px-3 py-2 border border-gray-300 rounded-lg text-sm"><option value="">All status</option><option value="active">Active</option><option value="inactive">Inactive</option></select>
                 <button onClick={() => printBlankCatalogue(branding)} className="flex items-center gap-1.5 border border-gray-300 text-gray-700 hover:bg-gray-50 px-3 py-2 rounded-lg text-sm"><FileText className="h-4 w-4" />Blank</button>
+                <button title="Blank catalogue PDF" onClick={() => printBlankCatalogue(branding, { pdf: true })} className="flex items-center border border-gray-300 text-gray-700 hover:bg-gray-50 px-2 py-2 rounded-lg text-sm"><FileDown className="h-4 w-4" /></button>
                 <button onClick={() => setItemModal({ open: true, edit: null })} className={`flex items-center gap-1.5 ${tc.btn} text-white px-3 py-2 rounded-lg text-sm`}><Plus className="h-4 w-4" />Add Item</button>
               </div>
               <div className="overflow-x-auto border border-gray-200 rounded-lg">
@@ -388,6 +389,7 @@ export function UniformManagement() {
                         <td className="px-4 py-2.5 text-right whitespace-nowrap">
                           <button onClick={() => showQr(i)} title="QR code" className="p-1.5 text-gray-500 hover:bg-gray-100 rounded"><QrCode className="h-3.5 w-3.5" /></button>
                           <button onClick={() => printSpec(i)} title="Spec sheet" className="p-1.5 text-gray-500 hover:bg-gray-100 rounded"><Printer className="h-3.5 w-3.5" /></button>
+                          <button onClick={() => printSpec(i, true)} title="Spec sheet PDF" className="p-1.5 text-gray-500 hover:bg-gray-100 rounded"><FileDown className="h-3.5 w-3.5" /></button>
                           <button onClick={() => setItemModal({ open: true, edit: i })} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded"><Pencil className="h-3.5 w-3.5" /></button>
                           <button onClick={() => { deleteUniformItem(i.id); toast('Item removed.', 'info'); }} className="p-1.5 text-red-600 hover:bg-red-50 rounded"><Trash2 className="h-3.5 w-3.5" /></button>
                         </td>
@@ -432,6 +434,7 @@ export function UniformManagement() {
                 <p className="text-sm text-gray-500">{uniformSizes.length} sizes in the master chart</p>
                 <div className="flex gap-2">
                   <button onClick={() => printSizeChart(uniformSizes, branding)} className="flex items-center gap-1.5 border border-gray-300 text-gray-700 hover:bg-gray-50 px-3 py-2 rounded-lg text-sm"><Printer className="h-4 w-4" />Print Chart</button>
+                  <button title="Size chart PDF" onClick={() => printSizeChart(uniformSizes, branding, { pdf: true })} className="flex items-center border border-gray-300 text-gray-700 hover:bg-gray-50 px-2 py-2 rounded-lg text-sm"><FileDown className="h-4 w-4" /></button>
                   <button onClick={() => setSizeModal({ open: true, edit: null })} className={`flex items-center gap-1.5 ${tc.btn} text-white px-3 py-2 rounded-lg text-sm`}><Plus className="h-4 w-4" />Add Size</button>
                 </div>
               </div>
@@ -463,12 +466,14 @@ export function UniformManagement() {
                 <p className="text-sm text-gray-500">{uniformStock.length} stock lines · valuation K{stockValuation.toLocaleString()}</p>
                 <div className="flex items-center gap-2 flex-wrap">
                   <select value={poSupplier} onChange={e => setPoSupplier(e.target.value)} className="px-2.5 py-2 border border-gray-300 rounded-lg text-sm"><option value="">Supplier…</option>{ctx.uniformSuppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</select>
-                  <button onClick={() => {
-                    const sup = ctx.uniformSuppliers.find(s => s.id === poSupplier);
-                    const lines = lowStock.map(s => ({ name: itemName(s.itemId), size: s.size, qty: Math.max(s.reorderLevel ?? s.minStock, s.minStock) - s.quantity, cost: s.cost })).filter(l => l.qty > 0);
-                    if (lines.length === 0) { toast('No items are below minimum stock.', 'warning'); return; }
-                    printPurchaseOrder(sup?.name || 'Supplier', sup ? [sup.phone, sup.email].filter(Boolean).join(' · ') : '', `PO-${Date.now().toString().slice(-6)}`, lines, branding);
-                  }} className="flex items-center gap-1.5 border border-gray-300 text-gray-700 hover:bg-gray-50 px-3 py-2 rounded-lg text-sm"><Printer className="h-4 w-4" />Reorder PO</button>
+                  {([['print', false], ['pdf', true]] as const).map(([k, pdf]) => (
+                    <button key={k} title={pdf ? 'Reorder PO PDF' : 'Print reorder PO'} onClick={() => {
+                      const sup = ctx.uniformSuppliers.find(s => s.id === poSupplier);
+                      const lines = lowStock.map(s => ({ name: itemName(s.itemId), size: s.size, qty: Math.max(s.reorderLevel ?? s.minStock, s.minStock) - s.quantity, cost: s.cost })).filter(l => l.qty > 0);
+                      if (lines.length === 0) { toast('No items are below minimum stock.', 'warning'); return; }
+                      printPurchaseOrder(sup?.name || 'Supplier', sup ? [sup.phone, sup.email].filter(Boolean).join(' · ') : '', `PO-${Date.now().toString().slice(-6)}`, lines, branding, { pdf });
+                    }} className={`flex items-center gap-1.5 border border-gray-300 text-gray-700 hover:bg-gray-50 ${pdf ? 'px-2' : 'px-3'} py-2 rounded-lg text-sm`}>{pdf ? <FileDown className="h-4 w-4" /> : <><Printer className="h-4 w-4" />Reorder PO</>}</button>
+                  ))}
                   <button onClick={() => setStockModal({ open: true, edit: null })} className={`flex items-center gap-1.5 ${tc.btn} text-white px-3 py-2 rounded-lg text-sm`}><Plus className="h-4 w-4" />Add Stock</button>
                 </div>
               </div>
@@ -518,6 +523,7 @@ export function UniformManagement() {
                 ['Size Distribution', () => { const byS: Record<string, number> = {}; uniformStock.forEach(s => { byS[s.size] = (byS[s.size] || 0) + s.quantity; }); exportCSV('GHA_Uniform_SizeDist', ['Size', 'Total Qty'], Object.entries(byS)); }],
                 ['Stock Movements', () => exportCSV('GHA_Uniform_Movements', ['Date', 'Item', 'Size', 'Type', 'Qty', 'Reason', 'Reference'], stockTransactions.map(t => [t.date.split('T')[0], itemName(t.itemId), t.size, t.type, t.quantity, t.reason || '', t.reference || '']))],
                 ['Blank Stock Count', () => printStockCount(uniformItems.map(i => ({ name: i.name, itemCode: i.itemCode })), branding)],
+                ['Blank Stock Count (PDF)', () => printStockCount(uniformItems.map(i => ({ name: i.name, itemCode: i.itemCode })), branding, { pdf: true })],
               ].map(([label, fn]) => (
                 <button key={label as string} onClick={fn as () => void} className="flex items-center justify-between border border-gray-200 rounded-lg px-4 py-3 text-sm text-gray-700 hover:border-gray-300 hover:bg-gray-50">
                   <span>{label as string}</span><Download className="h-4 w-4 text-gray-400" />
@@ -704,8 +710,12 @@ export function UniformManagement() {
           <div className="flex items-center justify-between mb-1">
             <p className="font-semibold text-gray-900">On {student ? `${student.name}'s` : 'the'} account</p>
             {sid && onAccount.length > 0 && (
-              <button onClick={() => printUniformReceipt(student, onAccount.map(i => ({ name: itemName(i.itemId), size: i.size, qty: i.quantity, price: sellPrice(i.itemId) })), branding)}
-                title="Print receipt" className="flex items-center gap-1 text-xs text-gray-600 border border-gray-200 hover:bg-gray-50 rounded px-2 py-1"><Printer className="h-3.5 w-3.5" />Receipt</button>
+              <div className="flex gap-1">
+                <button onClick={() => printUniformReceipt(student, onAccount.map(i => ({ name: itemName(i.itemId), size: i.size, qty: i.quantity, price: sellPrice(i.itemId) })), branding)}
+                  title="Print receipt" className="flex items-center gap-1 text-xs text-gray-600 border border-gray-200 hover:bg-gray-50 rounded px-2 py-1"><Printer className="h-3.5 w-3.5" />Receipt</button>
+                <button onClick={() => printUniformReceipt(student, onAccount.map(i => ({ name: itemName(i.itemId), size: i.size, qty: i.quantity, price: sellPrice(i.itemId) })), branding, { pdf: true })}
+                  title="Export receipt to PDF" className="flex items-center text-xs text-gray-600 border border-gray-200 hover:bg-gray-50 rounded px-2 py-1"><FileDown className="h-3.5 w-3.5" /></button>
+              </div>
             )}
           </div>
           {!sid ? <p className="text-sm text-gray-400 py-6 text-center">Select a student to see and manage their uniforms.</p> : (
@@ -766,7 +776,10 @@ export function UniformManagement() {
         <div className="bg-white border border-gray-200 rounded-lg p-5">
           <div className="flex items-center justify-between gap-2 flex-wrap mb-3">
             <p className="font-semibold text-gray-900">Record measurement</p>
-            <button onClick={() => printMeasurementForm(undefined, undefined, branding)} className="flex items-center gap-1.5 border border-gray-300 text-gray-700 hover:bg-gray-50 px-3 py-1.5 rounded-lg text-sm"><FileText className="h-4 w-4" />Blank form</button>
+            <div className="flex gap-2">
+              <button onClick={() => printMeasurementForm(undefined, undefined, branding)} className="flex items-center gap-1.5 border border-gray-300 text-gray-700 hover:bg-gray-50 px-3 py-1.5 rounded-lg text-sm"><FileText className="h-4 w-4" />Blank form</button>
+              <button title="Blank form PDF" onClick={() => printMeasurementForm(undefined, undefined, branding, { pdf: true })} className="flex items-center border border-gray-300 text-gray-700 hover:bg-gray-50 px-2 py-1.5 rounded-lg text-sm"><FileDown className="h-4 w-4" /></button>
+            </div>
           </div>
           <select className={`${inp} mb-3`} value={sid} onChange={e => setSid(e.target.value)}><option value="">— Select student —</option>{activeStudents.map(s => <option key={s.id} value={s.id}>{s.name} — {s.grade}</option>)}</select>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
@@ -800,7 +813,7 @@ export function UniformManagement() {
                     <td className="px-3 py-2"><span className="text-xs font-medium bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full">{m.recommendedSize || '—'}</span></td>
                     <td className="px-3 py-2 text-gray-400 text-xs">{new Date(m.dateMeasured).toLocaleDateString('en-ZM', { day: 'numeric', month: 'short', year: 'numeric' })}</td>
                     <td className="px-3 py-2 text-gray-400 text-xs">{hist} prior</td>
-                    <td className="px-3 py-2 text-right whitespace-nowrap"><button onClick={() => printMeasurementForm(st, m, branding)} className="p-1.5 text-gray-500 hover:bg-gray-100 rounded"><Printer className="h-3.5 w-3.5" /></button><button onClick={() => { deleteStudentMeasurement(m.id); toast('Measurement removed.', 'info'); }} className="p-1.5 text-red-600 hover:bg-red-50 rounded"><Trash2 className="h-3.5 w-3.5" /></button></td>
+                    <td className="px-3 py-2 text-right whitespace-nowrap"><button onClick={() => printMeasurementForm(st, m, branding)} title="Print" className="p-1.5 text-gray-500 hover:bg-gray-100 rounded"><Printer className="h-3.5 w-3.5" /></button><button onClick={() => printMeasurementForm(st, m, branding, { pdf: true })} title="Export PDF" className="p-1.5 text-gray-500 hover:bg-gray-100 rounded"><FileDown className="h-3.5 w-3.5" /></button><button onClick={() => { deleteStudentMeasurement(m.id); toast('Measurement removed.', 'info'); }} className="p-1.5 text-red-600 hover:bg-red-50 rounded"><Trash2 className="h-3.5 w-3.5" /></button></td>
                   </tr>
                 );
               })}
@@ -835,6 +848,7 @@ export function UniformManagement() {
           <p className="text-sm text-gray-500">{tailorOrders.length} orders</p>
           <div className="flex gap-2">
             <button onClick={() => printIssueForm('Issue', branding)} className="flex items-center gap-1.5 border border-gray-300 text-gray-700 hover:bg-gray-50 px-3 py-2 rounded-lg text-sm"><FileText className="h-4 w-4" />Blank Issue Form</button>
+            <button title="Blank issue form PDF" onClick={() => printIssueForm('Issue', branding, { pdf: true })} className="flex items-center border border-gray-300 text-gray-700 hover:bg-gray-50 px-2 py-2 rounded-lg text-sm"><FileDown className="h-4 w-4" /></button>
             <button onClick={() => { if (tailors.length === 0) { toast('Add a tailor in Settings first.', 'warning'); return; } setOpen(o => !o); }} className={`flex items-center gap-1.5 ${tc.btn} text-white px-3 py-2 rounded-lg text-sm`}><Plus className="h-4 w-4" />New Order</button>
           </div>
         </div>
@@ -874,7 +888,8 @@ export function UniformManagement() {
                   <td className="px-3 py-2"><span className={`text-xs px-2 py-0.5 rounded-full ${o.priority === 'high' ? 'bg-red-100 text-red-700' : o.priority === 'low' ? 'bg-gray-100 text-gray-500' : 'bg-blue-50 text-blue-700'}`}>{o.priority}</span></td>
                   <td className="px-3 py-2"><select value={o.status} onChange={e => updateTailorOrder(o.id, { status: e.target.value as TailorOrderStatus })} className="text-xs border border-gray-200 rounded px-1.5 py-1 capitalize">{STATUSES.map(s => <option key={s} value={s}>{s.replace('_', ' ')}</option>)}</select></td>
                   <td className="px-3 py-2 text-right whitespace-nowrap">
-                    <button onClick={() => printProductionSheet(o, tailorName(o.tailorId), o.items.map(it => ({ name: uniformItems.find(u => u.id === it.itemId)?.name || it.itemId, size: it.size, qty: it.quantity, material: it.material, instructions: it.instructions })), branding)} className="p-1.5 text-gray-500 hover:bg-gray-100 rounded"><Printer className="h-3.5 w-3.5" /></button>
+                    <button onClick={() => printProductionSheet(o, tailorName(o.tailorId), o.items.map(it => ({ name: uniformItems.find(u => u.id === it.itemId)?.name || it.itemId, size: it.size, qty: it.quantity, material: it.material, instructions: it.instructions })), branding)} title="Print" className="p-1.5 text-gray-500 hover:bg-gray-100 rounded"><Printer className="h-3.5 w-3.5" /></button>
+                    <button onClick={() => printProductionSheet(o, tailorName(o.tailorId), o.items.map(it => ({ name: uniformItems.find(u => u.id === it.itemId)?.name || it.itemId, size: it.size, qty: it.quantity, material: it.material, instructions: it.instructions })), branding, { pdf: true })} title="Export PDF" className="p-1.5 text-gray-500 hover:bg-gray-100 rounded"><FileDown className="h-3.5 w-3.5" /></button>
                     <button onClick={() => { deleteTailorOrder(o.id); toast('Order removed.', 'info'); }} className="p-1.5 text-red-600 hover:bg-red-50 rounded"><Trash2 className="h-3.5 w-3.5" /></button>
                   </td>
                 </tr>
@@ -927,6 +942,7 @@ export function UniformManagement() {
           <label className="flex items-center gap-1.5 text-sm text-gray-700 px-1"><input type="checkbox" checked={f.bill} onChange={e => setF({ ...f, bill: e.target.checked })} />Bill to account{f.itemId && f.size ? ` (K${priceFor(f.itemId, f.size.trim())})` : ''}</label>
           <button type="submit" className={`${tc.btn} text-white px-3 py-2 rounded-lg text-sm`}>Issue</button>
           <button type="button" onClick={() => printIssueForm('Return', branding)} className="border border-gray-300 text-gray-700 hover:bg-gray-50 px-3 py-2 rounded-lg text-sm">Blank Return Form</button>
+          <button type="button" title="Blank return form PDF" onClick={() => printIssueForm('Return', branding, { pdf: true })} className="flex items-center border border-gray-300 text-gray-700 hover:bg-gray-50 px-2 py-2 rounded-lg text-sm"><FileDown className="h-4 w-4" /></button>
         </form>
         <div className="overflow-x-auto border border-gray-200 rounded-lg">
           <table className="min-w-full text-sm divide-y divide-gray-100">

@@ -1,13 +1,13 @@
 import { UniformItem, UniformCategory, UniformSize, SchoolBranding, StudentMeasurement, TailorOrder, Student } from '../context/AppContext';
+import { esc, printHtml, exportPdf } from './print';
 
-const esc = (s: string) => (s || '').replace(/[&<>"']/g, c =>
-  ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c] as string));
-
-function open(html: string) {
-  const win = window.open('', '_blank');
-  if (!win) return;
-  win.document.write(html);
-  win.document.close();
+// Build the shell + send it to the print dialog, or to Save-as-PDF when opts.pdf.
+// Filename defaults to the document title.
+type DocOpts = { pdf?: boolean };
+function doc(title: string, branding: SchoolBranding, body: string, opts?: DocOpts) {
+  const html = shell(title, branding, body);
+  if (opts?.pdf) exportPdf(html, title);
+  else printHtml(html);
 }
 
 function shell(title: string, branding: SchoolBranding, body: string) {
@@ -45,13 +45,13 @@ function shell(title: string, branding: SchoolBranding, body: string) {
 }
 
 // Full specification sheet for one uniform item (with images).
-export function printItemSpec(item: UniformItem, category: UniformCategory | undefined, branding: SchoolBranding, qr?: string) {
+export function printItemSpec(item: UniformItem, category: UniformCategory | undefined, branding: SchoolBranding, qr?: string, opts?: DocOpts) {
   const row = (label: string, val?: string | boolean | number) =>
     `<div class="field"><b>${label}</b><span>${val === true ? 'Yes' : val === false ? 'No' : esc(String(val ?? '—'))}</span></div>`;
   const imgs = Object.entries({ Front: item.images.front, Back: item.images.back, Side: item.images.side, Detail: item.images.detail, Material: item.images.material })
     .filter(([, u]) => u)
     .map(([label, u]) => `<figure><img src="${u}" alt="" /><figcaption>${label}</figcaption></figure>`).join('');
-  open(shell('Uniform Specification Sheet', branding, `
+  doc('Uniform Specification Sheet', branding, `
     ${qr ? `<img src="${qr}" alt="QR" style="width:90px;height:90px;float:right" />` : ''}
     <h2 style="margin-bottom:8px">${esc(item.name)} <span style="color:#6b7280;font-size:13px">(${esc(item.itemCode)})</span></h2>
     ${row('Category', category?.name)}
@@ -69,45 +69,45 @@ export function printItemSpec(item: UniformItem, category: UniformCategory | und
     ${row('Status', item.status)}
     ${item.notes ? row('Notes', item.notes) : ''}
     ${imgs ? `<div class="imgs">${imgs}</div>` : ''}
-  `));
+  `, opts);
 }
 
 // Blank catalogue sheet for filling in by hand.
-export function printBlankCatalogue(branding: SchoolBranding) {
+export function printBlankCatalogue(branding: SchoolBranding, opts?: DocOpts) {
   const fields = ['Item Code', 'Item Name', 'Category', 'Gender', 'Applicable Grades', 'Description', 'Material', 'Colour', 'Sleeve Type', 'Collar Type', 'Season', 'Badge Required', 'Logo Position', 'Price', 'Status', 'Notes'];
-  open(shell('Uniform Catalogue Sheet', branding, `
+  doc('Uniform Catalogue Sheet', branding, `
     ${fields.map(f => `<div class="field"><b>${f}</b><span>&nbsp;</span></div>`).join('')}
     <div class="imgs">
       <figure><div style="width:150px;height:150px;border:1px dashed #cbd5e1;border-radius:6px"></div><figcaption>Front View</figcaption></figure>
       <figure><div style="width:150px;height:150px;border:1px dashed #cbd5e1;border-radius:6px"></div><figcaption>Back View</figcaption></figure>
       <figure><div style="width:150px;height:150px;border:1px dashed #cbd5e1;border-radius:6px"></div><figcaption>Side View</figcaption></figure>
-    </div>`));
+    </div>`, opts);
 }
 
 // Master size chart — filled if sizes provided, otherwise a blank template.
-export function printSizeChart(sizes: UniformSize[], branding: SchoolBranding) {
+export function printSizeChart(sizes: UniformSize[], branding: SchoolBranding, opts?: DocOpts) {
   const cols = ['Size', 'Age', 'Grade', 'Chest', 'Waist', 'Hip', 'Shoulder', 'Neck', 'Shirt L', 'Sleeve L', 'Trouser L', 'Skirt L', 'Short L', 'Sock', 'Shoe', 'Head'];
   const val = (n?: number | string) => n === undefined || n === '' ? '' : String(n);
   const rows = sizes.length > 0
     ? sizes.map(s => `<tr><td>${esc(s.sizeCode)}</td><td>${esc(s.ageRange || '')}</td><td>${esc(s.typicalGrade || '')}</td><td>${val(s.chest)}</td><td>${val(s.waist)}</td><td>${val(s.hip)}</td><td>${val(s.shoulder)}</td><td>${val(s.neck)}</td><td>${val(s.shirtLength)}</td><td>${val(s.sleeveLength)}</td><td>${val(s.trouserLength)}</td><td>${val(s.skirtLength)}</td><td>${val(s.shortLength)}</td><td>${esc(s.sockSize || '')}</td><td>${esc(s.shoeSize || '')}</td><td>${val(s.headCirc)}</td></tr>`).join('')
     : Array.from({ length: 12 }).map(() => `<tr class="blank">${cols.map(() => '<td></td>').join('')}</tr>`).join('');
-  open(shell('Master Size Chart', branding, `<table><thead><tr>${cols.map(c => `<th>${c}</th>`).join('')}</tr></thead><tbody>${rows}</tbody></table>`));
+  doc('Master Size Chart', branding, `<table><thead><tr>${cols.map(c => `<th>${c}</th>`).join('')}</tr></thead><tbody>${rows}</tbody></table>`, opts);
 }
 
 // Blank stock count sheet.
-export function printStockCount(items: { name: string; itemCode: string }[], branding: SchoolBranding) {
+export function printStockCount(items: { name: string; itemCode: string }[], branding: SchoolBranding, opts?: DocOpts) {
   const rows = (items.length ? items : Array.from({ length: 20 }).map(() => ({ name: '', itemCode: '' })))
     .map(i => `<tr class="blank"><td>${esc(i.itemCode)}</td><td>${esc(i.name)}</td><td></td><td></td><td></td><td></td></tr>`).join('');
-  open(shell('Stock Count Sheet', branding, `
+  doc('Stock Count Sheet', branding, `
     <p style="font-size:12px;color:#6b7280;margin-bottom:6px">Date: ______________  Counted by: ______________</p>
     <table><thead><tr><th>Item Code</th><th>Item</th><th>Colour</th><th>Size</th><th>System Qty</th><th>Counted Qty</th></tr></thead><tbody>${rows}</tbody></table>
-    <div class="sig"><div>Counted By</div><div>Verified By</div></div>`));
+    <div class="sig"><div>Counted By</div><div>Verified By</div></div>`, opts);
 }
 
 const MEASURE_ROWS = ['Height', 'Chest', 'Waist', 'Hip', 'Shoulder', 'Sleeve', 'Neck', 'Shirt Length', 'Trouser Length', 'Skirt Length', 'Foot Size', 'Head Size'];
 
 // Student measurement form — blank if no measurement given, otherwise filled.
-export function printMeasurementForm(student: Student | undefined, m: StudentMeasurement | undefined, branding: SchoolBranding) {
+export function printMeasurementForm(student: Student | undefined, m: StudentMeasurement | undefined, branding: SchoolBranding, opts?: DocOpts) {
   const v = (n?: number | string) => (n === undefined || n === '') ? '' : String(n);
   const map: Record<string, number | string | undefined> = m ? {
     'Height': m.height, 'Chest': m.chest, 'Waist': m.waist, 'Hip': m.hip, 'Shoulder': m.shoulder,
@@ -115,7 +115,7 @@ export function printMeasurementForm(student: Student | undefined, m: StudentMea
     'Skirt Length': m.skirtLength, 'Foot Size': m.footSize, 'Head Size': m.headSize,
   } : {};
   const rows = MEASURE_ROWS.map(label => `<tr><td>${label}</td><td style="width:120px">${v(map[label])}</td><td></td></tr>`).join('');
-  open(shell('Student Measurement Form', branding, `
+  doc('Student Measurement Form', branding, `
     <div class="field"><b>Student Name</b><span>${esc(student?.name || '')}</span></div>
     <div class="field"><b>Admission No.</b><span>${esc(student?.admissionNumber || '')}</span></div>
     <div class="field"><b>Class</b><span>${esc(student?.grade || m?.className || '')}</span></div>
@@ -125,13 +125,13 @@ export function printMeasurementForm(student: Student | undefined, m: StudentMea
     <table style="margin-top:10px"><thead><tr><th>Measurement</th><th>Value (cm)</th><th>Notes</th></tr></thead><tbody>${rows}</tbody></table>
     <div class="field" style="margin-top:10px"><b>Recommended Size</b><span>${esc(m?.recommendedSize || '')}</span></div>
     <div class="field"><b>Tailor Notes</b><span>${esc(m?.tailorNotes || '')}</span></div>
-    <div class="sig"><div>Measured By</div><div>Signature &amp; Date</div></div>`));
+    <div class="sig"><div>Measured By</div><div>Signature &amp; Date</div></div>`, opts);
 }
 
 // Tailor production sheet for an order (rows pre-resolved by the caller).
-export function printProductionSheet(order: TailorOrder, tailorName: string, rows: { name: string; size: string; qty: number; material?: string; instructions?: string }[], branding: SchoolBranding) {
+export function printProductionSheet(order: TailorOrder, tailorName: string, rows: { name: string; size: string; qty: number; material?: string; instructions?: string }[], branding: SchoolBranding, opts?: DocOpts) {
   const body = rows.map(r => `<tr><td>${esc(r.name)}</td><td>${esc(r.size)}</td><td style="text-align:center">${r.qty}</td><td>${esc(r.material || '')}</td><td>${esc(r.instructions || '')}</td></tr>`).join('');
-  open(shell('Tailor Production Order', branding, `
+  doc('Tailor Production Order', branding, `
     <div class="field"><b>Order No.</b><span>${esc(order.orderNo)}</span></div>
     <div class="field"><b>Tailor</b><span>${esc(tailorName)}</span></div>
     <div class="field"><b>Order Date</b><span>${new Date(order.date).toLocaleDateString('en-GB')}</span></div>
@@ -140,42 +140,42 @@ export function printProductionSheet(order: TailorOrder, tailorName: string, row
     <div class="field"><b>Status</b><span>${esc(order.status)}</span></div>
     <table style="margin-top:10px"><thead><tr><th>Item</th><th>Size</th><th>Qty</th><th>Material</th><th>Special Instructions</th></tr></thead><tbody>${body || '<tr><td colspan="5" style="color:#9ca3af">No items</td></tr>'}</tbody></table>
     ${order.notes ? `<p style="font-size:12px;color:#6b7280;margin-top:8px">Notes: ${esc(order.notes)}</p>` : ''}
-    <div class="sig"><div>Issued By (School)</div><div>Received By (Tailor)</div></div>`));
+    <div class="sig"><div>Issued By (School)</div><div>Received By (Tailor)</div></div>`, opts);
 }
 
 // Blank uniform issue / return form.
-export function printIssueForm(kind: 'Issue' | 'Return', branding: SchoolBranding) {
+export function printIssueForm(kind: 'Issue' | 'Return', branding: SchoolBranding, opts?: DocOpts) {
   const rows = Array.from({ length: 6 }).map(() => '<tr class="blank"><td></td><td></td><td></td><td></td></tr>').join('');
-  open(shell(`Uniform ${kind} Form`, branding, `
+  doc(`Uniform ${kind} Form`, branding, `
     <div class="field"><b>Student Name</b><span>&nbsp;</span></div>
     <div class="field"><b>Admission No.</b><span>&nbsp;</span></div>
     <div class="field"><b>Class</b><span>&nbsp;</span></div>
     <div class="field"><b>Date</b><span>&nbsp;</span></div>
     <table style="margin-top:10px"><thead><tr><th>Item</th><th>Size</th><th>Qty</th><th>Condition</th></tr></thead><tbody>${rows}</tbody></table>
-    <div class="sig"><div>${kind === 'Issue' ? 'Issued By' : 'Received By'}</div><div>Parent / Guardian Signature</div></div>`));
+    <div class="sig"><div>${kind === 'Issue' ? 'Issued By' : 'Received By'}</div><div>Parent / Guardian Signature</div></div>`, opts);
 }
 
 // Purchase order to a supplier. Rows: item, size, qty, unit cost.
-export function printPurchaseOrder(supplierName: string, supplierContact: string, poNo: string, rows: { name: string; size: string; qty: number; cost?: number }[], branding: SchoolBranding) {
+export function printPurchaseOrder(supplierName: string, supplierContact: string, poNo: string, rows: { name: string; size: string; qty: number; cost?: number }[], branding: SchoolBranding, opts?: DocOpts) {
   const body = (rows.length ? rows : [{ name: '', size: '', qty: 0 }, { name: '', size: '', qty: 0 }, { name: '', size: '', qty: 0 }])
     .map(r => `<tr${r.name ? '' : ' class="blank"'}><td>${esc(r.name)}</td><td>${esc(r.size)}</td><td style="text-align:center">${r.qty || ''}</td><td style="text-align:right">${r.cost ? 'K' + r.cost : ''}</td><td style="text-align:right">${r.cost && r.qty ? 'K' + (r.cost * r.qty).toLocaleString() : ''}</td></tr>`).join('');
   const total = rows.reduce((a, r) => a + (r.cost || 0) * r.qty, 0);
-  open(shell('Purchase Order', branding, `
+  doc('Purchase Order', branding, `
     <div class="field"><b>PO Number</b><span>${esc(poNo)}</span></div>
     <div class="field"><b>Date</b><span>${new Date().toLocaleDateString('en-GB')}</span></div>
     <div class="field"><b>Supplier</b><span>${esc(supplierName)}</span></div>
     ${supplierContact ? `<div class="field"><b>Contact</b><span>${esc(supplierContact)}</span></div>` : ''}
     <table style="margin-top:10px"><thead><tr><th>Item</th><th>Size</th><th>Qty</th><th>Unit Cost</th><th>Line Total</th></tr></thead><tbody>${body}</tbody>
     ${total > 0 ? `<tfoot><tr><td colspan="4" style="text-align:right;font-weight:700">Total</td><td style="text-align:right;font-weight:700">K${total.toLocaleString()}</td></tr></tfoot>` : ''}</table>
-    <div class="sig"><div>Authorised By</div><div>Supplier Acknowledgement</div></div>`));
+    <div class="sig"><div>Authorised By</div><div>Supplier Acknowledgement</div></div>`, opts);
 }
 
 // Receipt for uniforms issued to a student from the Store.
-export function printUniformReceipt(student: Student | undefined, lines: { name: string; size: string; qty: number; price: number }[], branding: SchoolBranding) {
+export function printUniformReceipt(student: Student | undefined, lines: { name: string; size: string; qty: number; price: number }[], branding: SchoolBranding, opts?: DocOpts) {
   const total = lines.reduce((a, l) => a + l.price * l.qty, 0);
   const body = lines.map(l => `<tr><td>${esc(l.name)}</td><td>${esc(l.size)}</td><td style="text-align:center">${l.qty}</td><td style="text-align:right">K${l.price.toLocaleString()}</td><td style="text-align:right">K${(l.price * l.qty).toLocaleString()}</td></tr>`).join('');
   const bank = branding.bankName || branding.bankAccountNumber;
-  open(shell('Uniform Receipt', branding, `
+  doc('Uniform Receipt', branding, `
     <div style="text-align:center;margin-bottom:8px"><span style="display:inline-block;background:#d1fae5;color:#065f46;border:2px solid #059669;border-radius:6px;padding:3px 14px;font-size:12px;font-weight:700">UNIFORM RECEIPT</span></div>
     <div class="field"><b>Student</b><span>${esc(student?.name || '')}</span></div>
     <div class="field"><b>Class</b><span>${esc(student?.grade || '')}</span></div>
@@ -186,5 +186,5 @@ export function printUniformReceipt(student: Student | undefined, lines: { name:
       <tfoot><tr><td colspan="4" style="text-align:right;font-weight:700">TOTAL</td><td style="text-align:right;font-weight:700;font-size:14px">K${total.toLocaleString()}</td></tr></tfoot>
     </table>
     ${bank ? `<div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:6px;padding:10px;margin-top:12px;font-size:11px;color:#1e40af"><b>Banking:</b> ${esc(branding.bankName || '')}${branding.bankBranch ? ' · ' + esc(branding.bankBranch) : ''} · Acct ${esc(branding.bankAccountNumber || '')}</div>` : ''}
-    <div class="sig"><div>Received By</div><div>Parent / Guardian</div></div>`));
+    <div class="sig"><div>Received By</div><div>Parent / Guardian</div></div>`, opts);
 }

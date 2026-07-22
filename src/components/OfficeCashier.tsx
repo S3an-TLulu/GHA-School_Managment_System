@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
-import { Search, Printer, Plus, CheckCircle, Clock, Receipt, X, Banknote, Smartphone, Building2, FileText } from 'lucide-react';
+import { Search, Printer, Plus, CheckCircle, Clock, Receipt, X, Banknote, Smartphone, Building2, FileText, FileDown } from 'lucide-react';
+import { printHtml, exportPdf } from '../lib/print';
 import { useAppContext, PaymentMethod } from '../context/AppContext';
 import { useToast } from './ToastProvider';
 import { useThemeClasses } from '../hooks/useThemeClasses';
@@ -97,7 +98,7 @@ export function OfficeCashier() {
     setStudentSearch('');
   };
 
-  const handlePrintDailyReport = () => {
+  const handlePrintDailyReport = (pdf = false) => {
     const rows = todayPayments
       .sort((a, b) => new Date(b.paidDate || b.createdDate).getTime() - new Date(a.paidDate || a.createdDate).getTime())
       .map(p => {
@@ -117,9 +118,7 @@ export function OfficeCashier() {
       `<tr><td style="padding:4px 10px">${x.type}</td><td style="padding:4px 10px;font-weight:bold">K${x.amt.toLocaleString()}</td></tr>`
     ).join('');
 
-    const win = window.open('', '_blank');
-    if (!win) return;
-    win.document.write(`
+    const html = `
       <!DOCTYPE html><html><head>
       <title>Daily Cash Report — ${new Date().toLocaleDateString()}</title>
       <style>
@@ -155,10 +154,11 @@ export function OfficeCashier() {
         <tbody>${rows}</tbody>
       </table>
       <p style="color:#9ca3af;font-size:11px;margin-top:32px">Generated: ${new Date().toLocaleString()} — Great Highway Academy SMS</p>
-      <script>window.print();</script>
+      <script>window.onload=function(){setTimeout(function(){window.print()},250)}</script>
       </body></html>
-    `);
-    win.document.close();
+    `;
+    if (pdf) exportPdf(html, `Daily_Cash_Report_${new Date().toISOString().split('T')[0]}`);
+    else printHtml(html);
   };
 
   const studentOutstanding = selectedStudent
@@ -172,10 +172,15 @@ export function OfficeCashier() {
           <h1 className="text-2xl font-bold text-gray-900">Office Cashier</h1>
           <p className="text-gray-600">Quick payment entry for front-desk operations</p>
         </div>
-        <button onClick={handlePrintDailyReport}
+        <button onClick={() => handlePrintDailyReport()}
           className="flex items-center space-x-2 bg-gray-700 text-white px-4 py-2 rounded-lg hover:bg-gray-800 transition-colors">
           <Printer className="h-4 w-4" />
           <span>Daily Report</span>
+        </button>
+        <button onClick={() => handlePrintDailyReport(true)} title="Export daily report to PDF"
+          className="flex items-center space-x-2 border border-gray-300 text-gray-700 px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors">
+          <FileDown className="h-4 w-4" />
+          <span>PDF</span>
         </button>
       </div>
 

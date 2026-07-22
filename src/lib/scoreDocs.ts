@@ -1,14 +1,12 @@
 import { Competition, CompetitionEntry, House, SchoolBranding } from '../context/AppContext';
 import { leaderboard, entryPoints } from './scoring';
+import { esc, printHtml, exportPdf } from './print';
 
-const esc = (s: string) => (s || '').replace(/[&<>"']/g, c =>
-  ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c] as string));
-
-function open(html: string) {
-  const w = window.open('', '_blank');
-  if (!w) return;
-  w.document.write(html);
-  w.document.close();
+// Route a finished document either to the print dialog or to Save-as-PDF.
+type DocOpts = { pdf?: boolean; filename?: string };
+function output(html: string, name: string, opts?: DocOpts) {
+  if (opts?.pdf) exportPdf(html, opts.filename ?? name);
+  else printHtml(html);
 }
 
 function head(title: string, branding: SchoolBranding, sub: string) {
@@ -44,7 +42,7 @@ const shell = (title: string, body: string) =>
   </style></head><body>${body}<script>window.onload=function(){setTimeout(function(){window.print()},250)}</script></body></html>`;
 
 // Blank judges score sheet (mirrors the school's paper form).
-export function printJudgesSheet(comp: Competition, houses: House[], branding: SchoolBranding) {
+export function printJudgesSheet(comp: Competition, houses: House[], branding: SchoolBranding, opts?: DocOpts) {
   const posCols = comp.places.map(p => `<th>${esc(p.label)} POSITION</th>`).join('');
   const rowsPerHouse = 3;
   const body = houses.map(h => {
@@ -54,15 +52,15 @@ export function printJudgesSheet(comp: Competition, houses: House[], branding: S
       ${comp.places.map(() => '<td></td>').join('')}<td></td></tr>`).join('');
     return rows;
   }).join('');
-  open(shell('Judges Score Sheet', `
+  output(shell('Judges Score Sheet', `
     ${head('JUDGES SCORE SHEET', branding, `${comp.type.toUpperCase()} ACTIVITY: ${esc(comp.name)}`)}
     <table><thead><tr><th>FIRST NAME</th><th>LAST NAME</th><th>GRADE</th><th>TEAM COLOUR</th>${posCols}<th>POINTS EARNED</th></tr></thead>
     <tbody>${body}</tbody></table>
-    ${LEGEND(comp)}`));
+    ${LEGEND(comp)}`), `Judges_Sheet_${comp.name}`, opts);
 }
 
 // Filled results sheet + final leaderboard/winner.
-export function printResults(comp: Competition, houses: House[], entries: CompetitionEntry[], branding: SchoolBranding) {
+export function printResults(comp: Competition, houses: House[], entries: CompetitionEntry[], branding: SchoolBranding, opts?: DocOpts) {
   const compEntries = entries.filter(e => e.competitionId === comp.id);
   const board = leaderboard(compEntries, houses, comp);
   const houseName = (id: string) => houses.find(h => h.id === id)?.name || '—';
@@ -71,7 +69,7 @@ export function printResults(comp: Competition, houses: House[], entries: Compet
     .sort((a, b) => entryPoints(b, compEntries, comp) - entryPoints(a, compEntries, comp))
     .map(e => `<tr><td class="name">${esc(e.name || houseName(e.houseId) + ' (team)')}</td><td>${esc(e.grade || '')}</td><td>${esc(houseName(e.houseId))}</td><td>${esc(String(posLabel(e)))}</td><td style="font-weight:700">${entryPoints(e, compEntries, comp)}</td></tr>`).join('');
   const winner = board.find(b => b.winner);
-  open(shell('Results', `
+  output(shell('Results', `
     ${head('RESULTS', branding, `${comp.type.toUpperCase()}: ${esc(comp.name)} — ${new Date(comp.date).toLocaleDateString('en-GB')}`)}
     <div style="display:flex;gap:12px;align-items:flex-start">
       <table style="flex:2"><thead><tr><th>Participant</th><th>Grade</th><th>House</th><th>${comp.scoringMode === 'points' ? 'Points' : 'Position'}</th><th>Earned</th></tr></thead><tbody>${rows || '<tr><td colspan="5">No entries</td></tr>'}</tbody></table>
@@ -80,5 +78,5 @@ export function printResults(comp: Competition, houses: House[], entries: Compet
       </tbody></table>
     </div>
     ${winner ? `<div style="text-align:center;margin-top:12px;font-size:15px;font-weight:800;color:#12274a">🏆 Winner: ${esc(winner.house.name)} House — ${winner.total} points</div>` : ''}
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:32px;margin-top:36px"><div style="border-top:1px solid #111;padding-top:4px;text-align:center;font-size:11px">Head Judge</div><div style="border-top:1px solid #111;padding-top:4px;text-align:center;font-size:11px">Verified By</div></div>`));
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:32px;margin-top:36px"><div style="border-top:1px solid #111;padding-top:4px;text-align:center;font-size:11px">Head Judge</div><div style="border-top:1px solid #111;padding-top:4px;text-align:center;font-size:11px">Verified By</div></div>`), `Results_${comp.name}`, opts);
 }

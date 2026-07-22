@@ -1,10 +1,11 @@
 import { useState } from 'react';
-import { Plus, Pencil, Trash2, X, UserX, DollarSign, Search, CheckCircle2, MessageCircle, Download } from 'lucide-react';
+import { Plus, Pencil, Trash2, X, UserX, DollarSign, Search, CheckCircle2, MessageCircle, Download, Printer, FileDown } from 'lucide-react';
 import { useAppContext, Debtor } from '../context/AppContext';
 import { useToast } from './ToastProvider';
 import { useThemeClasses } from '../hooks/useThemeClasses';
 import { waLink, buildFeeReminder } from '../lib/notify';
 import { exportCSV } from '../lib/exports';
+import { esc, printHtml, exportPdf } from '../lib/print';
 
 function DebtorModal({ debtor, onSave, onClose }: {
   debtor: Debtor | null;
@@ -143,6 +144,32 @@ export function Debtors() {
     toast(`K${amt.toLocaleString()} received from ${d.name}.`, 'success');
   };
 
+  // Printable debtors list (respects the current filter/search view).
+  const buildDoc = () => {
+    const rows = filtered.map(d => {
+      const bal = Math.max(0, withBalance(d));
+      const overdue = bal > 0 && d.dueDate && new Date(d.dueDate) < new Date();
+      return `<tr><td class="l">${esc(d.name)}</td><td class="l">${esc(d.description)}</td><td>K${d.amount.toLocaleString()}</td><td>K${d.amountPaid.toLocaleString()}</td><td style="font-weight:700${overdue ? ';color:#b91c1c' : ''}">K${bal.toLocaleString()}</td><td>${d.dueDate ? new Date(d.dueDate).toLocaleDateString('en-GB') : '—'}</td></tr>`;
+    }).join('');
+    return `<!DOCTYPE html><html><head><title>Debtors List</title><style>
+      @page{size:A4;margin:14mm}*{box-sizing:border-box;margin:0;padding:0}
+      body{font-family:Arial,sans-serif;color:#111;padding:8px}
+      .hd{text-align:center;border-bottom:2px solid #12274a;padding-bottom:8px;margin-bottom:10px}
+      table{width:100%;border-collapse:collapse;margin-top:6px}
+      th,td{border:1px solid #cbd5e1;padding:5px 7px;font-size:12px;text-align:center}
+      th{background:#eef2f7}td.l{text-align:left}
+      @media print{button{display:none}}
+    </style></head><body>
+      <div class="hd">${branding.logoUrl ? `<img src="${branding.logoUrl}" style="height:42px;width:42px;object-fit:contain" />` : ''}
+        <div style="font-size:18px;font-weight:800">${esc(branding.schoolName) || 'School'}</div>
+        <div style="font-size:13px;font-weight:700">Outstanding Debtors</div>
+        <div style="font-size:11px;color:#6b7280">${new Date().toLocaleDateString('en-GB')} · Total owed: K${totalOwed.toLocaleString()}</div></div>
+      <table><thead><tr><th>Name</th><th>Owed For</th><th>Amount</th><th>Paid</th><th>Balance</th><th>Due</th></tr></thead>
+        <tbody>${rows || '<tr><td colspan="6">No debtors</td></tr>'}</tbody></table>
+      <script>window.onload=function(){setTimeout(function(){window.print()},250)}</script>
+    </body></html>`;
+  };
+
   // Open WhatsApp with a pre-filled reminder for this debtor (no message is
   // sent automatically — the admin reviews and taps send).
   const sendReminder = (d: Debtor) => {
@@ -178,6 +205,14 @@ export function Debtors() {
           }}
             className="flex items-center gap-2 border border-gray-300 text-gray-700 hover:bg-gray-50 px-3 py-2 rounded-lg text-sm font-medium">
             <Download className="h-4 w-4" /><span className="hidden sm:inline">Export</span>
+          </button>
+          <button onClick={() => { if (filtered.length === 0) { toast('No debtors to print.', 'warning'); return; } printHtml(buildDoc()); }} title="Print debtors list"
+            className="flex items-center gap-2 border border-gray-300 text-gray-700 hover:bg-gray-50 px-3 py-2 rounded-lg text-sm font-medium">
+            <Printer className="h-4 w-4" /><span className="hidden sm:inline">Print</span>
+          </button>
+          <button onClick={() => { if (filtered.length === 0) { toast('No debtors to export.', 'warning'); return; } exportPdf(buildDoc(), 'Debtors_List'); }} title="Export debtors list to PDF"
+            className="flex items-center border border-gray-300 text-gray-700 hover:bg-gray-50 px-2 py-2 rounded-lg text-sm font-medium">
+            <FileDown className="h-4 w-4" />
           </button>
           <button onClick={() => { setEditing(null); setModalOpen(true); }}
             className={`flex items-center space-x-2 ${tc.btn} text-white px-4 py-2 rounded-lg`}>

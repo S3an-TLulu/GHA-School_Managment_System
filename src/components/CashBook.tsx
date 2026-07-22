@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Wallet, Printer, TrendingUp, TrendingDown } from 'lucide-react';
+import { Wallet, Printer, TrendingUp, TrendingDown, FileDown } from 'lucide-react';
+import { printHtml, exportPdf } from '../lib/print';
 import { useAppContext } from '../context/AppContext';
 import { useThemeClasses } from '../hooks/useThemeClasses';
 
@@ -31,10 +32,9 @@ export function CashBook() {
   const variance = countedN === null ? null : countedN - expected;
   const nameOf = (sid: string) => students.find(s => s.id === sid)?.name || sid;
 
-  const print = () => {
-    const w = window.open('', '_blank'); if (!w) return;
+  const print = (pdf = false) => {
     const rows = (title: string, items: string[][]) => `<h3 style="margin:12px 0 4px">${title}</h3><table style="width:100%;border-collapse:collapse">${items.map(r => `<tr><td style="padding:4px 8px;border-bottom:1px solid #eee">${r[0]}</td><td style="padding:4px 8px;border-bottom:1px solid #eee;text-align:right">K${r[1]}</td></tr>`).join('') || '<tr><td style="padding:4px 8px;color:#9ca3af">None</td></tr>'}</table>`;
-    w.document.write(`<!DOCTYPE html><html><head><title>Cashbook ${date}</title><style>@media print{button{display:none}}body{font-family:Arial,sans-serif;max-width:640px;margin:20px auto;color:#1a2332}</style></head><body>
+    const html = `<!DOCTYPE html><html><head><title>Cashbook ${date}</title><style>@media print{button{display:none}}body{font-family:Arial,sans-serif;max-width:640px;margin:20px auto;color:#1a2332}</style></head><body>
       <div style="text-align:center;border-bottom:2px solid #12274a;padding-bottom:8px;margin-bottom:8px">
         ${branding.logoUrl ? `<img src="${branding.logoUrl}" style="height:44px;width:44px;object-fit:cover;border-radius:8px" />` : ''}
         <h2 style="margin:0;color:#12274a">${branding.schoolName || 'School'}</h2><p style="margin:0;font-size:12px;color:#6b7280">Daily Cashbook — ${new Date(date + 'T00:00:00').toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</p></div>
@@ -46,8 +46,9 @@ export function CashBook() {
       ${rows('Cash received', cashPayments.map(p => [`${nameOf(p.studentId)} — ${p.type}`, p.amount.toLocaleString()]))}
       ${rows('Cash paid out', dayExpenses.map(e => [`${e.description} (${e.category})`, e.amount.toLocaleString()]))}
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:30px;margin-top:40px"><div style="border-top:1px solid #12274a;padding-top:4px;text-align:center;font-size:11px;color:#6b7280">Cashier</div><div style="border-top:1px solid #12274a;padding-top:4px;text-align:center;font-size:11px;color:#6b7280">Verified By</div></div>
-      <script>window.onload=function(){setTimeout(function(){window.print()},250)}</script></body></html>`);
-    w.document.close();
+      <script>window.onload=function(){setTimeout(function(){window.print()},250)}</script></body></html>`;
+    if (pdf) exportPdf(html, `Cashbook_${date}`);
+    else printHtml(html);
   };
 
   const inp = 'w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent';
@@ -57,7 +58,8 @@ export function CashBook() {
         <div><h1 className="text-2xl font-bold text-gray-900">Daily Cashbook</h1><p className="text-gray-600">Reconcile the office cash drawer at the end of the day</p></div>
         <div className="flex items-center gap-2">
           <input type="date" value={date} onChange={e => setDay(e.target.value)} className="px-3 py-2 border border-gray-300 rounded-lg text-sm" />
-          <button onClick={print} className={`flex items-center gap-2 ${tc.btn} text-white px-4 py-2 rounded-lg text-sm font-medium`}><Printer className="h-4 w-4" />Print</button>
+          <button onClick={() => print()} className={`flex items-center gap-2 ${tc.btn} text-white px-4 py-2 rounded-lg text-sm font-medium`}><Printer className="h-4 w-4" />Print</button>
+          <button title="Export cashbook to PDF" onClick={() => print(true)} className="flex items-center gap-2 border border-gray-300 text-gray-700 hover:bg-gray-50 px-3 py-2 rounded-lg text-sm font-medium"><FileDown className="h-4 w-4" />PDF</button>
         </div>
       </div>
 

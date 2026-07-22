@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Search, Printer, Users, ChevronDown, ChevronRight } from 'lucide-react';
+import { Search, Printer, Users, ChevronDown, ChevronRight, FileDown } from 'lucide-react';
+import { printHtml, exportPdf } from '../lib/print';
 import { useAppContext } from '../context/AppContext';
 import { useThemeClasses } from '../hooks/useThemeClasses';
 import { PersonDocuments } from './PersonDocs';
@@ -57,7 +58,7 @@ export function FamilyStatements() {
     f.students.some(s => s.name.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
-  const handlePrint = (family: FamilyGroup) => {
+  const handlePrint = (family: FamilyGroup, pdf = false) => {
     const studentRows = family.students.map(s => {
       const sp = payments.filter(p => p.studentId === s.id);
       const paid = sp.filter(p => p.status === 'paid').reduce((sum, p) => sum + p.amount, 0);
@@ -87,9 +88,7 @@ export function FamilyStatements() {
         </tr>`)
     ).join('');
 
-    const win = window.open('', '_blank');
-    if (!win) return;
-    win.document.write(`
+    const html = `
       <!DOCTYPE html>
       <html>
       <head>
@@ -160,11 +159,12 @@ export function FamilyStatements() {
         <p style="color:#6b7280;font-size:12px;margin-top:30px">
           This is a computer-generated statement from Great Highway Academy School Management System.
         </p>
-        <script>window.print();</script>
+        <script>window.onload=function(){setTimeout(function(){window.print()},250)}</script>
       </body>
       </html>
-    `);
-    win.document.close();
+    `;
+    if (pdf) exportPdf(html, `Family_Statement_${family.guardianName}`);
+    else printHtml(html);
   };
 
   const totalOutstanding = families.reduce((sum, f) => sum + f.totalPending + f.totalOverdue, 0);
@@ -232,6 +232,10 @@ export function FamilyStatements() {
                       className={`flex items-center space-x-1 px-3 py-1.5 ${tc.btn} text-white text-sm rounded-lg transition-colors`}>
                       <Printer className="h-3.5 w-3.5" />
                       <span>Print</span>
+                    </button>
+                    <button title="Export statement to PDF" onClick={e => { e.stopPropagation(); handlePrint(family, true); }}
+                      className="flex items-center px-2 py-1.5 border border-gray-300 text-gray-700 hover:bg-gray-50 text-sm rounded-lg transition-colors">
+                      <FileDown className="h-3.5 w-3.5" />
                     </button>
                     {isExpanded ? <ChevronDown className="h-4 w-4 text-gray-400" /> : <ChevronRight className="h-4 w-4 text-gray-400" />}
                   </div>

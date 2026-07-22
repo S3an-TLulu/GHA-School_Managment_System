@@ -1,7 +1,5 @@
 import { QuizQuestion, SchoolBranding } from '../context/AppContext';
-
-const esc = (s: string) => (s || '').replace(/[&<>"']/g, c =>
-  ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c] as string));
+import { esc, printHtml, exportPdf } from './print';
 
 const LETTERS = ['A', 'B', 'C', 'D', 'E', 'F'];
 
@@ -10,6 +8,7 @@ const LETTERS = ['A', 'B', 'C', 'D', 'E', 'F'];
 export function printTestPaper(opts: {
   title: string; subject: string; grade?: string; instructions?: string;
   questions: QuizQuestion[]; branding: SchoolBranding; withAnswers: boolean;
+  pdf?: boolean;
 }) {
   const { title, subject, grade, instructions, questions, branding, withAnswers } = opts;
   const totalMarks = questions.reduce((a, q) => a + (q.marks ?? 1), 0);
@@ -46,8 +45,6 @@ export function printTestPaper(opts: {
     ${body || '<p style="color:#9ca3af">No questions selected.</p>'}
     <script>window.onload=function(){setTimeout(function(){window.print()},250)}</script>
   </body></html>`;
-  const w = window.open('', '_blank');
-  if (!w) return;
-  w.document.write(html);
-  w.document.close();
+  if (opts.pdf) exportPdf(html, `${title}${withAnswers ? '_Answer_Key' : ''}`);
+  else printHtml(html);
 }

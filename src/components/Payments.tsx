@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Plus, Search, Check, X, Clock, Trash2, Printer, Banknote, Smartphone, Building2, FileText, MoreHorizontal, Download } from 'lucide-react';
+import { Plus, Search, Check, X, Clock, Trash2, Printer, Banknote, Smartphone, Building2, FileText, MoreHorizontal, Download, FileDown } from 'lucide-react';
+import { esc, printHtml, exportPdf } from '../lib/print';
 import { exportCSV } from '../lib/exports';
 import { useAppContext, Payment, Student, PaymentMethod, SchoolBranding } from '../context/AppContext';
 import { PaymentModal } from './PaymentModal';
@@ -27,10 +28,7 @@ function MethodBadge({ method, network }: { method?: PaymentMethod; network?: st
 
 
 // Escape user-entered strings before injecting into the receipt HTML.
-const esc = (s: string) => (s || '').replace(/[&<>"']/g, c =>
-  ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c] as string));
-
-function printReceipt(payment: Payment, student: Student | undefined, branding: SchoolBranding) {
+function printReceipt(payment: Payment, student: Student | undefined, branding: SchoolBranding, pdf = false) {
   const contactBits = [branding.address, branding.phone ? `Tel: ${branding.phone}` : ''].filter(Boolean).join(' | ');
   const hasBank = branding.bankName || branding.bankAccountNumber;
   const printContent = `
@@ -126,15 +124,12 @@ function printReceipt(payment: Payment, student: Student | undefined, branding: 
       <div class="footer">
         This is an official receipt of ${esc(branding.schoolName) || 'the school'} &bull; Thank you for your payment
       </div>
+    <script>window.onload=function(){setTimeout(function(){window.print()},250)}</script>
     </body>
     </html>
   `;
-  const win = window.open('', '_blank');
-  if (win) {
-    win.document.write(printContent);
-    win.document.close();
-    win.print();
-  }
+  if (pdf) exportPdf(printContent, `Receipt_${payment.receiptNumber || student?.name || 'payment'}`);
+  else printHtml(printContent);
 }
 
 export function Payments() {
@@ -307,6 +302,13 @@ export function Payments() {
                           title="Print Receipt"
                         >
                           <Printer className="h-3.5 w-3.5" />
+                        </button>
+                        <button
+                          onClick={() => printReceipt(payment, student, branding, true)}
+                          className="p-1.5 text-gray-500 hover:bg-gray-100 rounded"
+                          title="Export Receipt to PDF"
+                        >
+                          <FileDown className="h-3.5 w-3.5" />
                         </button>
                         <button onClick={() => handleDelete(payment.id)}
                           className="p-1.5 text-red-500 hover:bg-red-50 rounded">

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { GraduationCap, Users, UserCheck, ArrowRight, Check, Search, UserPlus, Plus, Trash2, ArrowUpRight, X, Printer } from 'lucide-react';
+import { GraduationCap, Users, UserCheck, ArrowRight, Check, Search, UserPlus, Plus, Trash2, ArrowUpRight, X, Printer, FileDown } from 'lucide-react';
 import { useAppContext, Student } from '../context/AppContext';
 import { useToast } from './ToastProvider';
 import { useThemeClasses } from '../hooks/useThemeClasses';
@@ -119,6 +119,15 @@ export function ClassManager() {
           }}
             className="flex items-center gap-2 border border-gray-300 text-gray-700 hover:bg-gray-50 px-4 py-2 rounded-lg text-sm font-medium">
             <Printer className="h-4 w-4" /> Print Register
+          </button>
+          <button title="Export register to PDF" onClick={() => {
+            const cls = activeStudents.filter(s => s.grade === selectedClass);
+            if (cls.length === 0) { toast('No students in this class to export.', 'warning'); return; }
+            printClassRegister(selectedClass, cls, branding,
+              new Date().toLocaleDateString('en-GB', { month: 'long', year: 'numeric' }), { pdf: true });
+          }}
+            className="flex items-center gap-2 border border-gray-300 text-gray-700 hover:bg-gray-50 px-4 py-2 rounded-lg text-sm font-medium">
+            <FileDown className="h-4 w-4" /> Register PDF
           </button>
           <button onClick={() => setPromoteOpen(true)}
             className="flex items-center gap-2 border border-gray-300 text-gray-700 hover:bg-gray-50 px-4 py-2 rounded-lg text-sm font-medium">

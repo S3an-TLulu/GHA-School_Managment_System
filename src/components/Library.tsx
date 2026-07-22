@@ -1,9 +1,11 @@
 import { useState } from 'react';
-import { BookOpen, Library as LibraryIcon, Plus, Pencil, Trash2, X, BookMarked, AlertTriangle, RotateCcw, Search } from 'lucide-react';
+import { BookOpen, Library as LibraryIcon, Plus, Pencil, Trash2, X, BookMarked, AlertTriangle, RotateCcw, Search, Printer, FileDown, Download } from 'lucide-react';
 import { useAppContext, LibraryBook, BookLoan } from '../context/AppContext';
 import { useToast } from './ToastProvider';
 import { useThemeClasses } from '../hooks/useThemeClasses';
 import { compressImage } from '../lib/images';
+import { esc, printHtml, exportPdf } from '../lib/print';
+import { exportCSV } from '../lib/exports';
 
 // ---- Book add/edit modal (with cover image, like the uniform catalog) ----
 function BookModal({ book, onSave, onClose }: {
@@ -219,7 +221,7 @@ function BorrowModal({ book, onClose }: { book: LibraryBook; onClose: () => void
 }
 
 export function Library() {
-  const { libraryBooks, bookLoans, addLibraryBook, updateLibraryBook, deleteLibraryBook, returnLoan, deleteLoan } = useAppContext();
+  const { libraryBooks, bookLoans, branding, addLibraryBook, updateLibraryBook, deleteLibraryBook, returnLoan, deleteLoan } = useAppContext();
   const { toast } = useToast();
   const tc = useThemeClasses();
   const [tab, setTab] = useState<'catalog' | 'loans'>('catalog');
@@ -256,6 +258,41 @@ export function Library() {
     });
 
   const bookTitle = (id: string) => libraryBooks.find(b => b.id === id)?.title || 'Removed book';
+  const fmtDate = (d?: string) => d ? new Date(d).toLocaleDateString('en-GB') : '—';
+
+  // Build the printable HTML for the active tab (catalogue or loans list).
+  const buildDoc = () => {
+    const title = tab === 'catalog' ? 'Library Catalogue' : 'Books on Loan';
+    const table = tab === 'catalog'
+      ? `<table><thead><tr><th>Title</th><th>Author</th><th>Category</th><th>Copies</th><th>On loan</th><th>Available</th></tr></thead><tbody>
+          ${filteredBooks.map(b => `<tr><td class="l">${esc(b.title)}</td><td class="l">${esc(b.author || '—')}</td><td class="l">${esc(b.category || '—')}</td><td>${b.totalCopies}</td><td>${activeLoans(b.id)}</td><td>${available(b)}</td></tr>`).join('') || '<tr><td colspan="6">No books</td></tr>'}
+        </tbody></table>`
+      : `<table><thead><tr><th>Book</th><th>Borrower</th><th>Type</th><th>Borrowed</th><th>Due</th><th>Returned</th></tr></thead><tbody>
+          ${filteredLoans.map(l => `<tr><td class="l">${esc(bookTitle(l.bookId))}</td><td class="l">${esc(l.borrowerName)}</td><td>${esc(l.borrowerType)}</td><td>${fmtDate(l.borrowedDate)}</td><td${isOverdue(l) ? ' style="color:#b91c1c;font-weight:700"' : ''}>${fmtDate(l.dueDate)}</td><td>${fmtDate(l.returnedDate)}</td></tr>`).join('') || '<tr><td colspan="6">No loans</td></tr>'}
+        </tbody></table>`;
+    return `<!DOCTYPE html><html><head><title>${esc(title)}</title><style>
+      @page{size:A4;margin:14mm}*{box-sizing:border-box;margin:0;padding:0}
+      body{font-family:Arial,sans-serif;color:#111;padding:8px}
+      .hd{text-align:center;border-bottom:2px solid #12274a;padding-bottom:8px;margin-bottom:10px}
+      table{width:100%;border-collapse:collapse;margin-top:6px}
+      th,td{border:1px solid #cbd5e1;padding:5px 7px;font-size:12px;text-align:center}
+      th{background:#eef2f7}td.l{text-align:left}
+      @media print{button{display:none}}
+    </style></head><body>
+      <div class="hd">${branding.logoUrl ? `<img src="${branding.logoUrl}" style="height:42px;width:42px;object-fit:contain" />` : ''}
+        <div style="font-size:18px;font-weight:800">${esc(branding.schoolName) || 'School'}</div>
+        <div style="font-size:13px;font-weight:700">${esc(title)}</div>
+        <div style="font-size:11px;color:#6b7280">${new Date().toLocaleDateString('en-GB')}</div></div>
+      ${table}
+      <script>window.onload=function(){setTimeout(function(){window.print()},250)}</script>
+    </body></html>`;
+  };
+  const exportLibraryCSV = () => {
+    if (tab === 'catalog') exportCSV('GHA_Library_Catalogue', ['Title', 'Author', 'Category', 'Copies', 'On Loan', 'Available'],
+      filteredBooks.map(b => [b.title, b.author || '', b.category || '', b.totalCopies, activeLoans(b.id), available(b)]));
+    else exportCSV('GHA_Library_Loans', ['Book', 'Borrower', 'Type', 'Borrowed', 'Due', 'Returned'],
+      filteredLoans.map(l => [bookTitle(l.bookId), l.borrowerName, l.borrowerType, fmtDate(l.borrowedDate), fmtDate(l.dueDate), fmtDate(l.returnedDate)]));
+  };
 
   return (
     <div className="space-y-6">
@@ -264,18 +301,25 @@ export function Library() {
           <h1 className="text-2xl font-bold text-gray-900">Library</h1>
           <p className="text-gray-600">Books, copies in stock and who has borrowed what</p>
         </div>
-        <div className="flex space-x-1 bg-gray-100 rounded-lg p-1">
-          {[
-            { id: 'catalog' as const, label: 'Books', icon: LibraryIcon },
-            { id: 'loans' as const, label: 'Borrowed', icon: BookMarked },
-          ].map(t => (
-            <button key={t.id} onClick={() => setTab(t.id)}
-              className={`flex items-center space-x-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                tab === t.id ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'
-              }`}>
-              <t.icon className="h-4 w-4" /><span>{t.label}</span>
-            </button>
-          ))}
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex gap-1">
+            <button onClick={exportLibraryCSV} title="Export to CSV" className="flex items-center gap-1.5 border border-gray-300 text-gray-700 hover:bg-gray-50 px-3 py-2 rounded-lg text-sm"><Download className="h-4 w-4" />CSV</button>
+            <button onClick={() => printHtml(buildDoc())} title="Print" className="flex items-center gap-1.5 border border-gray-300 text-gray-700 hover:bg-gray-50 px-3 py-2 rounded-lg text-sm"><Printer className="h-4 w-4" />Print</button>
+            <button onClick={() => exportPdf(buildDoc(), tab === 'catalog' ? 'Library_Catalogue' : 'Library_Loans')} title="Export to PDF" className="flex items-center border border-gray-300 text-gray-700 hover:bg-gray-50 px-2 py-2 rounded-lg text-sm"><FileDown className="h-4 w-4" /></button>
+          </div>
+          <div className="flex space-x-1 bg-gray-100 rounded-lg p-1">
+            {[
+              { id: 'catalog' as const, label: 'Books', icon: LibraryIcon },
+              { id: 'loans' as const, label: 'Borrowed', icon: BookMarked },
+            ].map(t => (
+              <button key={t.id} onClick={() => setTab(t.id)}
+                className={`flex items-center space-x-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  tab === t.id ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'
+                }`}>
+                <t.icon className="h-4 w-4" /><span>{t.label}</span>
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
