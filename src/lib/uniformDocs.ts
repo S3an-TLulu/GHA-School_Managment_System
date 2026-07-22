@@ -169,3 +169,22 @@ export function printPurchaseOrder(supplierName: string, supplierContact: string
     ${total > 0 ? `<tfoot><tr><td colspan="4" style="text-align:right;font-weight:700">Total</td><td style="text-align:right;font-weight:700">K${total.toLocaleString()}</td></tr></tfoot>` : ''}</table>
     <div class="sig"><div>Authorised By</div><div>Supplier Acknowledgement</div></div>`));
 }
+
+// Receipt for uniforms issued to a student from the Store.
+export function printUniformReceipt(student: Student | undefined, lines: { name: string; size: string; qty: number; price: number }[], branding: SchoolBranding) {
+  const total = lines.reduce((a, l) => a + l.price * l.qty, 0);
+  const body = lines.map(l => `<tr><td>${esc(l.name)}</td><td>${esc(l.size)}</td><td style="text-align:center">${l.qty}</td><td style="text-align:right">K${l.price.toLocaleString()}</td><td style="text-align:right">K${(l.price * l.qty).toLocaleString()}</td></tr>`).join('');
+  const bank = branding.bankName || branding.bankAccountNumber;
+  open(shell('Uniform Receipt', branding, `
+    <div style="text-align:center;margin-bottom:8px"><span style="display:inline-block;background:#d1fae5;color:#065f46;border:2px solid #059669;border-radius:6px;padding:3px 14px;font-size:12px;font-weight:700">UNIFORM RECEIPT</span></div>
+    <div class="field"><b>Student</b><span>${esc(student?.name || '')}</span></div>
+    <div class="field"><b>Class</b><span>${esc(student?.grade || '')}</span></div>
+    <div class="field"><b>Admission No.</b><span>${esc(student?.admissionNumber || '—')}</span></div>
+    <div class="field"><b>Date</b><span>${new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}</span></div>
+    <table style="margin-top:10px"><thead><tr><th>Item</th><th>Size</th><th>Qty</th><th style="text-align:right">Price</th><th style="text-align:right">Total</th></tr></thead>
+      <tbody>${body || '<tr><td colspan="5" style="color:#9ca3af">No items</td></tr>'}</tbody>
+      <tfoot><tr><td colspan="4" style="text-align:right;font-weight:700">TOTAL</td><td style="text-align:right;font-weight:700;font-size:14px">K${total.toLocaleString()}</td></tr></tfoot>
+    </table>
+    ${bank ? `<div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:6px;padding:10px;margin-top:12px;font-size:11px;color:#1e40af"><b>Banking:</b> ${esc(branding.bankName || '')}${branding.bankBranch ? ' · ' + esc(branding.bankBranch) : ''} · Acct ${esc(branding.bankAccountNumber || '')}</div>` : ''}
+    <div class="sig"><div>Received By</div><div>Parent / Guardian</div></div>`));
+}
