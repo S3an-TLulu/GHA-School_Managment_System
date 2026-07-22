@@ -38,6 +38,7 @@ import { CashBook } from './components/CashBook';
 import { ParentPortal } from './components/ParentPortal';
 import { Tools } from './components/Tools';
 import { Results } from './components/Results';
+import { Subjects } from './components/Subjects';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { useAppContext } from './context/AppContext';
 import { useEffect } from 'react';
@@ -102,6 +103,7 @@ function AppContent() {
       case 'reports':      return <Reports />;
       case 'timetable':    return <ClassTimetable />;
       case 'results':      return <Results />;
+      case 'subjects':     return <Subjects />;
       case 'bulkfees':     return <BulkFeeCollection />;
       case 'debtors':      return <Debtors />;
       case 'transport':    return <Transport />;

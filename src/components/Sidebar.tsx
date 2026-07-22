@@ -53,6 +53,7 @@ const menuGroups = [
     items: [
       { id: 'attendance', label: 'Attendance',       icon: ClipboardCheck },
       { id: 'results',    label: 'Academic Results', icon: GraduationCap },
+      { id: 'subjects',   label: 'Subjects',         icon: BookOpen },
       { id: 'timetable',  label: 'Class Timetable',  icon: Clock },
     ]
   },
