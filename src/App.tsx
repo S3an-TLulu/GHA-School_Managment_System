@@ -36,6 +36,7 @@ import { Messaging } from './components/Messaging';
 import { HelpGuide } from './components/HelpGuide';
 import { CashBook } from './components/CashBook';
 import { ParentPortal } from './components/ParentPortal';
+import { Tools } from './components/Tools';
 import { Results } from './components/Results';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { useAppContext } from './context/AppContext';
@@ -114,6 +115,7 @@ function AppContent() {
       case 'profile':      return <Profile />;
       case 'help':         return <HelpGuide />;
       case 'cashbook':     return <CashBook />;
+      case 'tools':        return <Tools />;
       default:             return <Dashboard />;
     }
   };
