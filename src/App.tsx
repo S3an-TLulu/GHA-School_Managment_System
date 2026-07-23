@@ -1,52 +1,65 @@
-import { useState } from 'react';
+import { useState, useEffect, lazy, Suspense, ComponentType } from 'react';
+// Eager: the app shell and the default landing view.
 import { Sidebar } from './components/Sidebar';
 import { Header } from './components/Header';
 import { Dashboard } from './components/Dashboard';
-import { Students } from './components/Students';
-import { FeeStructure } from './components/FeeStructure';
-import { Announcements } from './components/Announcements';
-import { Payments } from './components/Payments';
-import { UniformManagement } from './components/UniformManagement';
-import { Requirements } from './components/Requirements';
-import { Reports } from './components/Reports';
-import { Teachers } from './components/Teachers';
-import { Expenses } from './components/Expenses';
-import { Inventory } from './components/Inventory';
-import { Events } from './components/Events';
-import { FamilyStatements } from './components/FamilyStatements';
-import { OfficeCashier } from './components/OfficeCashier';
-import { Attendance } from './components/Attendance';
-import { SchoolCalendar } from './components/SchoolCalendar';
-import { BrandingManager } from './components/BrandingManager';
-import { ThemeManager, applyTheme } from './components/ThemeManager';
-import { DocumentTemplates } from './components/DocumentTemplates';
-import { ClassTimetable } from './components/ClassTimetable';
-import { BulkFeeCollection } from './components/BulkFeeCollection';
-import { Debtors } from './components/Debtors';
-import { Transport } from './components/Transport';
-import { Fundraisers } from './components/Fundraisers';
-import { Settings } from './components/Settings';
-import { ClassManager } from './components/ClassManager';
-import { HR } from './components/HR';
-import { Kitchen } from './components/Kitchen';
-import { Gallery } from './components/Gallery';
-import { Profile } from './components/Profile';
-import { Library } from './components/Library';
-import { Messaging } from './components/Messaging';
-import { HelpGuide } from './components/HelpGuide';
-import { CashBook } from './components/CashBook';
-import { ParentPortal } from './components/ParentPortal';
-import { Tools } from './components/Tools';
-import { Results } from './components/Results';
-import { Subjects } from './components/Subjects';
+import { applyTheme } from './components/ThemeManager';
 import { AuthProvider, useAuth } from './context/AuthContext';
-import { useAppContext } from './context/AppContext';
-import { useEffect } from 'react';
+import { useAppContext, AppProvider } from './context/AppContext';
 import { Login } from './components/Login';
 import { LandingPage } from './components/LandingPage';
-import { AppProvider } from './context/AppContext';
 import { ToastProvider } from './components/ToastProvider';
 import { ErrorBoundary } from './components/ErrorBoundary';
+
+// Lazy: every other section is code-split into its own chunk and only fetched
+// when the user first opens it, keeping the initial bundle small.
+const named = <M extends Record<string, unknown>>(loader: () => Promise<M>, key: keyof M) =>
+  lazy(() => loader().then(m => ({ default: m[key] as ComponentType })));
+
+const Students = named(() => import('./components/Students'), 'Students');
+const FeeStructure = named(() => import('./components/FeeStructure'), 'FeeStructure');
+const Announcements = named(() => import('./components/Announcements'), 'Announcements');
+const Payments = named(() => import('./components/Payments'), 'Payments');
+const UniformManagement = named(() => import('./components/UniformManagement'), 'UniformManagement');
+const Requirements = named(() => import('./components/Requirements'), 'Requirements');
+const Reports = named(() => import('./components/Reports'), 'Reports');
+const Teachers = named(() => import('./components/Teachers'), 'Teachers');
+const Expenses = named(() => import('./components/Expenses'), 'Expenses');
+const Inventory = named(() => import('./components/Inventory'), 'Inventory');
+const Events = named(() => import('./components/Events'), 'Events');
+const FamilyStatements = named(() => import('./components/FamilyStatements'), 'FamilyStatements');
+const OfficeCashier = named(() => import('./components/OfficeCashier'), 'OfficeCashier');
+const Attendance = named(() => import('./components/Attendance'), 'Attendance');
+const SchoolCalendar = named(() => import('./components/SchoolCalendar'), 'SchoolCalendar');
+const BrandingManager = named(() => import('./components/BrandingManager'), 'BrandingManager');
+const ThemeManager = named(() => import('./components/ThemeManager'), 'ThemeManager');
+const DocumentTemplates = named(() => import('./components/DocumentTemplates'), 'DocumentTemplates');
+const ClassTimetable = named(() => import('./components/ClassTimetable'), 'ClassTimetable');
+const BulkFeeCollection = named(() => import('./components/BulkFeeCollection'), 'BulkFeeCollection');
+const Debtors = named(() => import('./components/Debtors'), 'Debtors');
+const Transport = named(() => import('./components/Transport'), 'Transport');
+const Fundraisers = named(() => import('./components/Fundraisers'), 'Fundraisers');
+const Settings = named(() => import('./components/Settings'), 'Settings');
+const ClassManager = named(() => import('./components/ClassManager'), 'ClassManager');
+const HR = named(() => import('./components/HR'), 'HR');
+const Kitchen = named(() => import('./components/Kitchen'), 'Kitchen');
+const Gallery = named(() => import('./components/Gallery'), 'Gallery');
+const Profile = named(() => import('./components/Profile'), 'Profile');
+const Library = named(() => import('./components/Library'), 'Library');
+const Messaging = named(() => import('./components/Messaging'), 'Messaging');
+const HelpGuide = named(() => import('./components/HelpGuide'), 'HelpGuide');
+const CashBook = named(() => import('./components/CashBook'), 'CashBook');
+const Tools = named(() => import('./components/Tools'), 'Tools');
+const Results = named(() => import('./components/Results'), 'Results');
+const Subjects = named(() => import('./components/Subjects'), 'Subjects');
+const ParentPortal = named(() => import('./components/ParentPortal'), 'ParentPortal');
+
+// Fallback shown while a section's chunk loads.
+const SectionLoading = () => (
+  <div className="flex items-center justify-center py-24 text-gray-400">
+    <div className="h-6 w-6 border-2 border-gray-300 border-t-transparent rounded-full animate-spin" />
+  </div>
+);
 
 function AppContent() {
   const [activeSection, setActiveSection] = useState('dashboard');
@@ -71,7 +84,11 @@ function AppContent() {
 
   if (!isAuthenticated) {
     if (showPortal || location.hash === '#portal') {
-      return <ParentPortal onBack={() => { setShowPortal(false); if (location.hash) history.replaceState(null, '', location.pathname); }} />;
+      return (
+        <Suspense fallback={<SectionLoading />}>
+          <ParentPortal onBack={() => { setShowPortal(false); if (location.hash) history.replaceState(null, '', location.pathname); }} />
+        </Suspense>
+      );
     }
     if (showLogin) {
       return <Login onBack={() => setShowLogin(false)} onPortal={() => { setShowLogin(false); setShowPortal(true); }} />;
@@ -149,7 +166,9 @@ function AppContent() {
           {/* Per-section boundary: a crash in one screen won't take out the
               whole shell, and navigating away (new key) clears it. */}
           <ErrorBoundary key={activeSection}>
-            {renderContent()}
+            <Suspense fallback={<SectionLoading />}>
+              {renderContent()}
+            </Suspense>
           </ErrorBoundary>
         </main>
       </div>

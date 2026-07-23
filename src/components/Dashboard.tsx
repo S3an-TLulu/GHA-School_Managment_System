@@ -3,7 +3,7 @@ import { useAppContext } from '../context/AppContext';
 import { useThemeClasses } from '../hooks/useThemeClasses';
 
 export function Dashboard() {
-  const { students, payments, teachers, expenses, events, announcements, results, currentTerm, branding, fundraiserParticipants, toggleFundraiserParticipant } = useAppContext();
+  const { students, payments, teachers, expenses, events, announcements, results, attendance, currentTerm, branding, fundraiserParticipants, toggleFundraiserParticipant } = useAppContext();
   const tc = useThemeClasses();
 
   const activeStudents = students.filter(s => !s.status || s.status === 'active').length;
@@ -49,6 +49,23 @@ export function Dashboard() {
   const resultAvgs = latestResults.map(r => { const v = Object.values(r.subjects); return v.length ? Math.round(v.reduce((a,b)=>a+b,0)/v.length) : 0; });
   const academicPassRate = resultAvgs.length ? Math.round((resultAvgs.filter(a => a >= 50).length / resultAvgs.length) * 100) : null;
   const academicAvg = resultAvgs.length ? Math.round(resultAvgs.reduce((a,b)=>a+b,0)/resultAvgs.length) : null;
+
+  // Attendance analytics over the last 30 days (present + late count as here).
+  const attCutoff = new Date(); attCutoff.setDate(attCutoff.getDate() - 30);
+  const recentAtt = attendance.filter(a => new Date(a.date) >= attCutoff);
+  const attHere = (recs: typeof recentAtt) => recs.filter(a => a.status === 'present' || a.status === 'late').length;
+  const attendanceRate = recentAtt.length ? Math.round((attHere(recentAtt) / recentAtt.length) * 100) : null;
+  const attByClass = gradeOrder
+    .map(g => { const recs = recentAtt.filter(a => a.classGrade === g); return { grade: g, rate: recs.length ? Math.round((attHere(recs) / recs.length) * 100) : null, marked: recs.length }; })
+    .filter(x => x.rate !== null) as { grade: string; rate: number; marked: number }[];
+  const lowAttendance = attByClass.filter(x => x.rate < 85);
+
+  // Pupils falling behind in the latest results (average below the 50% pass mark).
+  const failingPupils = latestResults
+    .map(r => { const v = Object.values(r.subjects); const avg = v.length ? Math.round(v.reduce((a, b) => a + b, 0) / v.length) : 0; return { name: students.find(s => s.id === r.studentId)?.name || 'Unknown', grade: r.classGrade, avg }; })
+    .filter(x => x.avg < 50)
+    .sort((a, b) => a.avg - b.avg)
+    .slice(0, 6);
 
   const activeFundraisers = events
     .filter(e => e.type === 'Fundraiser' && e.participationFee)
@@ -321,6 +338,78 @@ export function Dashboard() {
               style={{ width: `${academicPassRate}%` }} />
           </div>
           <p className="text-xs text-gray-400 mt-1">{academicPassRate}% of students passed in {latestResultTerm}</p>
+        </div>
+      )}
+
+      {/* Attendance analytics + who needs attention */}
+      {(attendanceRate !== null || failingPupils.length > 0) && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {attendanceRate !== null && (
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+              <div className="flex items-center space-x-2 mb-4">
+                <UserCheck className={`h-5 w-5 ${tc.text}`} />
+                <h3 className="text-base font-semibold text-gray-900">Attendance</h3>
+                <span className="text-xs text-gray-400 ml-1">— last 30 days</span>
+              </div>
+              <div className="flex items-end gap-4 mb-4">
+                <div>
+                  <p className={`text-4xl font-bold ${attendanceRate >= 90 ? 'text-green-600' : attendanceRate >= 80 ? 'text-yellow-600' : 'text-red-600'}`}>{attendanceRate}%</p>
+                  <p className="text-xs text-gray-500">overall present rate ({recentAtt.length} marks)</p>
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                {attByClass.map(c => (
+                  <div key={c.grade} className="flex items-center gap-2">
+                    <span className="text-xs text-gray-600 w-24 flex-shrink-0 truncate">{c.grade}</span>
+                    <div className="flex-1 bg-gray-100 rounded-full h-2">
+                      <div className={`h-2 rounded-full ${c.rate >= 90 ? 'bg-green-500' : c.rate >= 80 ? 'bg-yellow-500' : 'bg-red-500'}`} style={{ width: `${c.rate}%` }} />
+                    </div>
+                    <span className="text-xs font-medium text-gray-700 w-9 text-right">{c.rate}%</span>
+                  </div>
+                ))}
+                {attByClass.length === 0 && <p className="text-sm text-gray-400">No attendance marked in the last 30 days.</p>}
+              </div>
+            </div>
+          )}
+
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            <div className="flex items-center space-x-2 mb-4">
+              <AlertCircle className="h-5 w-5 text-amber-500" />
+              <h3 className="text-base font-semibold text-gray-900">Needs Attention</h3>
+            </div>
+            <div className="space-y-4">
+              {lowAttendance.length > 0 && (
+                <div>
+                  <p className="text-xs font-semibold text-gray-500 uppercase mb-1.5">Low attendance (&lt;85%)</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {lowAttendance.map(c => <span key={c.grade} className="text-xs bg-red-50 text-red-700 rounded-full px-2.5 py-1">{c.grade} · {c.rate}%</span>)}
+                  </div>
+                </div>
+              )}
+              {failingPupils.length > 0 && (
+                <div>
+                  <p className="text-xs font-semibold text-gray-500 uppercase mb-1.5">Pupils below pass mark — {latestResultTerm}</p>
+                  <div className="space-y-1">
+                    {failingPupils.map((p, i) => (
+                      <div key={i} className="flex items-center justify-between text-sm">
+                        <span className="text-gray-800">{p.name} <span className="text-gray-400 text-xs">· {p.grade}</span></span>
+                        <span className="font-semibold text-red-600">{p.avg}%</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {overdueCount > 0 && (
+                <div>
+                  <p className="text-xs font-semibold text-gray-500 uppercase mb-1.5">Fees</p>
+                  <p className="text-sm text-gray-700">{overdueCount} overdue payment{overdueCount !== 1 ? 's' : ''} this term (K{totalPending.toLocaleString()} outstanding).</p>
+                </div>
+              )}
+              {lowAttendance.length === 0 && failingPupils.length === 0 && overdueCount === 0 && (
+                <p className="text-sm text-gray-400 py-4 text-center">All clear — nothing flagged right now. 🎉</p>
+              )}
+            </div>
+          </div>
         </div>
       )}
 

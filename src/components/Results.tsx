@@ -26,14 +26,14 @@ function calcAverage(subjects: Record<string, number>): number {
 }
 
 export function Results() {
-  const { students, results, saveClassResults, deleteResult, terms, branding } = useAppContext();
+  const { students, results, saveClassResults, deleteResult, terms, branding,
+    subjects: canonicalSubjects, addSubject: addCanonicalSubject, deleteSubject: deleteCanonicalSubject } = useAppContext();
   const TERMS = terms;
   const tc = useThemeClasses();
   const toast = useToast();
 
   const [selectedClass, setSelectedClass] = useState(CLASSES[3]);
   const [selectedTerm, setSelectedTerm] = useState(TERMS[0]);
-  const [subjects, setSubjects] = useState<string[]>(DEFAULT_SUBJECTS);
   const [newSubject, setNewSubject] = useState('');
   const [editGrid, setEditGrid] = useState<Record<string, Record<string, string>>>({});
   const [isEditing, setIsEditing] = useState(false);
@@ -42,6 +42,15 @@ export function Results() {
   const classStudents = students.filter(s => s.grade === selectedClass && (!s.status || s.status === 'active'));
 
   const classResults = results.filter(r => r.classGrade === selectedClass && r.term === selectedTerm);
+
+  // Subjects come from the canonical list (managed in Subjects / here), plus any
+  // subject names already recorded in this class's marks so history never hides.
+  const subjects = (() => {
+    const canonical = canonicalSubjects.filter(s => s.active !== false).map(s => s.name);
+    const fromResults = classResults.flatMap(r => Object.keys(r.subjects));
+    const merged = Array.from(new Set([...(canonical.length ? canonical : DEFAULT_SUBJECTS), ...fromResults]));
+    return merged;
+  })();
 
   const getStudentResult = (studentId: string): StudentResult | undefined =>
     classResults.find(r => r.studentId === studentId);
@@ -96,7 +105,8 @@ export function Results() {
   const addSubject = () => {
     const trimmed = newSubject.trim();
     if (!trimmed || subjects.includes(trimmed)) return;
-    setSubjects(prev => [...prev, trimmed]);
+    // Add to the canonical list so it's shared across the app.
+    addCanonicalSubject({ id: `subj-${Date.now()}`, name: trimmed, active: true });
     if (isEditing) {
       setEditGrid(prev => {
         const next = { ...prev };
@@ -108,7 +118,9 @@ export function Results() {
   };
 
   const removeSubject = (sub: string) => {
-    setSubjects(prev => prev.filter(s => s !== sub));
+    // Remove from the canonical list (by name). Historical marks stay in records.
+    const match = canonicalSubjects.find(s => s.name === sub);
+    if (match) deleteCanonicalSubject(match.id);
     if (isEditing) {
       setEditGrid(prev => {
         const next = { ...prev };
