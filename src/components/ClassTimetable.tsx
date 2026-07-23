@@ -16,7 +16,7 @@ function slotKey(day: string, period: string) {
 }
 
 export function ClassTimetable() {
-  const { timetables, saveTimetable, teachers } = useAppContext();
+  const { timetables, saveTimetable, teachers, subjects } = useAppContext();
   const tc = useThemeClasses();
   const [selectedClass, setSelectedClass] = useState(CLASSES[0]);
   const [editing, setEditing] = useState<{ day: string; period: string } | null>(null);
@@ -243,11 +243,15 @@ export function ClassTimetable() {
                 <label className="block text-sm font-medium text-gray-700 mb-1">Subject</label>
                 <input
                   autoFocus
+                  list="subject-list"
                   value={cellForm.subject}
                   onChange={e => setCellForm(f => ({ ...f, subject: e.target.value }))}
                   placeholder="e.g. Mathematics, English, Science…"
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
+                <datalist id="subject-list">
+                  {subjects.filter(s => s.active !== false).map(s => <option key={s.id} value={s.name} />)}
+                </datalist>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Teacher (optional)</label>

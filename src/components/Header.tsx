@@ -53,7 +53,7 @@ export function Header({ onMenuClick, onGoToUsers, onGoToProfile, onNavigate }: 
 
           <GlobalSearch onNavigate={onNavigate} />
 
-          <NotificationBell onGoToUsers={onGoToUsers} />
+          <NotificationBell onGoToUsers={onGoToUsers} onNavigate={onNavigate} />
 
           {currentUser && (
             <button onClick={onGoToProfile}
