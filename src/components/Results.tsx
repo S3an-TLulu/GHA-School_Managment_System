@@ -11,6 +11,27 @@ const emitDoc = (html: string, filename: string, pdf: boolean) => pdf ? exportPd
 const CLASSES = ['Baby Class', 'Middle Class', 'Reception', 'Grade 1', 'Grade 2', 'Grade 3', 'Grade 4', 'Grade 5', 'Grade 6', 'Grade 7'];
 const DEFAULT_SUBJECTS = ['English', 'Mathematics', 'Science', 'Social Studies', 'Religious Education', 'Creative Arts', 'Physical Education'];
 
+// The assessments a teacher can record within a single term. Marks are entered
+// per-assessment; the term Overall is the average across whatever has been
+// recorded. "Overall (Term)" is a read-only view of that computed result.
+const ASSESSMENTS = ['Monthly Test 1', 'Monthly Test 2', 'Monthly Test 3', 'Mid-Term', 'End of Term'];
+const OVERALL = 'Overall (Term)';
+
+// Average each subject's mark across all recorded assessments → the term overall.
+function computeOverall(assessments: Record<string, Record<string, number>>): Record<string, number> {
+  const totals: Record<string, { sum: number; n: number }> = {};
+  Object.values(assessments).forEach(marks => {
+    Object.entries(marks).forEach(([sub, mark]) => {
+      if (!totals[sub]) totals[sub] = { sum: 0, n: 0 };
+      totals[sub].sum += mark;
+      totals[sub].n += 1;
+    });
+  });
+  const out: Record<string, number> = {};
+  Object.entries(totals).forEach(([sub, { sum, n }]) => { out[sub] = Math.round(sum / n); });
+  return out;
+}
+
 function getGrade(mark: number): { letter: string; color: string } {
   if (mark >= 80) return { letter: 'A', color: 'text-green-600' };
   if (mark >= 70) return { letter: 'B', color: 'text-blue-600' };
@@ -34,10 +55,18 @@ export function Results() {
 
   const [selectedClass, setSelectedClass] = useState(CLASSES[3]);
   const [selectedTerm, setSelectedTerm] = useState(TERMS[0]);
+  const [selectedAssessment, setSelectedAssessment] = useState(ASSESSMENTS[0]);
   const [newSubject, setNewSubject] = useState('');
   const [editGrid, setEditGrid] = useState<Record<string, Record<string, string>>>({});
   const [isEditing, setIsEditing] = useState(false);
   const [viewStudent, setViewStudent] = useState<string | null>(null);
+
+  const viewingOverall = selectedAssessment === OVERALL;
+
+  // The marks currently shown for a student: the selected assessment's marks, or
+  // the computed term overall when the Overall view is active.
+  const displayMarks = (result?: StudentResult): Record<string, number> =>
+    !result ? {} : viewingOverall ? result.subjects : (result.assessments?.[selectedAssessment] ?? {});
 
   const classStudents = students.filter(s => s.grade === selectedClass && (!s.status || s.status === 'active'));
 
@@ -47,7 +76,8 @@ export function Results() {
   // subject names already recorded in this class's marks so history never hides.
   const subjects = (() => {
     const canonical = canonicalSubjects.filter(s => s.active !== false).map(s => s.name);
-    const fromResults = classResults.flatMap(r => Object.keys(r.subjects));
+    const fromResults = classResults.flatMap(r =>
+      [...Object.keys(r.subjects), ...Object.values(r.assessments ?? {}).flatMap(m => Object.keys(m))]);
     const merged = Array.from(new Set([...(canonical.length ? canonical : DEFAULT_SUBJECTS), ...fromResults]));
     return merged;
   })();
@@ -71,12 +101,13 @@ export function Results() {
   };
 
   const startEditing = () => {
+    if (viewingOverall) return; // the Overall view is read-only (computed)
     const grid: Record<string, Record<string, string>> = {};
     classStudents.forEach(s => {
-      const existing = getStudentResult(s.id);
+      const marks = getStudentResult(s.id)?.assessments?.[selectedAssessment] ?? {};
       grid[s.id] = {};
       subjects.forEach(sub => {
-        grid[s.id][sub] = existing?.subjects[sub]?.toString() ?? '';
+        grid[s.id][sub] = marks[sub]?.toString() ?? '';
       });
     });
     setEditGrid(grid);
@@ -84,22 +115,35 @@ export function Results() {
   };
 
   const saveAll = () => {
-    const records: StudentResult[] = classStudents.map(s => ({
-      id: getStudentResult(s.id)?.id ?? `result-${s.id}-${Date.now()}`,
-      studentId: s.id,
-      classGrade: selectedClass,
-      term: selectedTerm,
-      subjects: Object.fromEntries(
+    if (viewingOverall) return;
+    const records: StudentResult[] = classStudents.map(s => {
+      const existing = getStudentResult(s.id);
+      // Marks entered for the assessment being edited.
+      const marks = Object.fromEntries(
         subjects
-          .filter(sub => editGrid[s.id]?.[sub] !== '')
+          .filter(sub => (editGrid[s.id]?.[sub] ?? '') !== '')
           .map(sub => [sub, parseFloat(editGrid[s.id]?.[sub] ?? '0') || 0])
-      ),
-      recordedBy: 'Admin',
-      date: new Date().toISOString(),
-    }));
+      );
+      // Merge into any other assessments already recorded for this student.
+      const assessments = { ...(existing?.assessments ?? {}) };
+      if (Object.keys(marks).length) assessments[selectedAssessment] = marks;
+      else delete assessments[selectedAssessment];
+      // Recompute the term overall; fall back to legacy `subjects` if empty.
+      const overall = computeOverall(assessments);
+      return {
+        id: existing?.id ?? `result-${s.id}-${Date.now()}`,
+        studentId: s.id,
+        classGrade: selectedClass,
+        term: selectedTerm,
+        subjects: Object.keys(overall).length ? overall : (existing?.subjects ?? {}),
+        assessments,
+        recordedBy: 'Admin',
+        date: new Date().toISOString(),
+      };
+    });
     saveClassResults(selectedClass, selectedTerm, records);
     setIsEditing(false);
-    toast(`Results saved for ${selectedClass} — ${selectedTerm}.`, 'success');
+    toast(`${selectedAssessment} saved for ${selectedClass} — ${selectedTerm}.`, 'success');
   };
 
   const addSubject = () => {
@@ -139,6 +183,18 @@ export function Results() {
     const { letter } = getGrade(avg);
     const passed = avg >= 50;
 
+    // Breakdown of the term's assessments (Monthly Tests / Mid-Term / End of Term).
+    const recorded = ASSESSMENTS.filter(a => result.assessments?.[a] && Object.keys(result.assessments[a]).length);
+    const breakdown = recorded.length ? `
+    <p style="margin:16px 0 4px;font-weight:700;font-size:13px;color:#374151;">Assessment breakdown</p>
+    <table style="border-collapse:collapse;width:100%;margin-bottom:4px;">
+      <thead><tr><th>Assessment</th><th style="text-align:center;">Average</th><th style="text-align:center;">Grade</th></tr></thead>
+      <tbody>${recorded.map(a => {
+        const av = calcAverage(result.assessments![a]);
+        return `<tr><td style="padding:6px 12px;border:1px solid #e5e7eb;">${a}</td><td style="padding:6px 12px;border:1px solid #e5e7eb;text-align:center;font-weight:600;">${av}%</td><td style="padding:6px 12px;border:1px solid #e5e7eb;text-align:center;font-weight:700;">${getGrade(av).letter}</td></tr>`;
+      }).join('')}</tbody>
+    </table>` : '';
+
     const rows = subjects.map(sub => {
       const mark = result.subjects[sub] ?? '—';
       const g = typeof mark === 'number' ? getGrade(mark) : { letter: '—', color: '' };
@@ -174,6 +230,7 @@ export function Results() {
         </tr>
       </tfoot>
     </table>
+    ${breakdown}
     <div style="margin-top:20px;padding:12px;background:${passed ? '#f0fdf4' : '#fef2f2'};border-radius:8px;border:1px solid ${passed ? '#bbf7d0' : '#fecaca'};">
       <p style="margin:0;font-weight:700;color:${passed ? '#16a34a' : '#dc2626'};font-size:16px;">${passed ? 'PASSED' : 'FAILED'}</p>
       <p style="margin:4px 0 0;color:#6b7280;font-size:12px;">Overall average: ${avg}% — ${letter}</p>
@@ -289,10 +346,12 @@ export function Results() {
               <button title="Export all report cards to PDF" onClick={() => printAllCards(true)} className="flex items-center border border-gray-300 text-gray-700 px-2 py-2 rounded-lg text-sm font-medium hover:bg-gray-50">
                 <FileDown className="h-4 w-4" />
               </button>
-              <button onClick={startEditing} className={`flex items-center space-x-2 ${tc.btn} text-white px-4 py-2 rounded-lg text-sm font-medium`}>
-                <Plus className="h-4 w-4" />
-                <span>Enter Marks</span>
-              </button>
+              {!viewingOverall && (
+                <button onClick={startEditing} className={`flex items-center space-x-2 ${tc.btn} text-white px-4 py-2 rounded-lg text-sm font-medium`}>
+                  <Plus className="h-4 w-4" />
+                  <span>Enter Marks</span>
+                </button>
+              )}
             </>
           ) : (
             <>
@@ -333,6 +392,21 @@ export function Results() {
             <ChevronDown className="absolute right-2 top-2 h-4 w-4 text-gray-400 pointer-events-none" />
           </div>
         </div>
+        <div className="w-full">
+          <label className="block text-xs font-medium text-gray-500 mb-1">Assessment</label>
+          <div className="flex flex-wrap gap-2">
+            {[...ASSESSMENTS, OVERALL].map(a => (
+              <button key={a} onClick={() => { setSelectedAssessment(a); setIsEditing(false); }}
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
+                  selectedAssessment === a
+                    ? a === OVERALL ? 'bg-gray-800 text-white border-transparent' : `${tc.btn.split(' ')[0]} text-white border-transparent`
+                    : 'border-gray-300 text-gray-700 hover:border-gray-400'
+                }`}>
+                {a}
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
 
       {/* Subjects manager */}
@@ -364,7 +438,9 @@ export function Results() {
         <div className="p-4 border-b border-gray-100 flex items-center space-x-2">
           <GraduationCap className="h-4 w-4 text-blue-600" />
           <span className="font-semibold text-gray-900">{selectedClass} — {selectedTerm}</span>
+          <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${viewingOverall ? 'bg-gray-800 text-white' : `${tc.light} ${tc.text}`}`}>{selectedAssessment}</span>
           <span className="text-xs text-gray-400 ml-2">{classStudents.length} students</span>
+          {viewingOverall && <span className="text-xs text-gray-400">· average across recorded assessments</span>}
         </div>
 
         {classStudents.length === 0 ? (
@@ -389,7 +465,8 @@ export function Results() {
               <tbody>
                 {classStudents.map(student => {
                   const result = getStudentResult(student.id);
-                  const avg = result ? calcAverage(result.subjects) : null;
+                  const shown = displayMarks(result);
+                  const avg = Object.keys(shown).length ? calcAverage(shown) : null;
                   const grade = avg !== null ? getGrade(avg) : null;
                   return (
                     <tr key={student.id} className="hover:bg-gray-50 border-b border-gray-100">
@@ -411,7 +488,7 @@ export function Results() {
                             />
                           ) : (
                             <span className="text-xs text-gray-700">
-                              {result?.subjects[sub] !== undefined ? `${result.subjects[sub]}%` : '—'}
+                              {shown[sub] !== undefined ? `${shown[sub]}%` : '—'}
                             </span>
                           )}
                         </td>

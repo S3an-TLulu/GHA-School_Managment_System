@@ -458,7 +458,15 @@ export interface StudentResult {
   studentId: string;
   classGrade: string;
   term: string;
+  // `subjects` is the OVERALL term result per subject — kept as the canonical
+  // field consumed by the Dashboard, Reports and Parent Portal. When per-
+  // assessment marks are recorded it is the average across those assessments.
   subjects: Record<string, number>;
+  // Optional per-assessment marks: assessmentName -> subject -> mark. Lets a
+  // teacher enter Monthly Tests / Mid-Term / End of Term separately; `subjects`
+  // is recomputed as the average across whatever assessments exist. Legacy rows
+  // without this keep working (their `subjects` is the de-facto term overall).
+  assessments?: Record<string, Record<string, number>>;
   recordedBy: string;
   date: string;
 }
