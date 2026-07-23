@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import {
   BookOpen, Plus, Trash2, Printer, FileDown, Check, ArrowLeft, Shuffle,
-  ListChecks, Layers, FileQuestion, Users2, ScrollText, ClipboardList, Boxes, Gift, X,
+  ListChecks, Layers, FileQuestion, Users2, ScrollText, ClipboardList, Boxes, Gift, X, Sparkles,
 } from 'lucide-react';
+import { generateResource } from '../lib/aiGenerate';
 import {
   useAppContext, Subject, SubjectTopic, LessonPlan, ProjectTask, WorkGroup,
   ClassRule, ClassRole, ClassInventoryItem, WishlistItem, QuizQuestion,
@@ -155,10 +156,21 @@ export function Subjects() {
     const { subjectTopics, addSubjectTopic, updateSubjectTopic, deleteSubjectTopic } = ctx;
     const list = subjectTopics.filter(t => t.subject === subject).sort((a, b) => a.order - b.order);
     const [form, setForm] = useState({ title: '', content: '' });
+    const [gen, setGen] = useState(false);
     const add = () => {
       if (!form.title.trim()) { toast('Give the topic a title.', 'warning'); return; }
       const t: SubjectTopic = { id: uid('top'), subject, grade, title: form.title.trim(), content: form.content.trim(), order: list.length };
       addSubjectTopic(t); setForm({ title: '', content: '' }); toast('Topic added.', 'success');
+    };
+    const generate = async () => {
+      const topic = form.title.trim() || window.prompt('Generate topic notes about…') || '';
+      if (!topic.trim()) return;
+      setGen(true);
+      const r = await generateResource('topic', { subject, grade, topic: topic.trim() });
+      setGen(false);
+      if (!r.ok) { toast(r.error, 'error'); return; }
+      addSubjectTopic({ id: uid('top'), subject, grade, title: r.data.title || topic.trim(), content: r.data.content, order: list.length });
+      setForm({ title: '', content: '' }); toast('Topic notes generated.', 'success');
     };
     return (
       <div className="space-y-4">
@@ -170,7 +182,10 @@ export function Subjects() {
           <div className="space-y-2">
             <input className={`${inp} w-full`} placeholder="Topic title" value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} />
             <textarea className={`${inp} w-full`} rows={4} placeholder="Topic content / syllabus notes…" value={form.content} onChange={e => setForm({ ...form, content: e.target.value })} />
-            <button onClick={add} className={`flex items-center gap-1.5 ${tc.btn} text-white px-3 py-2 rounded-lg text-sm`}><Plus className="h-4 w-4" />Add topic</button>
+            <div className="flex gap-2">
+              <button onClick={add} className={`flex items-center gap-1.5 ${tc.btn} text-white px-3 py-2 rounded-lg text-sm`}><Plus className="h-4 w-4" />Add topic</button>
+              <button onClick={generate} disabled={gen} title="Generate topic notes with AI" className="flex items-center gap-1.5 border border-purple-300 text-purple-700 hover:bg-purple-50 px-3 py-2 rounded-lg text-sm disabled:opacity-50"><Sparkles className="h-4 w-4" />{gen ? 'Generating…' : 'Generate'}</button>
+            </div>
           </div>
           <div className="space-y-2">
             {list.map(t => (
@@ -196,10 +211,22 @@ export function Subjects() {
     const list = lessonPlans.filter(p => p.subject === subject);
     const [openId, setOpenId] = useState<string | null>(null);
     const [title, setTitle] = useState('');
+    const [gen, setGen] = useState(false);
     const create = () => {
       if (!title.trim()) { toast('Give the lesson a title.', 'warning'); return; }
       const p: LessonPlan = { id: uid('lp'), subject, grade, title: title.trim(), date: new Date().toISOString().split('T')[0], objectives: '', steps: [], resources: '', notes: '' };
       addLessonPlan(p); setTitle(''); setOpenId(p.id); toast('Lesson plan created.', 'success');
+    };
+    const generate = async () => {
+      const topic = title.trim() || window.prompt('Generate a lesson plan about…') || '';
+      if (!topic.trim()) return;
+      setGen(true);
+      const r = await generateResource('lesson', { subject, grade, topic: topic.trim() });
+      setGen(false);
+      if (!r.ok) { toast(r.error, 'error'); return; }
+      const steps: ProjectTask[] = (r.data.steps || []).map(text => ({ id: uid('st'), text, done: false }));
+      const p: LessonPlan = { id: uid('lp'), subject, grade, title: r.data.title || topic.trim(), date: new Date().toISOString().split('T')[0], objectives: r.data.objectives || '', steps, resources: r.data.resources || '', notes: r.data.notes || '' };
+      addLessonPlan(p); setTitle(''); setOpenId(p.id); toast('Lesson plan generated.', 'success');
     };
     const open = lessonPlans.find(p => p.id === openId);
     if (open) return <LessonDetail plan={open} onBack={() => setOpenId(null)} onUpdate={updateLessonPlan} />;
@@ -208,6 +235,7 @@ export function Subjects() {
         <form className="flex gap-2" onSubmit={e => { e.preventDefault(); create(); }}>
           <input className={`${inp} flex-1`} placeholder="New lesson plan title" value={title} onChange={e => setTitle(e.target.value)} />
           <button className={`flex items-center gap-1.5 ${tc.btn} text-white px-3 py-2 rounded-lg text-sm`}><Plus className="h-4 w-4" />New Plan</button>
+          <button type="button" onClick={generate} disabled={gen} title="Generate a lesson plan with AI" className="flex items-center gap-1.5 border border-purple-300 text-purple-700 hover:bg-purple-50 px-3 py-2 rounded-lg text-sm disabled:opacity-50"><Sparkles className="h-4 w-4" />{gen ? 'Generating…' : 'Generate'}</button>
         </form>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {list.map(p => {
@@ -278,6 +306,21 @@ export function Subjects() {
     const list = quizQuestions.filter(q => q.subject === subject);
     const [q, setQ] = useState({ question: '', options: ['', '', '', ''], correctIndex: 0, marks: '1', short: false });
     const [paperTitle, setPaperTitle] = useState('Class Test');
+    const [gen, setGen] = useState(false);
+    const generate = async () => {
+      const topic = window.prompt(`Generate questions for ${subject} about…`) || '';
+      if (!topic.trim()) return;
+      const n = parseInt(window.prompt('How many questions? (1–20)', '5') || '5') || 5;
+      setGen(true);
+      const r = await generateResource('quiz', { subject, grade, topic: topic.trim(), count: n });
+      setGen(false);
+      if (!r.ok) { toast(r.error, 'error'); return; }
+      (r.data.questions || []).forEach(g => addQuizQuestion({
+        id: uid('qq'), subject, grade: grade || undefined, question: g.question,
+        options: g.options || [], correctIndex: g.correctIndex ?? 0, marks: g.marks || 1,
+      }));
+      toast(`Added ${(r.data.questions || []).length} generated question(s).`, 'success');
+    };
     const add = () => {
       if (!q.question.trim()) { toast('Enter the question.', 'warning'); return; }
       const options = q.short ? [] : q.options.map(o => o.trim()).filter(Boolean);
@@ -303,7 +346,10 @@ export function Subjects() {
               <input className={`${inp} flex-1`} placeholder={`Option ${'ABCD'[i]}`} value={o} onChange={e => setQ({ ...q, options: q.options.map((x, j) => j === i ? e.target.value : x) })} />
             </div>
           ))}
-          <button onClick={add} className={`flex items-center gap-1.5 ${tc.btn} text-white px-3 py-2 rounded-lg text-sm`}><Plus className="h-4 w-4" />Add to bank</button>
+          <div className="flex gap-2">
+            <button onClick={add} className={`flex items-center gap-1.5 ${tc.btn} text-white px-3 py-2 rounded-lg text-sm`}><Plus className="h-4 w-4" />Add to bank</button>
+            <button onClick={generate} disabled={gen} title="Generate questions with AI" className="flex items-center gap-1.5 border border-purple-300 text-purple-700 hover:bg-purple-50 px-3 py-2 rounded-lg text-sm disabled:opacity-50"><Sparkles className="h-4 w-4" />{gen ? 'Generating…' : 'Generate'}</button>
+          </div>
         </div>
         <div className="space-y-3">
           <p className="font-semibold text-gray-900">Bank ({list.length})</p>
