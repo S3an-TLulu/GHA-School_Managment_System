@@ -1,8 +1,10 @@
 import { useState } from 'react';
-import { Search, Printer, Users, ChevronDown, ChevronRight, FileDown } from 'lucide-react';
+import { Search, Printer, Users, ChevronDown, ChevronRight, FileDown, MessageCircle, Phone, Mail, Plus } from 'lucide-react';
 import { printHtml, exportPdf } from '../lib/print';
 import { useAppContext } from '../context/AppContext';
 import { useThemeClasses } from '../hooks/useThemeClasses';
+import { useToast } from './ToastProvider';
+import { waLink, buildFeeReminder } from '../lib/notify';
 import { PersonDocuments } from './PersonDocs';
 
 interface FamilyGroup {
@@ -20,10 +22,40 @@ interface FamilyGroup {
 }
 
 export function FamilyStatements() {
-  const { students, payments } = useAppContext();
+  const { students, payments, branding, currentTerm, addPayment } = useAppContext();
   const tc = useThemeClasses();
+  const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState('');
   const [expandedFamily, setExpandedFamily] = useState<string | null>(null);
+
+  // Quick WhatsApp reminder for a family's outstanding balance (opens WhatsApp
+  // pre-filled; nothing is sent automatically).
+  const remindFamily = (family: FamilyGroup) => {
+    const balance = family.totalPending + family.totalOverdue;
+    if (!family.guardianPhone) { toast('No phone number on this family.', 'warning'); return; }
+    if (balance <= 0) { toast('This family has no outstanding balance.', 'info'); return; }
+    const msg = buildFeeReminder({
+      schoolName: branding.schoolName, recipientName: family.guardianName,
+      what: 'school fees', balance,
+      studentName: family.students.map(s => s.name).join(', '),
+    });
+    window.open(waLink(family.guardianPhone, msg), '_blank', 'noopener');
+  };
+
+  // Quick-record a cash payment against a child (prompts for the amount).
+  const quickPay = (studentId: string, studentName: string) => {
+    const input = window.prompt(`Record a payment for ${studentName}\n\nAmount received (K):`);
+    if (!input) return;
+    const amt = parseFloat(input);
+    if (isNaN(amt) || amt <= 0) { toast('Invalid amount.', 'error'); return; }
+    const now = new Date().toISOString();
+    addPayment({
+      id: `pay-${Date.now()}`, studentId, type: 'Fees', amount: amt,
+      dueDate: now, status: 'paid', paidDate: now, createdDate: now,
+      term: currentTerm, receiptNumber: `RCP-${Date.now().toString().slice(-6)}`, paymentMethod: 'Cash',
+    });
+    toast(`K${amt.toLocaleString()} recorded for ${studentName}.`, 'success');
+  };
 
   const families: FamilyGroup[] = [];
   const guardianMap = new Map<string, FamilyGroup>();
@@ -173,8 +205,8 @@ export function FamilyStatements() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Family Statements</h1>
-        <p className="text-gray-600">View and print payment statements grouped by family</p>
+        <h1 className="text-2xl font-bold text-gray-900">Families</h1>
+        <p className="text-gray-600">Each family's children, balances, contacts and statements in one place</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -228,6 +260,12 @@ export function FamilyStatements() {
                         Balance: K{totalBalance.toLocaleString()}
                       </p>
                     </div>
+                    {totalBalance > 0 && family.guardianPhone && (
+                      <button onClick={e => { e.stopPropagation(); remindFamily(family); }} title="Send WhatsApp fee reminder"
+                        className="flex items-center gap-1 px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-sm rounded-lg transition-colors">
+                        <MessageCircle className="h-3.5 w-3.5" /><span className="hidden sm:inline">Remind</span>
+                      </button>
+                    )}
                     <button onClick={e => { e.stopPropagation(); handlePrint(family); }}
                       className={`flex items-center space-x-1 px-3 py-1.5 ${tc.btn} text-white text-sm rounded-lg transition-colors`}>
                       <Printer className="h-3.5 w-3.5" />
@@ -243,6 +281,12 @@ export function FamilyStatements() {
 
                 {isExpanded && (
                   <div className="mt-4 pl-13">
+                    {/* Guardian contact quick-actions */}
+                    <div className="flex flex-wrap gap-2 mb-4">
+                      {family.guardianPhone && <a href={`tel:${family.guardianPhone}`} className="inline-flex items-center gap-1.5 text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 text-gray-700 hover:bg-gray-50"><Phone className="h-3.5 w-3.5" />{family.guardianPhone}</a>}
+                      {family.guardianPhone && totalBalance > 0 && <button onClick={() => remindFamily(family)} className="inline-flex items-center gap-1.5 text-xs border border-green-200 text-green-700 rounded-lg px-2.5 py-1.5 hover:bg-green-50"><MessageCircle className="h-3.5 w-3.5" />WhatsApp reminder</button>}
+                      {family.guardianEmail && <a href={`mailto:${family.guardianEmail}`} className="inline-flex items-center gap-1.5 text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 text-gray-700 hover:bg-gray-50"><Mail className="h-3.5 w-3.5" />{family.guardianEmail}</a>}
+                    </div>
                     <div className="grid grid-cols-3 gap-3 mb-4">
                       <div className="bg-green-50 rounded-lg p-3 text-center">
                         <p className="text-xs text-green-600">Paid</p>
@@ -267,7 +311,13 @@ export function FamilyStatements() {
                         const studentPayments = payments.filter(p => p.studentId === student.id);
                         return (
                           <div key={student.id} className="border border-gray-100 rounded-lg p-3 bg-gray-50">
-                            <p className="text-sm font-medium text-gray-900 mb-2">{student.name} — <span className="text-gray-500">{student.grade}</span></p>
+                            <div className="flex items-center justify-between mb-2">
+                              <p className="text-sm font-medium text-gray-900">{student.name} — <span className="text-gray-500">{student.grade}</span></p>
+                              <button onClick={() => quickPay(student.id, student.name)} title="Record a payment"
+                                className="flex items-center gap-1 text-xs text-blue-600 border border-blue-200 hover:bg-blue-50 rounded px-2 py-1">
+                                <Plus className="h-3 w-3" />Payment
+                              </button>
+                            </div>
                             {studentPayments.length === 0 ? (
                               <p className="text-xs text-gray-400">No payment records</p>
                             ) : (

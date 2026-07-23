@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import {
   LayoutDashboard, Users, CreditCard, ShoppingBag, ClipboardList,
-  BarChart3, UserCheck, TrendingDown, Package, Calendar, FileText,
+  BarChart3, UserCheck, TrendingDown, Package, Calendar,
   DollarSign, Bell, MonitorCheck, ClipboardCheck, CalendarDays,
   Palette, Building2, LayoutTemplate, Clock, Layers, GraduationCap,
   ChevronDown, ChevronsLeft, ChevronsRight, Heart, Bus, UserX, Settings as SettingsIcon, Briefcase, ChefHat, UserCircle, Camera, BookOpen, MessageSquare, HelpCircle, Wallet, Wrench
@@ -43,7 +43,7 @@ const menuGroups = [
       { id: 'feestructure',label: 'Fee Structure',       icon: DollarSign },
       { id: 'debtors',     label: 'Debtors',             icon: UserX },
       { id: 'expenses',    label: 'Expenses',            icon: TrendingDown },
-      { id: 'statements',  label: 'Family Statements',   icon: FileText },
+      { id: 'statements',  label: 'Families',            icon: Users },
       { id: 'fundraisers', label: 'Fundraisers',         icon: Heart },
       { id: 'hr',          label: 'HR & Payroll',        icon: Briefcase },
     ]
