@@ -7,6 +7,10 @@ export interface Problem {
   questionHtml: string;
   answerHtml: string;
   marks: number;
+  // Optional plain-text forms so a bankable generator's problems can be pushed
+  // into the Quiz Builder question bank.
+  bankQuestion?: string;
+  bankAnswer?: string;
 }
 
 // Declarative schema for one setting — drives an auto-rendered settings form in
@@ -22,15 +26,22 @@ export interface SettingSpec {
 }
 
 export type GeneratorCategory =
-  | 'arithmetic' | 'numberSense' | 'counting' | 'wordProblems' | 'visual' | 'handwriting';
+  | 'arithmetic' | 'numberSense' | 'counting' | 'wordProblems' | 'measurement'
+  | 'geometry' | 'reasoning' | 'visual' | 'handwriting' | 'english' | 'science' | 'social';
 
 export const CATEGORY_LABELS: Record<GeneratorCategory, string> = {
   arithmetic: 'Arithmetic',
   numberSense: 'Number sense',
   counting: 'Counting & patterns',
   wordProblems: 'Word problems',
+  measurement: 'Measurement & money',
+  geometry: 'Geometry',
+  reasoning: 'Reasoning',
   visual: 'Visual maths',
   handwriting: 'Handwriting',
+  english: 'English',
+  science: 'Science',
+  social: 'Social Studies',
 };
 
 export interface GenerateArgs {
@@ -51,6 +62,9 @@ export interface Generator {
   settings: SettingSpec[];
   defaults: Record<string, unknown>;
   generate(args: GenerateArgs): Problem[];
+  // When true, this generator's problems are plain-text Q&A and can be pushed
+  // into the Quiz Builder question bank.
+  bankable?: boolean;
 }
 
 // Small typed helpers for reading loosely-typed settings inside generators.

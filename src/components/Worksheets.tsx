@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import {
   PencilRuler, Plus, Trash2, Printer, FileDown, RefreshCw, Lock, Unlock,
-  ChevronUp, ChevronDown, Save, FilePlus, Copy, Eye,
+  ChevronUp, ChevronDown, Save, FilePlus, Copy, Eye, Sliders, Send,
 } from 'lucide-react';
 import { useAppContext, Worksheet, WorksheetSection } from '../context/AppContext';
 import { useThemeClasses } from '../hooks/useThemeClasses';
@@ -10,7 +10,7 @@ import { GENERATORS, getGenerator } from '../lib/worksheet/generators';
 import { CATEGORY_LABELS, GeneratorCategory, SettingSpec } from '../lib/worksheet/types';
 import { GRADES } from '../lib/worksheet/grades';
 import { randomSeed } from '../lib/worksheet/rng';
-import { printWorksheet, sectionProblems } from '../lib/worksheetDocs';
+import { printWorksheet, printWorksheetPack, sectionProblems } from '../lib/worksheetDocs';
 
 const uid = (p: string) => `${p}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
 
@@ -22,7 +22,7 @@ const newSection = (generatorId: string): WorksheetSection => {
 };
 
 export function Worksheets() {
-  const { worksheets, addWorksheet, updateWorksheet, deleteWorksheet, branding, subjects } = useAppContext();
+  const { worksheets, addWorksheet, updateWorksheet, deleteWorksheet, addQuizQuestion, branding, subjects } = useAppContext();
   const tc = useThemeClasses();
   const { toast } = useToast();
 
@@ -36,6 +36,7 @@ export function Worksheets() {
   const [savedId, setSavedId] = useState<string | null>(null);
   const [addGen, setAddGen] = useState(GENERATORS[0].id);
   const [showPreview, setShowPreview] = useState(true);
+  const [copies, setCopies] = useState(1);
 
   const set = (patch: Partial<Worksheet>) => setWs(w => ({ ...w, ...patch }));
   const setLayout = (patch: Partial<Worksheet['layout']>) => setWs(w => ({ ...w, layout: { ...w.layout, ...patch } }));
@@ -50,8 +51,36 @@ export function Worksheets() {
     [arr[i], arr[j]] = [arr[j], arr[i]];
     return { ...w, sections: arr };
   });
-  const regenerate = (id: string) => patchSection(id, { seed: randomSeed() });
-  const regenerateAll = () => setWs(w => ({ ...w, sections: w.sections.map(s => s.locked ? s : { ...s, seed: randomSeed() }) }));
+  // Reroll only the questions that aren't individually locked (keeps their salts).
+  const rerollSection = (s: WorksheetSection): WorksheetSection => {
+    const locked = new Set(s.lockedItems ?? []);
+    const salts = { ...(s.salts ?? {}) };
+    for (let i = 0; i < s.count; i++) if (!locked.has(i)) salts[i] = (salts[i] ?? 0) + 1;
+    return { ...s, salts };
+  };
+  const regenerate = (id: string) => setWs(w => ({ ...w, sections: w.sections.map(s => s.id === id ? rerollSection(s) : s) }));
+  const regenerateAll = () => setWs(w => ({ ...w, sections: w.sections.map(s => s.locked ? s : rerollSection(s)) }));
+  const rerollItem = (id: string, i: number) => setWs(w => ({ ...w, sections: w.sections.map(s => s.id === id ? { ...s, salts: { ...(s.salts ?? {}), [i]: (s.salts?.[i] ?? 0) + 1 } } : s) }));
+  const toggleItemLock = (id: string, i: number) => setWs(w => ({ ...w, sections: w.sections.map(s => {
+    if (s.id !== id) return s;
+    const set = new Set(s.lockedItems ?? []);
+    set.has(i) ? set.delete(i) : set.add(i);
+    return { ...s, lockedItems: [...set] };
+  }) }));
+  const applyGradeDefaults = () => setWs(w => ({ ...w, sections: w.sections.map(s => { const g = getGenerator(s.generatorId); return g ? { ...s, settings: { ...g.defaults } } : s; }) }));
+
+  const sendToBank = (s: WorksheetSection) => {
+    const gen = getGenerator(s.generatorId);
+    if (!gen?.bankable) { toast('This question type can’t be sent to the bank.', 'warning'); return; }
+    const problems = sectionProblems(s, ws.grade).filter(p => p.bankQuestion);
+    if (!problems.length) { toast('No bank-ready questions in this section.', 'warning'); return; }
+    problems.forEach(p => addQuizQuestion({
+      id: `qq-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`, subject: ws.subject || 'Mathematics',
+      grade: ws.grade || undefined, question: p.bankQuestion!, options: [], type: 'short',
+      answerText: p.bankAnswer || undefined, marks: p.marks || 1,
+    }));
+    toast(`Added ${problems.length} question(s) to the quiz bank.`, 'success');
+  };
 
   const saveTemplate = () => {
     if (!ws.sections.length) { toast('Add at least one section first.', 'warning'); return; }
@@ -64,7 +93,8 @@ export function Worksheets() {
 
   const doPrint = (withAnswers: boolean, pdf = false) => {
     if (!ws.sections.length) { toast('Add a section first.', 'warning'); return; }
-    printWorksheet(ws, branding, { withAnswers, pdf });
+    if (copies > 1) printWorksheetPack(ws, branding, { copies, withAnswers, pdf });
+    else printWorksheet(ws, branding, { withAnswers, pdf });
   };
 
   const inp = 'px-2.5 py-1.5 border border-gray-300 rounded-lg text-sm';
@@ -114,6 +144,9 @@ export function Worksheets() {
         </label>
         <label className="flex items-center gap-1.5 text-sm text-gray-600"><input type="checkbox" checked={ws.layout.bw} onChange={e => setLayout({ bw: e.target.checked })} />Black &amp; white</label>
         <label className="flex items-center gap-1.5 text-sm text-gray-600"><input type="checkbox" checked={ws.layout.pageNumbers} onChange={e => setLayout({ pageNumbers: e.target.checked })} />Footer</label>
+        <label className="text-xs font-medium text-gray-500" title="Print several differentiated variants at once">Copies
+          <input type="number" min={1} max={40} className={`${inp} block mt-1 w-20`} value={copies} onChange={e => setCopies(Math.max(1, parseInt(e.target.value) || 1))} />
+        </label>
         <span className="text-xs text-gray-400 ml-auto">Total marks: <b className="text-gray-700">{totalMarks}</b></span>
       </div>
 
@@ -131,11 +164,13 @@ export function Worksheets() {
             </select>
             <button onClick={addSection} className={`flex items-center gap-1.5 ${tc.btn} text-white px-3 py-1.5 rounded-lg text-sm`}><Plus className="h-4 w-4" />Add section</button>
             {ws.sections.length > 0 && <button onClick={regenerateAll} className="flex items-center gap-1.5 border border-gray-300 text-gray-700 px-3 py-1.5 rounded-lg text-sm hover:bg-gray-50"><RefreshCw className="h-4 w-4" />Regenerate all</button>}
+            {ws.sections.length > 0 && <button onClick={applyGradeDefaults} title="Reset all sections to grade-appropriate defaults" className="flex items-center gap-1.5 border border-gray-300 text-gray-700 px-3 py-1.5 rounded-lg text-sm hover:bg-gray-50"><Sliders className="h-4 w-4" />Grade defaults</button>}
           </div>
         </div>
         {ws.sections.length === 0 && <p className="text-sm text-gray-400 text-center py-6">Pick a question type above and add a section to begin.</p>}
         {ws.sections.map((s, i) => <SectionEditor key={s.id} section={s} index={i} total={ws.sections.length} grade={ws.grade}
-          onPatch={patchSection} onRemove={removeSection} onMove={moveSection} onRegenerate={regenerate} showPreview={showPreview} />)}
+          onPatch={patchSection} onRemove={removeSection} onMove={moveSection} onRegenerate={regenerate}
+          onRerollItem={rerollItem} onToggleItemLock={toggleItemLock} onSendToBank={sendToBank} showPreview={showPreview} />)}
       </div>
 
       {/* Save / templates */}
@@ -167,25 +202,29 @@ export function Worksheets() {
   );
 }
 
-function SectionEditor({ section, index, total, grade, onPatch, onRemove, onMove, onRegenerate, showPreview }: {
+function SectionEditor({ section, index, total, grade, onPatch, onRemove, onMove, onRegenerate, onRerollItem, onToggleItemLock, onSendToBank, showPreview }: {
   section: WorksheetSection; index: number; total: number; grade: string;
   onPatch: (id: string, patch: Partial<WorksheetSection>) => void;
-  onRemove: (id: string) => void; onMove: (i: number, dir: -1 | 1) => void; onRegenerate: (id: string) => void; showPreview: boolean;
+  onRemove: (id: string) => void; onMove: (i: number, dir: -1 | 1) => void; onRegenerate: (id: string) => void;
+  onRerollItem: (id: string, i: number) => void; onToggleItemLock: (id: string, i: number) => void;
+  onSendToBank: (s: WorksheetSection) => void; showPreview: boolean;
 }) {
   const gen = getGenerator(section.generatorId);
   const setSetting = (key: string, value: unknown) => onPatch(section.id, { settings: { ...section.settings, [key]: value } });
   const inp = 'px-2 py-1 border border-gray-300 rounded text-sm';
-  const preview = showPreview ? sectionProblems(section, grade).slice(0, 4) : [];
+  const preview = showPreview ? sectionProblems(section, grade).slice(0, 24) : [];
+  const lockedItems = new Set(section.lockedItems ?? []);
 
   return (
     <div className="border border-gray-200 rounded-lg p-3 space-y-2 bg-gray-50/40">
       <div className="flex items-center gap-2 flex-wrap">
         <span className="font-semibold text-gray-900 text-sm">{gen?.label ?? section.generatorId}</span>
         <span className="flex-1" />
+        {gen?.bankable && <button onClick={() => onSendToBank(section)} title="Add these questions to the Quiz Builder bank" className="p-1 text-gray-400 hover:text-gray-800"><Send className="h-4 w-4" /></button>}
         <label className="text-xs text-gray-500 flex items-center gap-1">Count
           <input type="number" min={1} max={60} className={`${inp} w-16`} value={section.count} onChange={e => onPatch(section.id, { count: Math.max(1, parseInt(e.target.value) || 1) })} />
         </label>
-        <button onClick={() => onRegenerate(section.id)} title="Regenerate this section" className="p-1 text-gray-500 hover:text-gray-800"><RefreshCw className="h-4 w-4" /></button>
+        <button onClick={() => onRegenerate(section.id)} title="Regenerate this section (keeps locked questions)" className="p-1 text-gray-500 hover:text-gray-800"><RefreshCw className="h-4 w-4" /></button>
         <button onClick={() => onPatch(section.id, { locked: !section.locked })} title={section.locked ? 'Locked (kept on Regenerate all)' : 'Unlocked'} className={`p-1 ${section.locked ? 'text-amber-600' : 'text-gray-400'} hover:text-gray-800`}>{section.locked ? <Lock className="h-4 w-4" /> : <Unlock className="h-4 w-4" />}</button>
         <button onClick={() => onMove(index, -1)} disabled={index === 0} className="p-1 text-gray-400 hover:text-gray-800 disabled:opacity-30"><ChevronUp className="h-4 w-4" /></button>
         <button onClick={() => onMove(index, 1)} disabled={index === total - 1} className="p-1 text-gray-400 hover:text-gray-800 disabled:opacity-30"><ChevronDown className="h-4 w-4" /></button>
@@ -197,11 +236,21 @@ function SectionEditor({ section, index, total, grade, onPatch, onRemove, onMove
       </div>
       {showPreview && (
         <div className="bg-white border border-gray-200 rounded-lg p-3 overflow-x-auto">
-          <p className="text-[11px] uppercase tracking-wide text-gray-400 mb-1">Preview (first {preview.length})</p>
-          <div className="grid grid-cols-2 gap-3">
-            {preview.map((p, k) => <div key={k} className="text-sm" dangerouslySetInnerHTML={{ __html: p.questionHtml }} />)}
+          <p className="text-[11px] uppercase tracking-wide text-gray-400 mb-1">Preview — hover a question to reroll or lock it</p>
+          <div className="grid grid-cols-2 gap-x-3">
+            {preview.map((p, k) => (
+              <div key={k} className="group flex items-start gap-1 border-b border-gray-50 py-1">
+                <span className="text-xs text-gray-400 mt-0.5 w-5 shrink-0">{k + 1}.</span>
+                <div className="text-sm min-w-0 flex-1" dangerouslySetInnerHTML={{ __html: p.questionHtml }} />
+                <span className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 shrink-0">
+                  <button onClick={() => onRerollItem(section.id, k)} title="Reroll this question" className="p-0.5 text-gray-400 hover:text-gray-800"><RefreshCw className="h-3 w-3" /></button>
+                  <button onClick={() => onToggleItemLock(section.id, k)} title={lockedItems.has(k) ? 'Locked' : 'Lock this question'} className={`p-0.5 ${lockedItems.has(k) ? 'text-amber-600 opacity-100' : 'text-gray-400'} hover:text-gray-800`}>{lockedItems.has(k) ? <Lock className="h-3 w-3" /> : <Unlock className="h-3 w-3" />}</button>
+                </span>
+              </div>
+            ))}
             {preview.length === 0 && <p className="text-xs text-gray-400">No preview.</p>}
           </div>
+          {section.count > preview.length && <p className="text-[11px] text-gray-400 mt-1">Showing {preview.length} of {section.count}.</p>}
         </div>
       )}
     </div>

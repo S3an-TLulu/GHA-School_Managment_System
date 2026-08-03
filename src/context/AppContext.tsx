@@ -535,7 +535,12 @@ export interface QuizQuestion {
 // A saved worksheet template. Problems are not stored — each section keeps a
 // generator id + settings + seed, so the sheet regenerates identically (or a
 // new seed rerolls it). See src/lib/worksheet/*.
-export interface WorksheetSection { id: string; generatorId: string; settings: Record<string, unknown>; count: number; heading?: string; seed: number; locked?: boolean; }
+export interface WorksheetSection {
+  id: string; generatorId: string; settings: Record<string, unknown>; count: number; heading?: string;
+  seed: number; locked?: boolean;
+  salts?: Record<number, number>;   // per-question reroll salt (index -> salt)
+  lockedItems?: number[];           // question indices kept when regenerating
+}
 export interface WorksheetLayout { orientation: 'portrait' | 'landscape'; columns: number; fontSize: number; spacing: number; bw: boolean; pageNumbers: boolean; }
 export interface Worksheet {
   id: string;
