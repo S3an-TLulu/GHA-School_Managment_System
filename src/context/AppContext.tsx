@@ -472,7 +472,11 @@ export interface StudentResult {
 }
 
 // ---- Tools: houses & competition scoreboard ----
-export interface House { id: string; name: string; colour: string; }
+// A house can name a teacher-in-charge and hold its pupil members. Each member
+// may carry a role (Captain, Vice-Captain, …); studentId links to a Student
+// record when the member was picked from the roll, otherwise name is free-text.
+export interface HouseMember { id: string; name: string; grade?: string; role?: string; studentId?: string; }
+export interface House { id: string; name: string; colour: string; teacher?: string; members?: HouseMember[]; }
 export interface Competition {
   id: string;
   name: string;

@@ -1,9 +1,9 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import {
   Trophy, Users2, Plus, Trash2, Printer, Download, ArrowLeft, Check, Lock, Pencil,
-  Shuffle, Medal, Lightbulb, FileQuestion, X, FileDown,
+  Shuffle, Medal, Lightbulb, FileQuestion, X, FileDown, Crown, UserPlus,
 } from 'lucide-react';
-import { useAppContext, Competition, CompetitionEntry, House, SchoolProject, ProjectTask, QuizQuestion } from '../context/AppContext';
+import { useAppContext, Competition, CompetitionEntry, House, HouseMember, SchoolProject, ProjectTask, QuizQuestion } from '../context/AppContext';
 import { useToast } from './ToastProvider';
 import { useThemeClasses } from '../hooks/useThemeClasses';
 import { leaderboard, entryPoints } from '../lib/scoring';
@@ -21,6 +21,8 @@ const PROJECT_TEMPLATES: Record<string, string[]> = {
 };
 
 const TYPES: Competition['type'][] = ['Sports', 'Quiz', 'Debate', 'Spelling Bee', 'Other'];
+const HOUSE_ROLES = ['Captain', 'Vice-Captain', 'Prefect', 'Member'];
+const REEL_ITEM_H = 84; // px per name row in the spinning name-picker reel
 const DEFAULT_PLACES = [
   { label: '1st', points: 10 }, { label: '2nd', points: 8 }, { label: '3rd', points: 6 }, { label: '4th', points: 4 },
 ];
@@ -117,22 +119,96 @@ export function Tools() {
     const { addHouse, updateHouse, deleteHouse } = ctx;
     const [name, setName] = useState(''); const [colour, setColour] = useState('#2563eb');
     return (
-      <div className="max-w-lg space-y-4">
-        <form className="flex gap-2 items-center" onSubmit={e => { e.preventDefault(); if (!name.trim()) return; addHouse({ id: `house-${Date.now()}`, name: name.trim(), colour }); setName(''); }}>
+      <div className="max-w-2xl space-y-4">
+        <form className="flex gap-2 items-center" onSubmit={e => { e.preventDefault(); if (!name.trim()) return; addHouse({ id: `house-${Date.now()}`, name: name.trim(), colour, members: [] }); setName(''); }}>
           <input type="color" value={colour} onChange={e => setColour(e.target.value)} className="w-10 h-10 border border-gray-300 rounded cursor-pointer" />
           <input className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm" placeholder="House name" value={name} onChange={e => setName(e.target.value)} />
-          <button className={`${tc.btn} text-white px-3 py-2 rounded-lg text-sm`}>Add</button>
+          <button className={`${tc.btn} text-white px-3 py-2 rounded-lg text-sm`}>Add House</button>
         </form>
-        <div className="space-y-2">
-          {houses.map(h => (
-            <div key={h.id} className="flex items-center gap-3 px-3 py-2 border border-gray-200 rounded-lg">
-              <input type="color" value={h.colour} onChange={e => updateHouse(h.id, { colour: e.target.value })} className="w-8 h-8 border border-gray-200 rounded cursor-pointer" />
-              <input defaultValue={h.name} onBlur={e => e.target.value !== h.name && updateHouse(h.id, { name: e.target.value })} className="flex-1 text-sm border-none focus:ring-1 focus:ring-blue-300 rounded px-1" />
-              <button onClick={() => deleteHouse(h.id)} className="p-1 text-red-500 hover:bg-red-50 rounded"><Trash2 className="h-4 w-4" /></button>
-            </div>
-          ))}
+        <div className="space-y-3">
+          {houses.map(h => <HouseCard key={h.id} house={h} onUpdate={updateHouse} onDelete={deleteHouse} />)}
           {houses.length === 0 && <p className="text-sm text-gray-400 text-center py-4">No houses — add your team colours above.</p>}
         </div>
+      </div>
+    );
+  }
+
+  function HouseCard({ house: h, onUpdate, onDelete }: { house: House; onUpdate: (id: string, patch: Partial<House>) => void; onDelete: (id: string) => void }) {
+    const { students } = ctx;
+    const activeStudents = students.filter(s => !s.status || s.status === 'active');
+    const members = h.members ?? [];
+    const [expanded, setExpanded] = useState(false);
+    const [mName, setMName] = useState(''); const [mGrade, setMGrade] = useState(''); const [mRole, setMRole] = useState('Member');
+
+    const roleRank = (r?: string) => { const i = HOUSE_ROLES.indexOf(r || 'Member'); return i === -1 ? HOUSE_ROLES.length : i; };
+    const sorted = [...members].sort((a, b) => roleRank(a.role) - roleRank(b.role) || a.name.localeCompare(b.name));
+    const captains = members.filter(m => m.role === 'Captain' || m.role === 'Vice-Captain');
+
+    const addMember = () => {
+      if (!mName.trim()) { toast('Type or pick a pupil’s name.', 'warning'); return; }
+      if (members.some(m => m.name.toLowerCase() === mName.trim().toLowerCase())) { toast('That pupil is already in this house.', 'warning'); return; }
+      const st = activeStudents.find(s => s.name === mName.trim());
+      const member: HouseMember = { id: `hm-${Date.now()}`, name: mName.trim(), grade: mGrade.trim() || st?.grade || undefined, role: mRole || 'Member', studentId: st?.id };
+      onUpdate(h.id, { members: [...members, member] });
+      setMName(''); setMGrade('');
+    };
+    const setRole = (id: string, role: string) => onUpdate(h.id, { members: members.map(m => m.id === id ? { ...m, role } : m) });
+    const removeMember = (id: string) => onUpdate(h.id, { members: members.filter(m => m.id !== id) });
+
+    const roleBadge = (role?: string) => {
+      if (role === 'Captain') return <span className="inline-flex items-center gap-1 text-xs font-semibold text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded"><Crown className="h-3 w-3" />Captain</span>;
+      if (role === 'Vice-Captain') return <span className="inline-flex items-center gap-1 text-xs font-semibold text-indigo-700 bg-indigo-100 px-1.5 py-0.5 rounded"><Crown className="h-3 w-3" />Vice-Captain</span>;
+      if (role === 'Prefect') return <span className="text-xs font-medium text-teal-700 bg-teal-100 px-1.5 py-0.5 rounded">Prefect</span>;
+      return null;
+    };
+    const inp = 'px-2.5 py-1.5 border border-gray-300 rounded-lg text-sm';
+
+    return (
+      <div className="border border-gray-200 rounded-lg overflow-hidden">
+        <div className="flex items-center gap-3 px-3 py-2.5" style={{ borderLeft: `4px solid ${h.colour}` }}>
+          <input type="color" value={h.colour} onChange={e => onUpdate(h.id, { colour: e.target.value })} className="w-8 h-8 border border-gray-200 rounded cursor-pointer flex-shrink-0" />
+          <input defaultValue={h.name} onBlur={e => e.target.value !== h.name && onUpdate(h.id, { name: e.target.value })} className="font-semibold text-gray-900 text-sm border-none focus:ring-1 focus:ring-blue-300 rounded px-1 w-32" />
+          <div className="flex items-center gap-1.5 flex-1 min-w-0">
+            <Users2 className="h-3.5 w-3.5 text-gray-400 flex-shrink-0" />
+            <input defaultValue={h.teacher ?? ''} onBlur={e => e.target.value !== (h.teacher ?? '') && onUpdate(h.id, { teacher: e.target.value.trim() || undefined })} placeholder="Teacher in charge…" className="text-sm text-gray-600 border-none focus:ring-1 focus:ring-blue-300 rounded px-1 flex-1 min-w-0" />
+          </div>
+          <button onClick={() => setExpanded(v => !v)} className="text-xs text-gray-500 hover:text-gray-800 flex-shrink-0 flex items-center gap-1"><UserPlus className="h-3.5 w-3.5" />{members.length} pupil{members.length !== 1 ? 's' : ''}</button>
+          <button onClick={() => { if (window.confirm(`Delete house “${h.name}”?`)) onDelete(h.id); }} className="p-1 text-red-500 hover:bg-red-50 rounded flex-shrink-0"><Trash2 className="h-4 w-4" /></button>
+        </div>
+
+        {!expanded && captains.length > 0 && (
+          <div className="px-4 py-2 flex flex-wrap gap-2 border-t border-gray-100 bg-gray-50/50">
+            {captains.map(m => <span key={m.id} className="flex items-center gap-1.5 text-xs">{roleBadge(m.role)}<span className="text-gray-700">{m.name}</span></span>)}
+          </div>
+        )}
+
+        {expanded && (
+          <div className="px-4 py-3 border-t border-gray-100 space-y-3 bg-gray-50/50">
+            <div className="flex flex-wrap gap-2 items-end">
+              <div className="flex-1 min-w-[140px]">
+                <input list={`house-students-${h.id}`} className={`${inp} w-full`} placeholder="Pupil name" value={mName}
+                  onChange={e => { const st = activeStudents.find(s => s.name === e.target.value); setMName(e.target.value); if (st) setMGrade(st.grade); }} onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addMember())} />
+                <datalist id={`house-students-${h.id}`}>{activeStudents.map(s => <option key={s.id} value={s.name} />)}</datalist>
+              </div>
+              <input className={`${inp} w-24`} placeholder="Grade" value={mGrade} onChange={e => setMGrade(e.target.value)} />
+              <select className={inp} value={mRole} onChange={e => setMRole(e.target.value)}>{HOUSE_ROLES.map(r => <option key={r} value={r}>{r}</option>)}</select>
+              <button onClick={addMember} className={`flex items-center gap-1 ${tc.btn} text-white px-3 py-1.5 rounded-lg text-sm`}><Plus className="h-4 w-4" />Add</button>
+            </div>
+            <div className="space-y-1.5">
+              {sorted.map(m => (
+                <div key={m.id} className="flex items-center gap-2 px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm">
+                  <span className="font-medium text-gray-900 min-w-0 truncate">{m.name}</span>
+                  {m.grade && <span className="text-xs text-gray-400 flex-shrink-0">{m.grade}</span>}
+                  <span className="flex-shrink-0">{roleBadge(m.role)}</span>
+                  <span className="flex-1" />
+                  <select value={m.role || 'Member'} onChange={e => setRole(m.id, e.target.value)} className="text-xs border border-gray-200 rounded px-1.5 py-1 flex-shrink-0">{HOUSE_ROLES.map(r => <option key={r} value={r}>{r}</option>)}</select>
+                  <button onClick={() => removeMember(m.id)} className="p-1 text-red-400 hover:bg-red-50 rounded flex-shrink-0"><Trash2 className="h-3.5 w-3.5" /></button>
+                </div>
+              ))}
+              {members.length === 0 && <p className="text-xs text-gray-400 text-center py-2">No pupils yet — add them above.</p>}
+            </div>
+          </div>
+        )}
       </div>
     );
   }
@@ -181,7 +257,7 @@ export function Tools() {
     );
   }
 
-  // ---------- Random name picker ----------
+  // ---------- Random name picker (spinning-wheel roll) ----------
   function NamePickerTab() {
     const { students } = ctx;
     const active = students.filter(s => !s.status || s.status === 'active');
@@ -191,29 +267,78 @@ export function Tools() {
     const [picked, setPicked] = useState<string | null>(null);
     const [used, setUsed] = useState<Set<string>>(new Set());
     const [noRepeat, setNoRepeat] = useState(true);
+    const [reel, setReel] = useState<string[]>([]);   // names scrolling past
+    const [target, setTarget] = useState(0);          // index that lands in the window
+    const [anim, setAnim] = useState(false);          // transition on/off
+    const [spinning, setSpinning] = useState(false);
+    const chosenRef = useRef<{ id: string; name: string } | null>(null);
 
     const pool = active.filter(s => (!grade || s.grade === grade) && (!gender || s.gender === gender) && (!noRepeat || !used.has(s.id)));
+
     const pick = () => {
+      if (spinning) return;
       if (pool.length === 0) { toast(noRepeat && used.size > 0 ? 'Everyone has been picked — reset to go again.' : 'No students match the filters.', 'warning'); return; }
       const chosen = pool[Math.floor(Math.random() * pool.length)];
-      setPicked(chosen.name);
-      if (noRepeat) setUsed(prev => new Set(prev).add(chosen.id));
+      chosenRef.current = { id: chosen.id, name: chosen.name };
+      // Build a reel of random names, drop the winner in, then a couple of fillers
+      // so the window has names above and below as it eases to a stop.
+      const src = pool.length ? pool : active;
+      const spin = 26 + Math.floor(Math.random() * 10);
+      const rand = () => src[Math.floor(Math.random() * src.length)].name;
+      const items = [...Array.from({ length: spin }, rand), chosen.name, rand(), rand()];
+      setPicked(null);
+      setReel(items);
+      setAnim(false);
+      setTarget(0);
+      setSpinning(true);
+      // Enable the transition on the next frames, then roll to the winner.
+      requestAnimationFrame(() => requestAnimationFrame(() => { setAnim(true); setTarget(spin); }));
     };
+
+    const onRollEnd = (e: React.TransitionEvent) => {
+      if (e.propertyName !== 'transform' || !spinning) return;
+      const win = chosenRef.current;
+      setSpinning(false);
+      if (win) { setPicked(win.name); if (noRepeat) setUsed(prev => new Set(prev).add(win.id)); }
+    };
+
+    const reset = () => { if (spinning) return; setUsed(new Set()); setPicked(null); setReel([]); };
     const inp = 'px-3 py-2 border border-gray-300 rounded-lg text-sm';
     return (
       <div className="max-w-xl mx-auto space-y-4 text-center">
         <p className="text-sm text-gray-500">Randomly pick a pupil — great for cold-calling, teams or prizes.</p>
         <div className="flex items-center justify-center gap-2 flex-wrap">
-          <select value={grade} onChange={e => setGrade(e.target.value)} className={inp}><option value="">All classes</option>{grades.map(g => <option key={g} value={g}>{g}</option>)}</select>
-          <select value={gender} onChange={e => setGender(e.target.value)} className={inp}><option value="">Any gender</option><option value="Male">Boys</option><option value="Female">Girls</option></select>
-          <label className="flex items-center gap-1.5 text-sm text-gray-600"><input type="checkbox" checked={noRepeat} onChange={e => setNoRepeat(e.target.checked)} />No repeats</label>
+          <select value={grade} onChange={e => setGrade(e.target.value)} disabled={spinning} className={inp}><option value="">All classes</option>{grades.map(g => <option key={g} value={g}>{g}</option>)}</select>
+          <select value={gender} onChange={e => setGender(e.target.value)} disabled={spinning} className={inp}><option value="">Any gender</option><option value="Male">Boys</option><option value="Female">Girls</option></select>
+          <label className="flex items-center gap-1.5 text-sm text-gray-600"><input type="checkbox" checked={noRepeat} disabled={spinning} onChange={e => setNoRepeat(e.target.checked)} />No repeats</label>
         </div>
-        <div className={`rounded-2xl border-2 border-dashed ${picked ? 'border-blue-300' : 'border-gray-200'} py-12 px-4`}>
-          {picked ? <p className="text-3xl font-extrabold text-gray-900">{picked}</p> : <p className="text-gray-400">Press pick to choose someone</p>}
+
+        {/* Spinning wheel window */}
+        <div className={`relative mx-auto max-w-sm rounded-2xl border-2 ${picked ? 'border-blue-400' : 'border-gray-200'} overflow-hidden bg-white`} style={{ height: REEL_ITEM_H * 3 }}>
+          {/* centre selection band */}
+          <div className="absolute inset-x-0 z-10 pointer-events-none" style={{ top: REEL_ITEM_H, height: REEL_ITEM_H, boxShadow: 'inset 0 0 0 2px rgba(59,130,246,0.5)', background: 'rgba(59,130,246,0.04)' }} />
+          {/* fade top & bottom */}
+          <div className="absolute inset-x-0 top-0 z-10 pointer-events-none" style={{ height: REEL_ITEM_H, background: 'linear-gradient(to bottom, white, transparent)' }} />
+          <div className="absolute inset-x-0 bottom-0 z-10 pointer-events-none" style={{ height: REEL_ITEM_H, background: 'linear-gradient(to top, white, transparent)' }} />
+          {reel.length === 0 ? (
+            <div className="h-full flex items-center justify-center">
+              {picked ? <p className="text-3xl font-extrabold text-gray-900">{picked}</p> : <p className="text-gray-400">Press pick to spin the wheel</p>}
+            </div>
+          ) : (
+            <div onTransitionEnd={onRollEnd}
+              style={{ transform: `translateY(${(1 - target) * REEL_ITEM_H}px)`, transition: anim ? 'transform 3.4s cubic-bezier(0.16, 0.8, 0.22, 1)' : 'none' }}>
+              {reel.map((nm, i) => (
+                <div key={i} className={`flex items-center justify-center font-extrabold ${i === target && !spinning ? 'text-blue-600 text-3xl' : 'text-gray-800 text-2xl'}`} style={{ height: REEL_ITEM_H }}>
+                  {nm}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
+
         <div className="flex items-center justify-center gap-2">
-          <button onClick={pick} className={`flex items-center gap-2 ${tc.btn} text-white px-6 py-2.5 rounded-lg font-medium`}><Shuffle className="h-4 w-4" />Pick random</button>
-          {used.size > 0 && <button onClick={() => { setUsed(new Set()); setPicked(null); }} className="px-4 py-2.5 border border-gray-300 rounded-lg text-sm text-gray-600">Reset ({used.size})</button>}
+          <button onClick={pick} disabled={spinning} className={`flex items-center gap-2 ${tc.btn} text-white px-6 py-2.5 rounded-lg font-medium disabled:opacity-60`}><Shuffle className="h-4 w-4" />{spinning ? 'Spinning…' : 'Spin'}</button>
+          {used.size > 0 && <button onClick={reset} disabled={spinning} className="px-4 py-2.5 border border-gray-300 rounded-lg text-sm text-gray-600 disabled:opacity-60">Reset ({used.size})</button>}
         </div>
         <p className="text-xs text-gray-400">{pool.length} candidate{pool.length !== 1 ? 's' : ''} available{noRepeat && used.size > 0 ? ` · ${used.size} already picked` : ''}</p>
       </div>
