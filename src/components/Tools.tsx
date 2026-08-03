@@ -1,7 +1,7 @@
 import { useState, useRef } from 'react';
 import {
   Trophy, Users2, Plus, Trash2, Printer, Download, ArrowLeft, Check, Lock, Pencil,
-  Shuffle, Medal, Lightbulb, FileQuestion, X, FileDown, Crown, UserPlus, Image as ImageIcon,
+  Shuffle, Medal, Lightbulb, FileQuestion, X, FileDown, Crown, UserPlus, Image as ImageIcon, FileType2,
 } from 'lucide-react';
 import { useAppContext, Competition, CompetitionEntry, House, HouseMember, SchoolProject, ProjectTask, QuizQuestion, QuestionType } from '../context/AppContext';
 import { useToast } from './ToastProvider';
@@ -427,7 +427,13 @@ export function Tools() {
 
   // ---------- Quiz / test builder + question bank ----------
   function QuizTab() {
-    const { quizQuestions, addQuizQuestion, deleteQuizQuestion, branding } = ctx;
+    const { quizQuestions, addQuizQuestion, updateQuizQuestion, deleteQuizQuestion, branding } = ctx;
+    const editImage = (id: string, file?: File) => {
+      if (!file) return;
+      const r = new FileReader();
+      r.onload = () => updateQuizQuestion(id, { imageData: String(r.result) });
+      r.readAsDataURL(file);
+    };
     const subjects = Array.from(new Set(quizQuestions.map(q => q.subject).filter(Boolean))).sort();
     const [filter, setFilter] = useState('');
     const [sel, setSel] = useState<Set<string>>(new Set());
@@ -459,10 +465,10 @@ export function Tools() {
     };
     const toggleSel = (id: string) => setSel(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
     const chosen = () => quizQuestions.filter(x => sel.has(x.id));
-    const print = (withAnswers: boolean, pdf = false) => {
+    const print = (withAnswers: boolean, out: 'print' | 'pdf' | 'word' = 'print') => {
       const qs = chosen().length > 0 ? chosen() : filtered;
       if (qs.length === 0) { toast('Add or select some questions first.', 'warning'); return; }
-      printTestPaper({ title: paper.title || 'Test', subject: paper.subject || qs[0].subject, grade: paper.grade || undefined, instructions: paper.instructions || undefined, questions: qs, branding, withAnswers, pdf });
+      printTestPaper({ title: paper.title || 'Test', subject: paper.subject || qs[0].subject, grade: paper.grade || undefined, instructions: paper.instructions || undefined, questions: qs, branding, withAnswers, pdf: out === 'pdf', word: out === 'word' });
     };
 
     return (
@@ -512,7 +518,10 @@ export function Tools() {
             {filtered.map(x => (
               <label key={x.id} className="flex items-start gap-2 px-3 py-2 text-sm cursor-pointer hover:bg-gray-50">
                 <input type="checkbox" checked={sel.has(x.id)} onChange={() => toggleSel(x.id)} className="mt-1" />
-                <span className="flex-1 min-w-0"><span className="text-gray-900">{x.question}</span><span className="block text-xs text-gray-400">{x.subject}{x.grade ? ` · ${x.grade}` : ''} · {x.marks ?? 1} mark{(x.marks ?? 1) !== 1 ? 's' : ''}{x.options.length ? ` · ${x.options.length} options` : ' · short answer'}</span></span>
+                {x.imageData && <img src={x.imageData} alt="" className="h-10 w-10 object-cover rounded border border-gray-200 flex-shrink-0" />}
+                <span className="flex-1 min-w-0"><span className="text-gray-900">{x.question}</span><span className="block text-xs text-gray-400">{x.subject}{x.grade ? ` · ${x.grade}` : ''} · {x.marks ?? 1} mark{(x.marks ?? 1) !== 1 ? 's' : ''}{x.options.length ? ` · ${x.options.length} options` : (x.type === 'draw' ? ' · draw box' : ' · short answer')}{x.imageData ? ' · 🖼' : ''}</span></span>
+                <label onClick={e => e.stopPropagation()} title={x.imageData ? 'Replace image' : 'Add image'} className="p-1 text-gray-400 hover:text-blue-600 rounded flex-shrink-0 cursor-pointer"><ImageIcon className="h-3.5 w-3.5" /><input type="file" accept="image/*" className="hidden" onChange={e => editImage(x.id, e.target.files?.[0])} /></label>
+                {x.imageData && <button onClick={e => { e.preventDefault(); updateQuizQuestion(x.id, { imageData: undefined }); }} title="Remove image" className="p-1 text-gray-400 hover:text-red-500 rounded flex-shrink-0"><X className="h-3.5 w-3.5" /></button>}
                 <button onClick={e => { e.preventDefault(); deleteQuizQuestion(x.id); }} className="p-1 text-red-400 hover:bg-red-50 rounded flex-shrink-0"><Trash2 className="h-3.5 w-3.5" /></button>
               </label>
             ))}
@@ -525,9 +534,11 @@ export function Tools() {
             <p className="text-xs text-gray-400">{sel.size > 0 ? `${sel.size} selected` : `Using all ${filtered.length} filtered`} question(s).</p>
             <div className="flex flex-wrap gap-2">
               <button onClick={() => print(false)} className="flex items-center gap-1.5 border border-gray-300 text-gray-700 hover:bg-white px-3 py-1.5 rounded-lg text-sm"><Printer className="h-4 w-4" />Test Paper</button>
-              <button title="Export test paper to PDF" onClick={() => print(false, true)} className="flex items-center border border-gray-300 text-gray-700 hover:bg-white px-2 py-1.5 rounded-lg text-sm"><FileDown className="h-4 w-4" /></button>
+              <button title="Export test paper to PDF" onClick={() => print(false, 'pdf')} className="flex items-center border border-gray-300 text-gray-700 hover:bg-white px-2 py-1.5 rounded-lg text-sm"><FileDown className="h-4 w-4" /></button>
+              <button title="Export test paper to Word" onClick={() => print(false, 'word')} className="flex items-center border border-gray-300 text-gray-700 hover:bg-white px-2 py-1.5 rounded-lg text-sm"><FileType2 className="h-4 w-4" /></button>
               <button onClick={() => print(true)} className="flex items-center gap-1.5 border border-gray-300 text-gray-700 hover:bg-white px-3 py-1.5 rounded-lg text-sm"><Printer className="h-4 w-4" />Answer Key</button>
-              <button title="Export answer key to PDF" onClick={() => print(true, true)} className="flex items-center border border-gray-300 text-gray-700 hover:bg-white px-2 py-1.5 rounded-lg text-sm"><FileDown className="h-4 w-4" /></button>
+              <button title="Export answer key to PDF" onClick={() => print(true, 'pdf')} className="flex items-center border border-gray-300 text-gray-700 hover:bg-white px-2 py-1.5 rounded-lg text-sm"><FileDown className="h-4 w-4" /></button>
+              <button title="Export answer key to Word" onClick={() => print(true, 'word')} className="flex items-center border border-gray-300 text-gray-700 hover:bg-white px-2 py-1.5 rounded-lg text-sm"><FileType2 className="h-4 w-4" /></button>
             </div>
           </div>
         </div>

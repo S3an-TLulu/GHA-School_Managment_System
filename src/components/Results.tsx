@@ -1,9 +1,9 @@
 import { useState } from 'react';
-import { GraduationCap, Printer, Save, Plus, Trash2, ChevronDown, FileDown } from 'lucide-react';
+import { GraduationCap, Printer, Save, Plus, Trash2, ChevronDown, FileDown, Table2 } from 'lucide-react';
 import { useAppContext, StudentResult } from '../context/AppContext';
 import { useThemeClasses } from '../hooks/useThemeClasses';
 import { useToast } from './ToastProvider';
-import { printHtml, exportPdf } from '../lib/print';
+import { printHtml, exportPdf, DOC_FONT } from '../lib/print';
 
 // Send a finished document HTML to the print dialog, or to Save-as-PDF.
 const emitDoc = (html: string, filename: string, pdf: boolean) => pdf ? exportPdf(html, filename) : printHtml(html);
@@ -285,6 +285,42 @@ export function Results() {
     emitDoc(html, `Class_Results_${selectedClass}_${selectedTerm}`, pdf);
   };
 
+  // A blank mark schedule the class teacher fills in by hand: student rows ×
+  // subject columns, plus a few spare rows. Uses the school's Century Gothic look.
+  const printMarkSchedule = (pdf = false) => {
+    const subCols = subjects.map(s => `<th style="border:1px solid #333;padding:4px 6px;font-size:10px;font-weight:600">${s}</th>`).join('');
+    const blankRow = (label: string) => `<tr>
+      <td style="border:1px solid #333;padding:6px 8px;font-size:11px">${label}</td>
+      ${subjects.map(() => '<td style="border:1px solid #333;padding:6px 8px;height:26px"></td>').join('')}
+      <td style="border:1px solid #333"></td><td style="border:1px solid #333"></td><td style="border:1px solid #333"></td>
+    </tr>`;
+    const rows = classStudents.map((s, i) => blankRow(`${i + 1}. ${s.name}`)).join('')
+      + Array.from({ length: 5 }, (_, i) => blankRow(`${classStudents.length + i + 1}.`)).join('');
+    const html = `<!DOCTYPE html><html><head><title>Mark Schedule – ${selectedClass} – ${selectedTerm}</title>
+    <style>@page{size:A4 landscape;margin:12mm}body{font-family:${DOC_FONT};color:#111}table{border-collapse:collapse;width:100%}th{background:#f0f0f0}@media print{button{display:none}}</style></head>
+    <body>
+    <div style="text-align:center;margin-bottom:10px">
+      ${branding.logoUrl ? `<img src="${branding.logoUrl}" style="height:40px;width:40px;object-fit:contain" />` : ''}
+      <div style="font-size:16pt;font-weight:700">${branding.schoolName || 'School'}</div>
+      <div style="font-size:12pt;font-weight:600">Mark Schedule — ${selectedClass} · ${selectedTerm}</div>
+      <div style="font-size:9pt;color:#555">Teacher: ____________________  ·  Date: ____________</div>
+    </div>
+    <table>
+      <thead><tr>
+        <th style="border:1px solid #333;padding:4px 8px;font-size:10px;text-align:left">Student</th>
+        ${subCols}
+        <th style="border:1px solid #333;padding:4px 6px;font-size:10px">Total</th>
+        <th style="border:1px solid #333;padding:4px 6px;font-size:10px">Avg</th>
+        <th style="border:1px solid #333;padding:4px 6px;font-size:10px">Pos.</th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+    <p style="margin-top:10px;font-size:9px;color:#888">Grades: A 80–100 · B 70–79 · C 60–69 · D 50–59 · F below 50</p>
+    <script>window.onload=function(){setTimeout(function(){window.print()},300)}</script>
+    </body></html>`;
+    emitDoc(html, `Mark_Schedule_${selectedClass}_${selectedTerm}`, pdf);
+  };
+
   // Print every student's full report card in one document (one card per page).
   const printAllCards = (pdf = false) => {
     const withResults = classStudents.filter(s => getStudentResult(s.id));
@@ -342,6 +378,13 @@ export function Results() {
               <button onClick={() => printAllCards()} className="flex items-center space-x-2 border border-gray-300 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-50">
                 <Printer className="h-4 w-4" />
                 <span>All Cards</span>
+              </button>
+              <button onClick={() => printMarkSchedule()} title="Print a blank mark schedule to fill in by hand" className="flex items-center space-x-2 border border-gray-300 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-50">
+                <Table2 className="h-4 w-4" />
+                <span>Blank Sheet</span>
+              </button>
+              <button title="Export blank mark schedule to PDF" onClick={() => printMarkSchedule(true)} className="flex items-center border border-gray-300 text-gray-700 px-2 py-2 rounded-lg text-sm font-medium hover:bg-gray-50">
+                <FileDown className="h-4 w-4" />
               </button>
               <button title="Export all report cards to PDF" onClick={() => printAllCards(true)} className="flex items-center border border-gray-300 text-gray-700 px-2 py-2 rounded-lg text-sm font-medium hover:bg-gray-50">
                 <FileDown className="h-4 w-4" />

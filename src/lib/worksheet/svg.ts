@@ -111,16 +111,36 @@ export function pictureRow(emoji: string, count: number): string {
   return `<div style="font-size:22px;line-height:1.4;max-width:100%">${Array.from({ length: count }, () => emoji).join(' ')}</div>`;
 }
 
-// ---- Handwriting: a traceable row of grey glyphs on 4-line guides ----
-export function handwritingRow(text: string, opts: { repeats?: number; size?: number } = {}): string {
-  const size = opts.size ?? 34;
-  const repeats = opts.repeats ?? 1;
-  const rowH = size * 1.7;
-  const mid = rowH * 0.32, base = rowH * 0.72;      // dotted mid-line & solid baseline
-  const content = Array.from({ length: repeats }, () => text).join('&nbsp;&nbsp;');
-  return `<div style="position:relative;height:${rowH}px;margin:4px 0;border-top:1px solid #cbd5e1">
+// Rounded, child-friendly handwriting font stack (falls back gracefully). These
+// fonts are commonly present on teachers' machines; no external download needed.
+export const HANDWRITING_FONT = "'Century Gothic','Comic Sans MS','Comic Neue','Chalkboard SE','Segoe Print',cursive";
+
+// ---- Handwriting practice row: Reference | Trace (light) | Practice (blank) ----
+// One row on 3 guide lines (top, dashed mid-line, solid baseline): a bold
+// reference glyph on the left, light glyphs to trace over, then blank practice.
+export function handwritingRow(reference: string, trace: string, opts: { repeats?: number; size?: number } = {}): string {
+  const size = opts.size ?? 30;
+  const repeats = opts.repeats ?? 5;
+  const rowH = Math.round(size * 1.7);
+  const mid = Math.round(rowH * 0.34), base = Math.round(rowH * 0.72);
+  const light = Array.from({ length: repeats }, () => trace).join('&nbsp;&nbsp;');
+  const guides = `
+    <div style="position:absolute;left:0;right:0;top:2px;border-top:1px solid #cbd5e1"></div>
     <div style="position:absolute;left:0;right:0;top:${mid}px;border-top:1px dashed #cbd5e1"></div>
-    <div style="position:absolute;left:0;right:0;top:${base}px;border-top:1.5px solid #111"></div>
-    <div style="position:absolute;left:8px;top:2px;font-size:${size}px;letter-spacing:6px;color:#cbd5e1;font-family:Arial;white-space:nowrap;overflow:hidden">${content}</div>
+    <div style="position:absolute;left:0;right:0;top:${base}px;border-top:1.5px solid #9ca3af"></div>`;
+  return `<div style="display:flex;align-items:stretch;border-bottom:1px solid #e5e7eb">
+    <div style="width:62px;flex:none;display:flex;align-items:center;font-family:${HANDWRITING_FONT};font-size:${size}px;color:#111;padding-left:2px">${reference}</div>
+    <div style="width:52%;position:relative;height:${rowH}px;border-left:1px solid #e5e7eb">
+      ${guides}
+      <div style="position:absolute;left:8px;top:1px;font-family:${HANDWRITING_FONT};font-size:${size}px;color:#d9dee6;white-space:nowrap;overflow:hidden">${light}</div>
+    </div>
+    <div style="flex:1;position:relative;height:${rowH}px;border-left:1px solid #e5e7eb">${guides}</div>
+  </div>`;
+}
+
+// A REFERENCE · TRACE · PRACTICE column header for the top of a handwriting block.
+export function handwritingHeader(): string {
+  return `<div style="display:flex;font-size:9px;letter-spacing:1px;color:#9ca3af;text-transform:uppercase;font-family:Arial;border-bottom:1px solid #9ca3af;padding-bottom:2px">
+    <div style="width:62px;flex:none">Ref.</div><div style="width:52%">Trace</div><div style="flex:1;padding-left:4px">Practice</div>
   </div>`;
 }

@@ -1,5 +1,5 @@
 import { QuizQuestion, QuestionType, SchoolBranding } from '../context/AppContext';
-import { esc, printHtml, exportPdf } from './print';
+import { esc, emitDoc, DOC_FONT } from './print';
 import { answerBox } from './worksheet/svg';
 
 const LETTERS = ['A', 'B', 'C', 'D', 'E', 'F'];
@@ -12,7 +12,7 @@ const qType = (q: QuizQuestion): QuestionType => q.type ?? (q.options.length ? '
 export function printTestPaper(opts: {
   title: string; subject: string; grade?: string; instructions?: string;
   questions: QuizQuestion[]; branding: SchoolBranding; withAnswers: boolean;
-  pdf?: boolean;
+  pdf?: boolean; word?: boolean;
 }) {
   const { title, subject, grade, instructions, questions, branding, withAnswers } = opts;
   const totalMarks = questions.reduce((a, q) => a + (q.marks ?? 1), 0);
@@ -45,23 +45,24 @@ export function printTestPaper(opts: {
   }).join('');
 
   const html = `<!DOCTYPE html><html><head><title>${esc(title)}${withAnswers ? ' — Answer Key' : ''}</title><style>
-    @page{size:A4;margin:16mm}*{box-sizing:border-box;margin:0;padding:0}
-    body{font-family:Arial,sans-serif;color:#111;font-size:13px;line-height:1.5}
-    .hd{text-align:center;border-bottom:2px solid #111;padding-bottom:8px;margin-bottom:10px}
-    .meta{display:flex;justify-content:space-between;font-size:12px;margin-bottom:10px;flex-wrap:wrap;gap:6px}
+    @page{size:A4;margin:2cm}*{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:${DOC_FONT};color:#111;font-size:11pt;line-height:1.5}
+    .hd{text-align:center;border-bottom:1.5px solid #111;padding-bottom:8px;margin-bottom:12px}
+    .meta{display:flex;justify-content:space-between;font-size:11pt;margin-bottom:12px;flex-wrap:wrap;gap:6px;border:1px solid #999;padding:6px 10px}
     @media print{button{display:none}}
   </style></head><body>
     <div class="hd">
-      ${branding.logoUrl ? `<img src="${branding.logoUrl}" style="height:44px;width:44px;object-fit:contain" />` : ''}
-      <div style="font-size:18px;font-weight:800">${esc(branding.schoolName) || 'School'}</div>
-      <div style="font-size:14px;font-weight:700;margin-top:2px">${esc(title)}${withAnswers ? ' — MARKING KEY' : ''}</div>
-      <div style="font-size:12px;color:#374151">${esc(subject)}${grade ? ' · ' + esc(grade) : ''} · Total marks: ${totalMarks}</div>
+      ${branding.logoUrl ? `<img src="${branding.logoUrl}" style="height:46px;width:46px;object-fit:contain" />` : ''}
+      <div style="font-size:16pt;font-weight:700">${esc(branding.schoolName) || 'School'}</div>
+      ${branding.motto ? `<div style="font-size:9pt;color:#555;font-style:italic">${esc(branding.motto)}</div>` : ''}
+      <div style="font-size:13pt;font-weight:700;margin-top:3px">${esc(title)}${withAnswers ? ' — MARKING KEY' : ''}</div>
+      <div style="font-size:10pt;color:#374151">${esc(subject)}${grade ? ' · ' + esc(grade) : ''} · Total marks: ${totalMarks}</div>
     </div>
     ${!withAnswers ? `<div class="meta"><span>Name: ______________________________</span><span>Class: ____________</span><span>Date: ____________</span></div>` : ''}
     ${instructions ? `<p style="font-style:italic;color:#374151;margin-bottom:10px">${esc(instructions)}</p>` : ''}
     ${body || '<p style="color:#9ca3af">No questions selected.</p>'}
     <script>window.onload=function(){setTimeout(function(){window.print()},250)}</script>
   </body></html>`;
-  if (opts.pdf) exportPdf(html, `${title}${withAnswers ? '_Answer_Key' : ''}`);
-  else printHtml(html);
+  const filename = `${title}${withAnswers ? '_Answer_Key' : ''}`;
+  emitDoc(html, filename, opts.word ? 'word' : opts.pdf ? 'pdf' : 'print');
 }

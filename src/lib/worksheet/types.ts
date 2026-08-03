@@ -49,6 +49,7 @@ export interface GenerateArgs {
   grade: string;
   count: number;
   rng: RNG;
+  index?: number;   // absolute index of the first problem (for ordered types like handwriting)
 }
 
 // A question-type generator. Register one and the whole app (menu, settings form,

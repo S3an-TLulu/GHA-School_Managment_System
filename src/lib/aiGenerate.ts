@@ -5,13 +5,13 @@ import { getClient } from './supabase';
 // Cloud Sync) and the function deployed with an ANTHROPIC_API_KEY secret. If it
 // isn't set up, we return a friendly error rather than throwing.
 
-export interface GenQuestion { question: string; options: string[]; correctIndex: number; marks: number; }
+export interface GenQuestion { question: string; options: string[]; correctIndex?: number; answer?: string; marks: number; }
 export interface GenQuiz { questions: GenQuestion[]; }
 export interface GenLesson { title: string; objectives: string; steps: string[]; resources: string; notes: string; }
 export interface GenTopic { title: string; content: string; }
 
-type Kind = 'quiz' | 'lesson' | 'topic';
-type DataFor<K extends Kind> = K extends 'quiz' ? GenQuiz : K extends 'lesson' ? GenLesson : GenTopic;
+type Kind = 'quiz' | 'short' | 'lesson' | 'topic';
+type DataFor<K extends Kind> = K extends 'quiz' | 'short' ? GenQuiz : K extends 'lesson' ? GenLesson : GenTopic;
 
 export async function generateResource<K extends Kind>(
   kind: K,

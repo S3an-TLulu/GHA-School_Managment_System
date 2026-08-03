@@ -8,6 +8,10 @@
 // saved file after the document <title> — so exportPdf just forces the title to
 // the filename we want and nudges the user to pick the PDF destination.
 
+// The school's preferred document font (Century Gothic), with sensible fallbacks
+// for machines that don't have it. Shared by every printable/Word document.
+export const DOC_FONT = "'Century Gothic','Calibri','Segoe UI',Arial,sans-serif";
+
 // Escape user text before injecting it into printable HTML. Shared by every
 // document builder (previously duplicated in each *Docs.ts file).
 export const esc = (s: string) => (s || '').replace(/[&<>"']/g, c =>
@@ -46,4 +50,37 @@ export function exportPdf(html: string, filename: string) {
     : hint + out;
 
   printHtml(out);
+}
+
+// Export the same document HTML as an editable Word (.doc) file. Word opens
+// HTML-based .doc documents and lets the teacher edit them. We add the Office
+// XML namespaces + a "Print" view hint, force a clean Calibri base font to match
+// a normal Word document, strip the auto-print script, and trigger a download.
+// Note: inline SVG (number lines, clocks, etc.) may not render in Word — Word
+// export suits text/image papers; use PDF for SVG-heavy worksheets.
+export function exportWord(html: string, filename: string) {
+  let out = html
+    .replace(/<script>[\s\S]*?<\/script>/gi, '')
+    .replace(/<html[^>]*>/i, "<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>");
+  const head = "<meta charset='utf-8'>"
+    + "<!--[if gte mso 9]><xml><w:WordDocument><w:View>Print</w:View><w:Zoom>100</w:Zoom><w:DoNotOptimizeForBrowser/></w:WordDocument></xml><![endif]-->"
+    + `<style>body{font-family:${DOC_FONT}}</style>`;
+  out = /<head>/i.test(out) ? out.replace(/<head>/i, `<head>${head}`) : `<head>${head}</head>` + out;
+
+  const blob = new Blob(['﻿', out], { type: 'application/msword' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${cleanName(filename)}.doc`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1500);
+}
+
+// Route a finished HTML document to the chosen output.
+export function emitDoc(html: string, filename: string, mode: 'print' | 'pdf' | 'word') {
+  if (mode === 'word') exportWord(html, filename);
+  else if (mode === 'pdf') exportPdf(html, filename);
+  else printHtml(html);
 }

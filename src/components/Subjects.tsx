@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import {
   BookOpen, Plus, Trash2, Printer, FileDown, Check, ArrowLeft, Shuffle,
-  ListChecks, Layers, FileQuestion, Users2, ScrollText, ClipboardList, Boxes, Gift, X, Sparkles, Image as ImageIcon,
+  ListChecks, Layers, FileQuestion, Users2, ScrollText, ClipboardList, Boxes, Gift, X, Sparkles, Image as ImageIcon, FileType2,
 } from 'lucide-react';
 import { generateResource } from '../lib/aiGenerate';
 import {
@@ -302,24 +302,32 @@ export function Subjects() {
 
   // ---------- Question bank (reuses gha_quiz_questions) ----------
   function BankTab({ subject, grade }: { subject: string; grade: string }) {
-    const { quizQuestions, addQuizQuestion, deleteQuizQuestion } = ctx;
+    const { quizQuestions, addQuizQuestion, updateQuizQuestion, deleteQuizQuestion } = ctx;
+    const editImage = (id: string, file?: File) => { if (!file) return; const r = new FileReader(); r.onload = () => updateQuizQuestion(id, { imageData: String(r.result) }); r.readAsDataURL(file); };
     const list = quizQuestions.filter(q => q.subject === subject);
     const [q, setQ] = useState({ question: '', options: ['', '', '', ''], correctIndex: 0, marks: '1', type: 'mcq' as QuestionType, answerText: '', imageData: '', boxSize: 'medium' as 'small' | 'medium' | 'large' });
     const [paperTitle, setPaperTitle] = useState('Class Test');
     const onImage = (file?: File) => { if (!file) return; const r = new FileReader(); r.onload = () => setQ(prev => ({ ...prev, imageData: String(r.result) })); r.readAsDataURL(file); };
     const [gen, setGen] = useState(false);
+    const [genOpen, setGenOpen] = useState(false);
+    const [genTopic, setGenTopic] = useState('');
+    const [genCount, setGenCount] = useState('5');
+    const [genKind, setGenKind] = useState<'quiz' | 'short'>('quiz');
     const generate = async () => {
-      const topic = window.prompt(`Generate questions for ${subject} about…`) || '';
-      if (!topic.trim()) return;
-      const n = parseInt(window.prompt('How many questions? (1–20)', '5') || '5') || 5;
+      if (!genTopic.trim()) { toast('Enter a topic to generate about.', 'warning'); return; }
+      const n = Math.min(20, Math.max(1, parseInt(genCount) || 5));
       setGen(true);
-      const r = await generateResource('quiz', { subject, grade, topic: topic.trim(), count: n });
+      const r = await generateResource(genKind, { subject, grade, topic: genTopic.trim(), count: n });
       setGen(false);
       if (!r.ok) { toast(r.error, 'error'); return; }
       (r.data.questions || []).forEach(g => addQuizQuestion({
         id: uid('qq'), subject, grade: grade || undefined, question: g.question,
-        options: g.options || [], correctIndex: g.correctIndex ?? 0, marks: g.marks || 1,
+        options: genKind === 'quiz' ? (g.options || []) : [],
+        correctIndex: genKind === 'quiz' ? (g.correctIndex ?? 0) : undefined,
+        type: genKind === 'quiz' ? 'mcq' : 'short',
+        answerText: g.answer || undefined, marks: g.marks || 1,
       }));
+      setGenOpen(false); setGenTopic('');
       toast(`Added ${(r.data.questions || []).length} generated question(s).`, 'success');
     };
     const add = () => {
@@ -333,9 +341,9 @@ export function Subjects() {
       };
       addQuizQuestion(item); setQ({ ...q, question: '', options: ['', '', '', ''], answerText: '', imageData: '' }); toast('Question added to the bank.', 'success');
     };
-    const doPrint = (withAnswers: boolean, pdf = false) => {
+    const doPrint = (withAnswers: boolean, out: 'print' | 'pdf' | 'word' = 'print') => {
       if (list.length === 0) { toast('Add some questions first.', 'warning'); return; }
-      printTestPaper({ title: paperTitle || 'Test', subject, grade: grade || undefined, questions: list, branding, withAnswers, pdf });
+      printTestPaper({ title: paperTitle || 'Test', subject, grade: grade || undefined, questions: list, branding, withAnswers, pdf: out === 'pdf', word: out === 'word' });
     };
     return (
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -374,15 +382,30 @@ export function Subjects() {
           )}
           <div className="flex gap-2">
             <button onClick={add} className={`flex items-center gap-1.5 ${tc.btn} text-white px-3 py-2 rounded-lg text-sm`}><Plus className="h-4 w-4" />Add to bank</button>
-            <button onClick={generate} disabled={gen} title="Generate questions with AI" className="flex items-center gap-1.5 border border-purple-300 text-purple-700 hover:bg-purple-50 px-3 py-2 rounded-lg text-sm disabled:opacity-50"><Sparkles className="h-4 w-4" />{gen ? 'Generating…' : 'Generate'}</button>
+            <button onClick={() => setGenOpen(v => !v)} title="Generate questions with AI" className="flex items-center gap-1.5 border border-purple-300 text-purple-700 hover:bg-purple-50 px-3 py-2 rounded-lg text-sm"><Sparkles className="h-4 w-4" />AI Generate</button>
           </div>
+          {genOpen && (
+            <div className="border border-purple-200 bg-purple-50/50 rounded-lg p-3 space-y-2">
+              <p className="text-xs font-medium text-purple-800">Generate questions for {subject}{grade ? ` · ${grade}` : ''}</p>
+              <input className={`${inp} w-full`} placeholder="Topic (e.g. fractions, the water cycle)" value={genTopic} onChange={e => setGenTopic(e.target.value)} onKeyDown={e => e.key === 'Enter' && generate()} />
+              <div className="flex items-center gap-2 flex-wrap">
+                <select className={inp} value={genKind} onChange={e => setGenKind(e.target.value as 'quiz' | 'short')}><option value="quiz">Multiple choice</option><option value="short">Short answer</option></select>
+                <label className="text-xs text-gray-500 flex items-center gap-1">Count<input type="number" min={1} max={20} className={`${inp} w-16`} value={genCount} onChange={e => setGenCount(e.target.value)} /></label>
+                <button onClick={generate} disabled={gen} className="flex items-center gap-1.5 bg-purple-600 text-white hover:bg-purple-700 px-3 py-1.5 rounded-lg text-sm disabled:opacity-50"><Sparkles className="h-4 w-4" />{gen ? 'Generating…' : 'Generate'}</button>
+              </div>
+              <p className="text-[11px] text-gray-500">Needs the school’s cloud project connected (Settings → Cloud Sync) with the gha-generate function deployed. Only the subject, grade and topic are sent — no pupil data.</p>
+            </div>
+          )}
         </div>
         <div className="space-y-3">
           <p className="font-semibold text-gray-900">Bank ({list.length})</p>
           <div className="border border-gray-200 rounded-lg max-h-56 overflow-y-auto divide-y divide-gray-50">
             {list.map(x => (
               <div key={x.id} className="flex items-start gap-2 px-3 py-2 text-sm">
-                <span className="flex-1"><span className="text-gray-900">{x.question}</span><span className="block text-xs text-gray-400">{x.marks ?? 1} mark(s) · {x.options.length ? `${x.options.length} options` : 'short answer'}</span></span>
+                {x.imageData && <img src={x.imageData} alt="" className="h-10 w-10 object-cover rounded border border-gray-200 flex-shrink-0" />}
+                <span className="flex-1 min-w-0"><span className="text-gray-900">{x.question}</span><span className="block text-xs text-gray-400">{x.marks ?? 1} mark(s) · {x.options.length ? `${x.options.length} options` : (x.type === 'draw' ? 'draw box' : 'short answer')}{x.imageData ? ' · 🖼' : ''}</span></span>
+                <label title={x.imageData ? 'Replace image' : 'Add image'} className="p-1 text-gray-400 hover:text-blue-600 rounded flex-shrink-0 cursor-pointer"><ImageIcon className="h-3.5 w-3.5" /><input type="file" accept="image/*" className="hidden" onChange={e => editImage(x.id, e.target.files?.[0])} /></label>
+                {x.imageData && <button onClick={() => updateQuizQuestion(x.id, { imageData: undefined })} title="Remove image" className="p-1 text-gray-400 hover:text-red-500 rounded flex-shrink-0"><X className="h-3.5 w-3.5" /></button>}
                 <button onClick={() => deleteQuizQuestion(x.id)} className="p-1 text-red-400 hover:bg-red-50 rounded flex-shrink-0"><Trash2 className="h-3.5 w-3.5" /></button>
               </div>
             ))}
@@ -392,9 +415,10 @@ export function Subjects() {
             <input className={`${inp} w-full`} placeholder="Test paper title" value={paperTitle} onChange={e => setPaperTitle(e.target.value)} />
             <div className="flex flex-wrap gap-2">
               <button onClick={() => doPrint(false)} className={cardBtn}><Printer className="h-4 w-4" />Test Paper</button>
-              <button onClick={() => doPrint(false, true)} className={cardBtn} title="Test paper PDF"><FileDown className="h-4 w-4" /></button>
+              <button onClick={() => doPrint(false, 'pdf')} className={cardBtn} title="Test paper PDF"><FileDown className="h-4 w-4" /></button>
+              <button onClick={() => doPrint(false, 'word')} className={cardBtn} title="Test paper Word"><FileType2 className="h-4 w-4" /></button>
               <button onClick={() => doPrint(true)} className={cardBtn}><Printer className="h-4 w-4" />Answer Key</button>
-              <button onClick={() => doPrint(true, true)} className={cardBtn} title="Answer key PDF"><FileDown className="h-4 w-4" /></button>
+              <button onClick={() => doPrint(true, 'pdf')} className={cardBtn} title="Answer key PDF"><FileDown className="h-4 w-4" /></button>
             </div>
           </div>
         </div>

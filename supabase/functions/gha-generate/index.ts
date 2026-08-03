@@ -25,28 +25,36 @@ const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { ...CORS, 'Content-Type': 'application/json' } });
 
 interface GenBody {
-  kind: 'quiz' | 'lesson' | 'topic';
+  kind: 'quiz' | 'short' | 'lesson' | 'topic';
   subject: string;
   grade?: string;
   topic: string;
-  count?: number;      // quiz only
+  count?: number;      // quiz / short only
 }
 
-// Prompt + the JSON shape we ask the model to return, per resource kind.
+// Prompt + the JSON shape we ask the model to return, per resource kind. The
+// prompts are tuned for Zambian primary-school context (local names, Kwacha).
 function buildPrompt(b: GenBody): string {
   const who = `for ${b.grade ? b.grade + ' ' : ''}pupils in the subject "${b.subject}"`;
+  const ctx = `Use age-appropriate language and, where examples help, a Zambian context (local names such as Chipo or Mwansa, and the Kwacha for money).`;
   if (b.kind === 'quiz') {
     const n = Math.min(Math.max(b.count ?? 5, 1), 20);
-    return `Write ${n} multiple-choice questions ${who} on the topic "${b.topic}". `
-      + `Return ONLY JSON of the form {"questions":[{"question":string,"options":[string,string,string,string],"correctIndex":number,"marks":number}]}. `
-      + `Each question must have exactly 4 options, correctIndex is the 0-based index of the correct option, marks is a small integer (usually 1). No commentary, JSON only.`;
+    return `Write ${n} multiple-choice questions ${who} on the topic "${b.topic}". ${ctx} `
+      + `Return ONLY JSON of the form {"questions":[{"question":string,"options":[string,string,string,string],"correctIndex":number,"answer":string,"marks":number}]}. `
+      + `Each question has exactly 4 options; correctIndex is the 0-based index of the correct option; "answer" is the correct option's text; marks is a small integer (usually 1). No commentary, JSON only.`;
+  }
+  if (b.kind === 'short') {
+    const n = Math.min(Math.max(b.count ?? 5, 1), 20);
+    return `Write ${n} short-answer questions ${who} on the topic "${b.topic}". ${ctx} `
+      + `Return ONLY JSON of the form {"questions":[{"question":string,"options":[],"answer":string,"marks":number}]}. `
+      + `"answer" is the concise correct answer; "options" is an empty array; marks is a small integer. No commentary, JSON only.`;
   }
   if (b.kind === 'lesson') {
-    return `Write a concise lesson plan ${who} on the topic "${b.topic}". `
+    return `Write a concise lesson plan ${who} on the topic "${b.topic}". ${ctx} `
       + `Return ONLY JSON of the form {"title":string,"objectives":string,"steps":[string],"resources":string,"notes":string}. `
       + `"steps" is an ordered list of 4-8 short teaching steps. Keep it practical for a primary-school classroom. JSON only.`;
   }
-  return `Write clear topic notes ${who} on the topic "${b.topic}", suitable to hand to pupils or use as teaching content. `
+  return `Write clear topic notes ${who} on the topic "${b.topic}", suitable to hand to pupils or use as teaching content. ${ctx} `
     + `Return ONLY JSON of the form {"title":string,"content":string}. "content" is a few short paragraphs in plain text. JSON only.`;
 }
 
