@@ -1,7 +1,11 @@
-import { QuizQuestion, SchoolBranding } from '../context/AppContext';
+import { QuizQuestion, QuestionType, SchoolBranding } from '../context/AppContext';
 import { esc, printHtml, exportPdf } from './print';
+import { answerBox } from './worksheet/svg';
 
 const LETTERS = ['A', 'B', 'C', 'D', 'E', 'F'];
+
+// Legacy rows have no `type` — infer it from whether options were stored.
+const qType = (q: QuizQuestion): QuestionType => q.type ?? (q.options.length ? 'mcq' : 'short');
 
 // Print a test / quiz paper from a set of questions. `withAnswers` produces the
 // marking key (correct option highlighted / answer shown).
@@ -13,16 +17,29 @@ export function printTestPaper(opts: {
   const { title, subject, grade, instructions, questions, branding, withAnswers } = opts;
   const totalMarks = questions.reduce((a, q) => a + (q.marks ?? 1), 0);
   const body = questions.map((q, i) => {
-    const opts = q.options.length > 0
-      ? `<div style="margin:4px 0 0 18px">${q.options.map((o, j) => {
-          const correct = withAnswers && q.correctIndex === j;
-          return `<div style="${correct ? 'font-weight:700;color:#15803d' : ''}">${LETTERS[j]}. ${esc(o)} ${correct ? ' ✓' : ''}</div>`;
-        }).join('')}</div>`
-      : (withAnswers
-          ? `<div style="margin-left:18px;color:#15803d;font-weight:600">Answer: ${esc(String(q.correctIndex ?? '')) || '__________'}</div>`
-          : `<div style="margin:6px 0 0 18px;border-bottom:1px solid #cbd5e1;height:20px"></div><div style="margin-left:18px;border-bottom:1px solid #cbd5e1;height:20px"></div>`);
+    const type = qType(q);
+    const img = q.imageData
+      ? `<img src="${q.imageData}" style="max-height:170px;max-width:100%;display:block;margin:6px 0 4px" />` : '';
+    const box = q.answerBox ? answerBox(q.answerBox.size, q.answerBox.width, q.answerBox.height) : '';
+    let opts: string;
+    if (type === 'mcq' && q.options.length > 0) {
+      opts = `<div style="margin:4px 0 0 18px">${q.options.map((o, j) => {
+        const correct = withAnswers && q.correctIndex === j;
+        return `<div style="${correct ? 'font-weight:700;color:#15803d' : ''}">${LETTERS[j]}. ${esc(o)} ${correct ? ' ✓' : ''}</div>`;
+      }).join('')}</div>`;
+    } else if (type === 'draw') {
+      opts = `<div style="margin-left:18px">${box || answerBox('medium')}${
+        withAnswers && q.answerText ? `<div style="color:#15803d;font-weight:600;margin-top:2px">Answer: ${esc(q.answerText)}</div>` : ''}</div>`;
+    } else { // short answer
+      opts = withAnswers
+        ? `<div style="margin-left:18px;color:#15803d;font-weight:600">Answer: ${esc(q.answerText || '') || '__________'}</div>`
+        : (box
+            ? `<div style="margin-left:18px">${box}</div>`
+            : `<div style="margin:6px 0 0 18px;border-bottom:1px solid #cbd5e1;height:20px"></div><div style="margin-left:18px;border-bottom:1px solid #cbd5e1;height:20px"></div>`);
+    }
     return `<div style="margin-bottom:12px;page-break-inside:avoid">
       <div style="display:flex;justify-content:space-between"><span><b>${i + 1}.</b> ${esc(q.question)}</span><span style="color:#6b7280;font-size:11px">[${q.marks ?? 1}]</span></div>
+      ${img}
       ${opts}
     </div>`;
   }).join('');

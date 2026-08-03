@@ -52,6 +52,7 @@ const CashBook = named(() => import('./components/CashBook'), 'CashBook');
 const Tools = named(() => import('./components/Tools'), 'Tools');
 const Results = named(() => import('./components/Results'), 'Results');
 const Subjects = named(() => import('./components/Subjects'), 'Subjects');
+const Worksheets = named(() => import('./components/Worksheets'), 'Worksheets');
 const ParentPortal = named(() => import('./components/ParentPortal'), 'ParentPortal');
 
 // Fallback shown while a section's chunk loads.
@@ -121,6 +122,7 @@ function AppContent() {
       case 'timetable':    return <ClassTimetable />;
       case 'results':      return <Results />;
       case 'subjects':     return <Subjects />;
+      case 'worksheets':   return <Worksheets />;
       case 'bulkfees':     return <BulkFeeCollection />;
       case 'debtors':      return <Debtors />;
       case 'transport':    return <Transport />;

@@ -1,12 +1,12 @@
 import { useState } from 'react';
 import {
   BookOpen, Plus, Trash2, Printer, FileDown, Check, ArrowLeft, Shuffle,
-  ListChecks, Layers, FileQuestion, Users2, ScrollText, ClipboardList, Boxes, Gift, X, Sparkles,
+  ListChecks, Layers, FileQuestion, Users2, ScrollText, ClipboardList, Boxes, Gift, X, Sparkles, Image as ImageIcon,
 } from 'lucide-react';
 import { generateResource } from '../lib/aiGenerate';
 import {
   useAppContext, Subject, SubjectTopic, LessonPlan, ProjectTask, WorkGroup,
-  ClassRule, ClassRole, ClassInventoryItem, WishlistItem, QuizQuestion,
+  ClassRule, ClassRole, ClassInventoryItem, WishlistItem, QuizQuestion, QuestionType,
 } from '../context/AppContext';
 import { useThemeClasses } from '../hooks/useThemeClasses';
 import { useAuth } from '../context/AuthContext';
@@ -304,8 +304,9 @@ export function Subjects() {
   function BankTab({ subject, grade }: { subject: string; grade: string }) {
     const { quizQuestions, addQuizQuestion, deleteQuizQuestion } = ctx;
     const list = quizQuestions.filter(q => q.subject === subject);
-    const [q, setQ] = useState({ question: '', options: ['', '', '', ''], correctIndex: 0, marks: '1', short: false });
+    const [q, setQ] = useState({ question: '', options: ['', '', '', ''], correctIndex: 0, marks: '1', type: 'mcq' as QuestionType, answerText: '', imageData: '', boxSize: 'medium' as 'small' | 'medium' | 'large' });
     const [paperTitle, setPaperTitle] = useState('Class Test');
+    const onImage = (file?: File) => { if (!file) return; const r = new FileReader(); r.onload = () => setQ(prev => ({ ...prev, imageData: String(r.result) })); r.readAsDataURL(file); };
     const [gen, setGen] = useState(false);
     const generate = async () => {
       const topic = window.prompt(`Generate questions for ${subject} about…`) || '';
@@ -323,9 +324,14 @@ export function Subjects() {
     };
     const add = () => {
       if (!q.question.trim()) { toast('Enter the question.', 'warning'); return; }
-      const options = q.short ? [] : q.options.map(o => o.trim()).filter(Boolean);
-      const item: QuizQuestion = { id: uid('qq'), subject, grade: grade || undefined, question: q.question.trim(), options, correctIndex: q.short ? undefined : q.correctIndex, marks: parseInt(q.marks) || 1 };
-      addQuizQuestion(item); setQ({ ...q, question: '', options: ['', '', '', ''] }); toast('Question added to the bank.', 'success');
+      const options = q.type === 'mcq' ? q.options.map(o => o.trim()).filter(Boolean) : [];
+      const item: QuizQuestion = {
+        id: uid('qq'), subject, grade: grade || undefined, question: q.question.trim(), options,
+        correctIndex: q.type === 'mcq' ? q.correctIndex : undefined, marks: parseInt(q.marks) || 1, type: q.type,
+        answerText: q.type !== 'mcq' ? (q.answerText.trim() || undefined) : undefined,
+        imageData: q.imageData || undefined, answerBox: q.type === 'draw' ? { size: q.boxSize } : undefined,
+      };
+      addQuizQuestion(item); setQ({ ...q, question: '', options: ['', '', '', ''], answerText: '', imageData: '' }); toast('Question added to the bank.', 'success');
     };
     const doPrint = (withAnswers: boolean, pdf = false) => {
       if (list.length === 0) { toast('Add some questions first.', 'warning'); return; }
@@ -339,13 +345,33 @@ export function Subjects() {
             <textarea className={`${inp} flex-1`} rows={2} placeholder="Question text" value={q.question} onChange={e => setQ({ ...q, question: e.target.value })} />
             <input className={`${inp} w-16`} type="number" min="1" title="Marks" value={q.marks} onChange={e => setQ({ ...q, marks: e.target.value })} />
           </div>
-          <label className="flex items-center gap-1.5 text-sm text-gray-600"><input type="checkbox" checked={q.short} onChange={e => setQ({ ...q, short: e.target.checked })} />Short-answer (no options)</label>
-          {!q.short && q.options.map((o, i) => (
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-xs text-gray-500">Type:</span>
+            {([['mcq', 'Multiple choice'], ['short', 'Short answer'], ['draw', 'Draw / working box']] as const).map(([t, label]) => (
+              <label key={t} className={`px-2.5 py-1 rounded-lg text-xs border cursor-pointer ${q.type === t ? `${tc.btn.split(' ')[0]} text-white border-transparent` : 'border-gray-300 text-gray-600'}`}>
+                <input type="radio" name="bank-qtype" className="hidden" checked={q.type === t} onChange={() => setQ({ ...q, type: t })} />{label}
+              </label>
+            ))}
+          </div>
+          <div className="flex items-center gap-2 flex-wrap text-sm">
+            <label className="flex items-center gap-1.5 text-gray-600 cursor-pointer border border-gray-300 rounded-lg px-2.5 py-1 hover:bg-gray-50">
+              <ImageIcon className="h-4 w-4" />{q.imageData ? 'Change image' : 'Add image'}
+              <input type="file" accept="image/*" className="hidden" onChange={e => onImage(e.target.files?.[0])} />
+            </label>
+            {q.imageData && (<><img src={q.imageData} alt="" className="h-9 w-9 object-cover rounded border border-gray-200" /><button onClick={() => setQ({ ...q, imageData: '' })} className="text-xs text-red-500 hover:underline">Remove</button></>)}
+          </div>
+          {q.type === 'mcq' && q.options.map((o, i) => (
             <div key={i} className="flex items-center gap-2">
               <input type="radio" name="correct" checked={q.correctIndex === i} onChange={() => setQ({ ...q, correctIndex: i })} title="Mark correct" />
               <input className={`${inp} flex-1`} placeholder={`Option ${'ABCD'[i]}`} value={o} onChange={e => setQ({ ...q, options: q.options.map((x, j) => j === i ? e.target.value : x) })} />
             </div>
           ))}
+          {q.type !== 'mcq' && <input className={`${inp} w-full`} placeholder="Answer (for the marking key)" value={q.answerText} onChange={e => setQ({ ...q, answerText: e.target.value })} />}
+          {q.type === 'draw' && (
+            <label className="text-xs text-gray-500 flex items-center gap-2">Box size
+              <select className={inp} value={q.boxSize} onChange={e => setQ({ ...q, boxSize: e.target.value as 'small' | 'medium' | 'large' })}><option value="small">Small</option><option value="medium">Medium</option><option value="large">Large</option></select>
+            </label>
+          )}
           <div className="flex gap-2">
             <button onClick={add} className={`flex items-center gap-1.5 ${tc.btn} text-white px-3 py-2 rounded-lg text-sm`}><Plus className="h-4 w-4" />Add to bank</button>
             <button onClick={generate} disabled={gen} title="Generate questions with AI" className="flex items-center gap-1.5 border border-purple-300 text-purple-700 hover:bg-purple-50 px-3 py-2 rounded-lg text-sm disabled:opacity-50"><Sparkles className="h-4 w-4" />{gen ? 'Generating…' : 'Generate'}</button>
