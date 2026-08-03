@@ -4,7 +4,7 @@ import {
   BarChart3, UserCheck, TrendingDown, Package, Calendar,
   DollarSign, Bell, MonitorCheck, ClipboardCheck, CalendarDays,
   Palette, Building2, LayoutTemplate, Clock, Layers, GraduationCap,
-  ChevronDown, ChevronsLeft, ChevronsRight, Heart, Bus, UserX, Settings as SettingsIcon, Briefcase, ChefHat, UserCircle, Camera, BookOpen, MessageSquare, HelpCircle, Wallet, Wrench
+  ChevronDown, ChevronsLeft, ChevronsRight, Heart, Bus, UserX, Settings as SettingsIcon, Briefcase, ChefHat, UserCircle, Camera, BookOpen, MessageSquare, HelpCircle, Wallet, Wrench, PencilRuler
 } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
@@ -54,6 +54,7 @@ const menuGroups = [
       { id: 'attendance', label: 'Attendance',       icon: ClipboardCheck },
       { id: 'results',    label: 'Academic Results', icon: GraduationCap },
       { id: 'subjects',   label: 'Subjects',         icon: BookOpen },
+      { id: 'worksheets', label: 'Worksheets',       icon: PencilRuler },
       { id: 'timetable',  label: 'Class Timetable',  icon: Clock },
     ]
   },

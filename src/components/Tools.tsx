@@ -1,9 +1,9 @@
 import { useState, useRef } from 'react';
 import {
   Trophy, Users2, Plus, Trash2, Printer, Download, ArrowLeft, Check, Lock, Pencil,
-  Shuffle, Medal, Lightbulb, FileQuestion, X, FileDown, Crown, UserPlus,
+  Shuffle, Medal, Lightbulb, FileQuestion, X, FileDown, Crown, UserPlus, Image as ImageIcon,
 } from 'lucide-react';
-import { useAppContext, Competition, CompetitionEntry, House, HouseMember, SchoolProject, ProjectTask, QuizQuestion } from '../context/AppContext';
+import { useAppContext, Competition, CompetitionEntry, House, HouseMember, SchoolProject, ProjectTask, QuizQuestion, QuestionType } from '../context/AppContext';
 import { useToast } from './ToastProvider';
 import { useThemeClasses } from '../hooks/useThemeClasses';
 import { leaderboard, entryPoints } from '../lib/scoring';
@@ -432,15 +432,29 @@ export function Tools() {
     const [filter, setFilter] = useState('');
     const [sel, setSel] = useState<Set<string>>(new Set());
     const [paper, setPaper] = useState({ title: 'Class Test', subject: '', grade: '', instructions: '' });
-    const [q, setQ] = useState({ subject: '', grade: '', question: '', options: ['', '', '', ''], correctIndex: 0, marks: '1', short: false });
+    const [q, setQ] = useState({ subject: '', grade: '', question: '', options: ['', '', '', ''], correctIndex: 0, marks: '1', type: 'mcq' as QuestionType, answerText: '', imageData: '', boxSize: 'medium' as 'small' | 'medium' | 'large' });
     const inp = 'px-2.5 py-1.5 border border-gray-300 rounded-lg text-sm';
+
+    const onImage = (file?: File) => {
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => setQ(prev => ({ ...prev, imageData: String(reader.result) }));
+      reader.readAsDataURL(file);
+    };
 
     const filtered = quizQuestions.filter(x => !filter || x.subject === filter);
     const addQ = () => {
       if (!q.subject.trim() || !q.question.trim()) { toast('Subject and question are required.', 'warning'); return; }
-      const options = q.short ? [] : q.options.map(o => o.trim()).filter(Boolean);
-      addQuizQuestion({ id: `qq-${Date.now()}`, subject: q.subject.trim(), grade: q.grade.trim() || undefined, question: q.question.trim(), options, correctIndex: q.short ? undefined : q.correctIndex, marks: parseInt(q.marks) || 1 });
-      setQ({ ...q, question: '', options: ['', '', '', ''] });
+      const options = q.type === 'mcq' ? q.options.map(o => o.trim()).filter(Boolean) : [];
+      addQuizQuestion({
+        id: `qq-${Date.now()}`, subject: q.subject.trim(), grade: q.grade.trim() || undefined,
+        question: q.question.trim(), options, correctIndex: q.type === 'mcq' ? q.correctIndex : undefined,
+        marks: parseInt(q.marks) || 1, type: q.type,
+        answerText: q.type !== 'mcq' ? (q.answerText.trim() || undefined) : undefined,
+        imageData: q.imageData || undefined,
+        answerBox: q.type === 'draw' ? { size: q.boxSize } : undefined,
+      });
+      setQ({ ...q, question: '', options: ['', '', '', ''], answerText: '', imageData: '' });
       toast('Question added to the bank.', 'success');
     };
     const toggleSel = (id: string) => setSel(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
@@ -458,13 +472,33 @@ export function Tools() {
           <p className="font-semibold text-gray-900">Add a question</p>
           <div className="flex gap-2"><input className={`${inp} flex-1`} placeholder="Subject" value={q.subject} onChange={e => setQ({ ...q, subject: e.target.value })} /><input className={`${inp} w-24`} placeholder="Grade" value={q.grade} onChange={e => setQ({ ...q, grade: e.target.value })} /><input className={`${inp} w-16`} type="number" min="1" title="Marks" value={q.marks} onChange={e => setQ({ ...q, marks: e.target.value })} /></div>
           <textarea className={`${inp} w-full`} rows={2} placeholder="Question text" value={q.question} onChange={e => setQ({ ...q, question: e.target.value })} />
-          <label className="flex items-center gap-1.5 text-sm text-gray-600"><input type="checkbox" checked={q.short} onChange={e => setQ({ ...q, short: e.target.checked })} />Short-answer (no options)</label>
-          {!q.short && q.options.map((o, i) => (
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-xs text-gray-500">Type:</span>
+            {([['mcq', 'Multiple choice'], ['short', 'Short answer'], ['draw', 'Draw / working box']] as const).map(([t, label]) => (
+              <label key={t} className={`px-2.5 py-1 rounded-lg text-xs border cursor-pointer ${q.type === t ? `${tc.btn.split(' ')[0]} text-white border-transparent` : 'border-gray-300 text-gray-600'}`}>
+                <input type="radio" name="qtype" className="hidden" checked={q.type === t} onChange={() => setQ({ ...q, type: t })} />{label}
+              </label>
+            ))}
+          </div>
+          <div className="flex items-center gap-2 flex-wrap text-sm">
+            <label className="flex items-center gap-1.5 text-gray-600 cursor-pointer border border-gray-300 rounded-lg px-2.5 py-1 hover:bg-gray-50">
+              <ImageIcon className="h-4 w-4" />{q.imageData ? 'Change image' : 'Add image'}
+              <input type="file" accept="image/*" className="hidden" onChange={e => onImage(e.target.files?.[0])} />
+            </label>
+            {q.imageData && (<><img src={q.imageData} alt="" className="h-9 w-9 object-cover rounded border border-gray-200" /><button onClick={() => setQ({ ...q, imageData: '' })} className="text-xs text-red-500 hover:underline">Remove</button></>)}
+          </div>
+          {q.type === 'mcq' && q.options.map((o, i) => (
             <div key={i} className="flex items-center gap-2">
               <input type="radio" name="correct" checked={q.correctIndex === i} onChange={() => setQ({ ...q, correctIndex: i })} title="Mark correct" />
               <input className={`${inp} flex-1`} placeholder={`Option ${'ABCD'[i]}`} value={o} onChange={e => setQ({ ...q, options: q.options.map((x, j) => j === i ? e.target.value : x) })} />
             </div>
           ))}
+          {q.type !== 'mcq' && <input className={`${inp} w-full`} placeholder="Answer (for the marking key)" value={q.answerText} onChange={e => setQ({ ...q, answerText: e.target.value })} />}
+          {q.type === 'draw' && (
+            <label className="text-xs text-gray-500 flex items-center gap-2">Box size
+              <select className={inp} value={q.boxSize} onChange={e => setQ({ ...q, boxSize: e.target.value as 'small' | 'medium' | 'large' })}><option value="small">Small</option><option value="medium">Medium</option><option value="large">Large</option></select>
+            </label>
+          )}
           <button onClick={addQ} className={`flex items-center gap-1.5 ${tc.btn} text-white px-3 py-2 rounded-lg text-sm`}><Plus className="h-4 w-4" />Add to bank</button>
         </div>
 
