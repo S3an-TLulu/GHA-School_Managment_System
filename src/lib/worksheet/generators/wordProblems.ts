@@ -16,6 +16,7 @@ export const wordProblems: Generator = {
   label: 'Word problems',
   category: 'wordProblems',
   description: 'Story problems with local names and Kwacha, scaled by grade.',
+  bankable: true,
   settings: [
     { key: 'ops', label: 'Operations', type: 'multiselect', options: [
       { value: 'add', label: 'Addition' }, { value: 'sub', label: 'Subtraction' },
@@ -60,7 +61,7 @@ export const wordProblems: Generator = {
           ans = `K${paid - cost}`;
         }
       }
-      return { questionHtml: `${text}${workBox}`, answerHtml: `<b>${ans}</b>`, marks: 2 };
+      return { questionHtml: `${text}${workBox}`, answerHtml: `<b>${ans}</b>`, marks: 2, bankQuestion: text, bankAnswer: ans };
     });
   },
 };

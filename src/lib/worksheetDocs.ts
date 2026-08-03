@@ -4,26 +4,35 @@ import { getGenerator } from './worksheet/generators';
 import { makeRng } from './worksheet/rng';
 import { Problem } from './worksheet/types';
 
+// Mix a section seed, a question index and its reroll salt into an independent
+// per-question seed — so each question is reproducible AND can be rerolled or
+// locked on its own without disturbing its neighbours.
+const mixSeed = (seed: number, index: number, salt: number) =>
+  ((seed >>> 0) ^ Math.imul(index + 1, 2654435761) ^ Math.imul(salt + 1, 40503)) >>> 0;
+
 // Generate the problems for one worksheet section (seeded → reproducible).
+// Each question gets its own derived seed so per-question reroll/lock works.
 export function sectionProblems(section: Worksheet['sections'][number], grade: string): Problem[] {
   const gen = getGenerator(section.generatorId);
   if (!gen) return [];
-  try {
-    return gen.generate({ settings: section.settings, grade, count: Math.max(1, section.count), rng: makeRng(section.seed >>> 0) });
-  } catch {
-    return [];
+  const count = Math.max(1, section.count);
+  const out: Problem[] = [];
+  for (let i = 0; i < count; i++) {
+    try {
+      const salt = section.salts?.[i] ?? 0;
+      const rng = makeRng(mixSeed(section.seed, i, salt));
+      const p = gen.generate({ settings: section.settings, grade, count: 1, rng })[0];
+      if (p) out.push(p);
+    } catch { /* skip a bad problem */ }
   }
+  return out;
 }
 
-// Build the printable worksheet (or its answer key) as a self-contained A4 HTML
-// document, then route to print or Save-as-PDF. Mirrors the shared *Docs.ts idiom.
-export function printWorksheet(worksheet: Worksheet, branding: SchoolBranding, opts: { withAnswers?: boolean; pdf?: boolean } = {}) {
-  const { withAnswers = false, pdf = false } = opts;
+// Build the inner body (header, pupil row, sections) for one worksheet — shared
+// by single-sheet printing and multi-copy "packs".
+function sheetBody(worksheet: Worksheet, branding: SchoolBranding, withAnswers: boolean, accent: string): string {
   const L = worksheet.layout;
-  const accent = L.bw ? '#111' : '#12274a';
-
-  let n = 0;               // running question number across the sheet
-  let totalMarks = 0;
+  let n = 0, totalMarks = 0;
   const sectionsHtml = worksheet.sections.map(section => {
     const gen = getGenerator(section.generatorId);
     const problems = sectionProblems(section, worksheet.grade);
@@ -57,10 +66,25 @@ export function printWorksheet(worksheet: Worksheet, branding: SchoolBranding, o
     ? `<div class="pupil"><span>Name: ______________________________</span><span>Class: ____________</span><span>Score: ______ / ${totalMarks}</span></div>`
     : '';
 
-  const foot = L.pageNumbers
-    ? `<div class="foot">${esc(branding.schoolName || 'School')} · ${esc(worksheet.title)}${withAnswers ? ' — Answer Key' : ''}</div>` : '';
+  return `<div class="hd">
+      ${branding.logoUrl ? `<img src="${branding.logoUrl}" style="height:44px;width:44px;object-fit:contain" />` : ''}
+      <div class="name">${esc(branding.schoolName) || 'School'}</div>
+      ${branding.motto ? `<div class="motto">${esc(branding.motto)}</div>` : ''}
+      <div class="title">${esc(worksheet.title)}${withAnswers ? ' — MARKING KEY' : ''}</div>
+      <div class="meta">${metaBits}</div>
+    </div>
+    ${pupilRow}
+    ${worksheet.instructions ? `<div class="instr">${esc(worksheet.instructions)}</div>` : ''}
+    ${sectionsHtml || '<p style="color:#9ca3af">Add a section to build the worksheet.</p>'}`;
+}
 
-  const html = `<!DOCTYPE html><html><head><title>${esc(worksheet.title)}${withAnswers ? ' — Answer Key' : ''}</title><style>
+// Wrap one or more sheet bodies in the standard document shell.
+function shell(worksheet: Worksheet, branding: SchoolBranding, withAnswers: boolean, bodies: string[]): string {
+  const L = worksheet.layout;
+  const accent = L.bw ? '#111' : '#12274a';
+  const foot = L.pageNumbers ? `<div class="foot">${esc(branding.schoolName || 'School')} · ${esc(worksheet.title)}${withAnswers ? ' — Answer Key' : ''}</div>` : '';
+  const inner = bodies.map((b, i) => `<div ${i < bodies.length - 1 ? 'style="page-break-after:always"' : ''}>${b}</div>`).join('');
+  return `<!DOCTYPE html><html><head><title>${esc(worksheet.title)}${withAnswers ? ' — Answer Key' : ''}</title><style>
     @page{size:A4 ${L.orientation};margin:14mm}
     *{box-sizing:border-box;margin:0;padding:0}
     body{font-family:Arial,sans-serif;color:#111;font-size:${L.fontSize}px;line-height:1.45;${foot ? 'padding-bottom:14mm' : ''}}
@@ -73,21 +97,30 @@ export function printWorksheet(worksheet: Worksheet, branding: SchoolBranding, o
     .instr{font-style:italic;color:#374151;margin:6px 0}
     .foot{position:fixed;bottom:4mm;left:0;right:0;text-align:center;font-size:10px;color:#9ca3af}
     @media print{button{display:none}}
-  </style></head><body>
-    <div class="hd">
-      ${branding.logoUrl ? `<img src="${branding.logoUrl}" style="height:44px;width:44px;object-fit:contain" />` : ''}
-      <div class="name">${esc(branding.schoolName) || 'School'}</div>
-      ${branding.motto ? `<div class="motto">${esc(branding.motto)}</div>` : ''}
-      <div class="title">${esc(worksheet.title)}${withAnswers ? ' — MARKING KEY' : ''}</div>
-      <div class="meta">${metaBits}</div>
-    </div>
-    ${pupilRow}
-    ${worksheet.instructions ? `<div class="instr">${esc(worksheet.instructions)}</div>` : ''}
-    ${sectionsHtml || '<p style="color:#9ca3af">Add a section to build the worksheet.</p>'}
-    ${foot}
+  </style></head><body>${inner}
     <script>window.onload=function(){setTimeout(function(){window.print()},300)}</script>
   </body></html>`;
+}
 
+// Build the printable worksheet (or its answer key) and route to print / Save-as-PDF.
+export function printWorksheet(worksheet: Worksheet, branding: SchoolBranding, opts: { withAnswers?: boolean; pdf?: boolean } = {}) {
+  const { withAnswers = false, pdf = false } = opts;
+  const accent = worksheet.layout.bw ? '#111' : '#12274a';
+  const html = shell(worksheet, branding, withAnswers, [sheetBody(worksheet, branding, withAnswers, accent)]);
   const filename = `${worksheet.title || 'Worksheet'}${withAnswers ? '_Answer_Key' : ''}`;
+  if (pdf) exportPdf(html, filename); else printHtml(html);
+}
+
+// Print a "pack" of `copies` differentiated variants in one document — each copy
+// reseeds every section, so the whole class gets unique-but-equivalent sheets.
+export function printWorksheetPack(worksheet: Worksheet, branding: SchoolBranding, opts: { copies: number; withAnswers?: boolean; pdf?: boolean }) {
+  const { copies, withAnswers = false, pdf = false } = opts;
+  const accent = worksheet.layout.bw ? '#111' : '#12274a';
+  const bodies = Array.from({ length: Math.max(1, copies) }, (_, c) => {
+    const variant: Worksheet = { ...worksheet, sections: worksheet.sections.map(s => ({ ...s, seed: (s.seed + c * 101 + 1) >>> 0 })) };
+    return sheetBody(variant, branding, withAnswers, accent);
+  });
+  const html = shell(worksheet, branding, withAnswers, bodies);
+  const filename = `${worksheet.title || 'Worksheet'}_pack${withAnswers ? '_Answer_Key' : ''}`;
   if (pdf) exportPdf(html, filename); else printHtml(html);
 }

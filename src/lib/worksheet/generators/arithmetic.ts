@@ -104,6 +104,7 @@ export const mentalMaths: Generator = {
   label: 'Mental maths',
   category: 'arithmetic',
   description: 'Quick horizontal calculations across chosen operations.',
+  bankable: true,
   settings: [
     { key: 'ops', label: 'Operations', type: 'multiselect', options: [
       { value: 'add', label: '+' }, { value: 'sub', label: '−' },
@@ -124,7 +125,7 @@ export const mentalMaths: Generator = {
       return {
         questionHtml: `<span style="font-size:16px">${expr} <span style="display:inline-block;border-bottom:1px solid #111;min-width:48px"></span></span>`,
         answerHtml: `<span style="font-size:16px">${expr} <b>${ans}</b></span>`,
-        marks: 1,
+        marks: 1, bankQuestion: expr, bankAnswer: String(ans),
       };
     });
   },
@@ -137,6 +138,7 @@ export const timesTables: Generator = {
   label: 'Multiplication tables',
   category: 'arithmetic',
   description: 'Random times-table practice with fill-in answers.',
+  bankable: true,
   settings: [
     { key: 'table', label: 'Table (0 = mixed)', type: 'number', min: 0, max: 12 },
   ],
@@ -150,7 +152,7 @@ export const timesTables: Generator = {
       return {
         questionHtml: `<span style="font-size:16px">${a} × ${b} = <span style="display:inline-block;border-bottom:1px solid #111;min-width:44px"></span></span>`,
         answerHtml: `<span style="font-size:16px">${a} × ${b} = <b>${a * b}</b></span>`,
-        marks: 1,
+        marks: 1, bankQuestion: `${a} × ${b} =`, bankAnswer: String(a * b),
       };
     });
   },
