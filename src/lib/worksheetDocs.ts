@@ -1,5 +1,5 @@
 import { Worksheet, SchoolBranding } from '../context/AppContext';
-import { esc, printHtml, exportPdf } from './print';
+import { esc, emitDoc, DOC_FONT } from './print';
 import { getGenerator } from './worksheet/generators';
 import { makeRng } from './worksheet/rng';
 import { Problem } from './worksheet/types';
@@ -21,7 +21,7 @@ export function sectionProblems(section: Worksheet['sections'][number], grade: s
     try {
       const salt = section.salts?.[i] ?? 0;
       const rng = makeRng(mixSeed(section.seed, i, salt));
-      const p = gen.generate({ settings: section.settings, grade, count: 1, rng })[0];
+      const p = gen.generate({ settings: section.settings, grade, count: 1, rng, index: i })[0];
       if (p) out.push(p);
     } catch { /* skip a bad problem */ }
   }
@@ -87,7 +87,7 @@ function shell(worksheet: Worksheet, branding: SchoolBranding, withAnswers: bool
   return `<!DOCTYPE html><html><head><title>${esc(worksheet.title)}${withAnswers ? ' — Answer Key' : ''}</title><style>
     @page{size:A4 ${L.orientation};margin:14mm}
     *{box-sizing:border-box;margin:0;padding:0}
-    body{font-family:Arial,sans-serif;color:#111;font-size:${L.fontSize}px;line-height:1.45;${foot ? 'padding-bottom:14mm' : ''}}
+    body{font-family:${DOC_FONT};color:#111;font-size:${L.fontSize}px;line-height:1.45;${foot ? 'padding-bottom:14mm' : ''}}
     .hd{text-align:center;border-bottom:2px solid ${accent};padding-bottom:8px;margin-bottom:8px}
     .hd .name{font-size:18px;font-weight:800;color:${accent}}
     .hd .motto{font-size:11px;color:#6b7280;font-style:italic}
@@ -102,25 +102,26 @@ function shell(worksheet: Worksheet, branding: SchoolBranding, withAnswers: bool
   </body></html>`;
 }
 
-// Build the printable worksheet (or its answer key) and route to print / Save-as-PDF.
-export function printWorksheet(worksheet: Worksheet, branding: SchoolBranding, opts: { withAnswers?: boolean; pdf?: boolean } = {}) {
-  const { withAnswers = false, pdf = false } = opts;
+type OutMode = 'print' | 'pdf' | 'word';
+const mode = (o: { pdf?: boolean; word?: boolean }): OutMode => o.word ? 'word' : o.pdf ? 'pdf' : 'print';
+
+// Build the printable worksheet (or its answer key) and route to print / PDF / Word.
+export function printWorksheet(worksheet: Worksheet, branding: SchoolBranding, opts: { withAnswers?: boolean; pdf?: boolean; word?: boolean } = {}) {
+  const { withAnswers = false } = opts;
   const accent = worksheet.layout.bw ? '#111' : '#12274a';
   const html = shell(worksheet, branding, withAnswers, [sheetBody(worksheet, branding, withAnswers, accent)]);
-  const filename = `${worksheet.title || 'Worksheet'}${withAnswers ? '_Answer_Key' : ''}`;
-  if (pdf) exportPdf(html, filename); else printHtml(html);
+  emitDoc(html, `${worksheet.title || 'Worksheet'}${withAnswers ? '_Answer_Key' : ''}`, mode(opts));
 }
 
 // Print a "pack" of `copies` differentiated variants in one document — each copy
 // reseeds every section, so the whole class gets unique-but-equivalent sheets.
-export function printWorksheetPack(worksheet: Worksheet, branding: SchoolBranding, opts: { copies: number; withAnswers?: boolean; pdf?: boolean }) {
-  const { copies, withAnswers = false, pdf = false } = opts;
+export function printWorksheetPack(worksheet: Worksheet, branding: SchoolBranding, opts: { copies: number; withAnswers?: boolean; pdf?: boolean; word?: boolean }) {
+  const { copies, withAnswers = false } = opts;
   const accent = worksheet.layout.bw ? '#111' : '#12274a';
   const bodies = Array.from({ length: Math.max(1, copies) }, (_, c) => {
     const variant: Worksheet = { ...worksheet, sections: worksheet.sections.map(s => ({ ...s, seed: (s.seed + c * 101 + 1) >>> 0 })) };
     return sheetBody(variant, branding, withAnswers, accent);
   });
   const html = shell(worksheet, branding, withAnswers, bodies);
-  const filename = `${worksheet.title || 'Worksheet'}_pack${withAnswers ? '_Answer_Key' : ''}`;
-  if (pdf) exportPdf(html, filename); else printHtml(html);
+  emitDoc(html, `${worksheet.title || 'Worksheet'}_pack${withAnswers ? '_Answer_Key' : ''}`, mode(opts));
 }

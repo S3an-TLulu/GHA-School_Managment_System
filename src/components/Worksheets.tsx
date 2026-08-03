@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import {
   PencilRuler, Plus, Trash2, Printer, FileDown, RefreshCw, Lock, Unlock,
-  ChevronUp, ChevronDown, Save, FilePlus, Copy, Eye, Sliders, Send,
+  ChevronUp, ChevronDown, Save, FilePlus, Copy, Eye, Sliders, Send, FileType2,
 } from 'lucide-react';
 import { useAppContext, Worksheet, WorksheetSection } from '../context/AppContext';
 import { useThemeClasses } from '../hooks/useThemeClasses';
@@ -91,10 +91,11 @@ export function Worksheets() {
   const duplicate = (t: Worksheet) => { const copy = { ...t, id: uid('ws'), title: `${t.title} (copy)`, createdAt: new Date().toISOString() }; addWorksheet(copy); setWs(copy); setSavedId(copy.id); toast('Duplicated.', 'success'); };
   const newSheet = () => { setWs(blank()); setSavedId(null); };
 
-  const doPrint = (withAnswers: boolean, pdf = false) => {
+  const doPrint = (withAnswers: boolean, out: 'print' | 'pdf' | 'word' = 'print') => {
     if (!ws.sections.length) { toast('Add a section first.', 'warning'); return; }
-    if (copies > 1) printWorksheetPack(ws, branding, { copies, withAnswers, pdf });
-    else printWorksheet(ws, branding, { withAnswers, pdf });
+    const o = { withAnswers, pdf: out === 'pdf', word: out === 'word' };
+    if (copies > 1) printWorksheetPack(ws, branding, { copies, ...o });
+    else printWorksheet(ws, branding, o);
   };
 
   const inp = 'px-2.5 py-1.5 border border-gray-300 rounded-lg text-sm';
@@ -109,9 +110,10 @@ export function Worksheets() {
         </div>
         <div className="flex gap-2 flex-wrap">
           <button onClick={() => doPrint(false)} className={`flex items-center gap-1.5 ${tc.btn} text-white px-3 py-2 rounded-lg text-sm`}><Printer className="h-4 w-4" />Print</button>
-          <button title="Export worksheet to PDF" onClick={() => doPrint(false, true)} className="flex items-center border border-gray-300 text-gray-700 px-2 py-2 rounded-lg text-sm hover:bg-gray-50"><FileDown className="h-4 w-4" /></button>
+          <button title="Export worksheet to PDF" onClick={() => doPrint(false, 'pdf')} className="flex items-center border border-gray-300 text-gray-700 px-2 py-2 rounded-lg text-sm hover:bg-gray-50"><FileDown className="h-4 w-4" /></button>
+          <button title="Export worksheet to Word" onClick={() => doPrint(false, 'word')} className="flex items-center border border-gray-300 text-gray-700 px-2 py-2 rounded-lg text-sm hover:bg-gray-50"><FileType2 className="h-4 w-4" /></button>
           <button onClick={() => doPrint(true)} className="flex items-center gap-1.5 border border-gray-300 text-gray-700 px-3 py-2 rounded-lg text-sm hover:bg-gray-50"><Printer className="h-4 w-4" />Answer Key</button>
-          <button title="Export answer key to PDF" onClick={() => doPrint(true, true)} className="flex items-center border border-gray-300 text-gray-700 px-2 py-2 rounded-lg text-sm hover:bg-gray-50"><FileDown className="h-4 w-4" /></button>
+          <button title="Export answer key to PDF" onClick={() => doPrint(true, 'pdf')} className="flex items-center border border-gray-300 text-gray-700 px-2 py-2 rounded-lg text-sm hover:bg-gray-50"><FileDown className="h-4 w-4" /></button>
         </div>
       </div>
 
