@@ -531,6 +531,20 @@ export interface QuizQuestion {
   answerBox?: AnswerBox;    // working/drawing space (draw questions, or extra room)
 }
 
+// ---- Families (explicit family units linking children and partner/guardians) ----
+// An optional layer over the auto-derived guardian groups: a named family that
+// links several children together (siblings) and one or more guardians/partners
+// (e.g. mother + father), regardless of what's typed on each student record.
+export interface FamilyGuardian { id: string; name: string; phone?: string; email?: string; relation?: string; }
+export interface Family {
+  id: string;
+  name: string;
+  guardians: FamilyGuardian[];
+  studentIds: string[];
+  notes?: string;
+  createdAt: string;
+}
+
 // ---- Worksheet generator (Academics) ----
 // A saved worksheet template. Problems are not stored — each section keeps a
 // generator id + settings + seed, so the sheet regenerates identically (or a
@@ -704,6 +718,10 @@ interface AppContextType {
   addWorksheet: (w: Worksheet) => void;
   updateWorksheet: (id: string, w: Partial<Worksheet>) => void;
   deleteWorksheet: (id: string) => void;
+  families: Family[];
+  addFamily: (f: Family) => void;
+  updateFamily: (id: string, f: Partial<Family>) => void;
+  deleteFamily: (id: string) => void;
   quizzes: Quiz[];
   addQuiz: (q: Quiz) => void;
   updateQuiz: (id: string, q: Partial<Quiz>) => void;
@@ -933,6 +951,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [projects, setProjects] = useState<SchoolProject[]>(() => loadFromStorage('gha_projects', []));
   const [quizQuestions, setQuizQuestions] = useState<QuizQuestion[]>(() => loadFromStorage('gha_quiz_questions', []));
   const [worksheets, setWorksheets] = useState<Worksheet[]>(() => loadFromStorage('gha_worksheets', []));
+  const [families, setFamilies] = useState<Family[]>(() => loadFromStorage('gha_families', []));
   const [quizzes, setQuizzes] = useState<Quiz[]>(() => loadFromStorage('gha_quizzes', []));
   // Subjects hub (Academics). Subjects seed from the school's standard list.
   const [subjects, setSubjects] = useState<Subject[]>(() => loadFromStorage('gha_subjects',
@@ -1015,6 +1034,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => { localStorage.setItem('gha_projects', JSON.stringify(projects)); queueLiveSync('gha_projects'); }, [projects]);
   useEffect(() => { localStorage.setItem('gha_quiz_questions', JSON.stringify(quizQuestions)); queueLiveSync('gha_quiz_questions'); }, [quizQuestions]);
   useEffect(() => { localStorage.setItem('gha_worksheets', JSON.stringify(worksheets)); queueLiveSync('gha_worksheets'); }, [worksheets]);
+  useEffect(() => { localStorage.setItem('gha_families', JSON.stringify(families)); queueLiveSync('gha_families'); }, [families]);
   useEffect(() => { localStorage.setItem('gha_quizzes', JSON.stringify(quizzes)); queueLiveSync('gha_quizzes'); }, [quizzes]);
   useEffect(() => { localStorage.setItem('gha_subjects', JSON.stringify(subjects)); queueLiveSync('gha_subjects'); }, [subjects]);
   useEffect(() => { localStorage.setItem('gha_subject_topics', JSON.stringify(subjectTopics)); queueLiveSync('gha_subject_topics'); }, [subjectTopics]);
@@ -1282,6 +1302,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const addWorksheet = (w: Worksheet) => setWorksheets(prev => [w, ...prev]);
   const updateWorksheet = (id: string, u: Partial<Worksheet>) => setWorksheets(prev => prev.map(w => w.id === id ? { ...w, ...u } : w));
   const deleteWorksheet = (id: string) => setWorksheets(prev => prev.filter(w => w.id !== id));
+  const addFamily = (f: Family) => setFamilies(prev => [f, ...prev]);
+  const updateFamily = (id: string, u: Partial<Family>) => setFamilies(prev => prev.map(f => f.id === id ? { ...f, ...u } : f));
+  const deleteFamily = (id: string) => setFamilies(prev => prev.filter(f => f.id !== id));
   const addQuiz = (q: Quiz) => setQuizzes(prev => [q, ...prev]);
   const updateQuiz = (id: string, u: Partial<Quiz>) => setQuizzes(prev => prev.map(q => q.id === id ? { ...q, ...u } : q));
   const deleteQuiz = (id: string) => setQuizzes(prev => prev.filter(q => q.id !== id));
@@ -1401,7 +1424,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     'gha_student_measurements', 'gha_measurement_history', 'gha_uniform_issues', 'gha_uniform_returns',
     'gha_uniform_settings',
     'gha_houses', 'gha_competitions', 'gha_competition_entries',
-    'gha_projects', 'gha_quiz_questions', 'gha_quizzes', 'gha_worksheets',
+    'gha_projects', 'gha_quiz_questions', 'gha_quizzes', 'gha_worksheets', 'gha_families',
     'gha_subjects', 'gha_subject_topics', 'gha_lesson_plans', 'gha_work_groups',
     'gha_class_rules', 'gha_class_roles', 'gha_class_inventory', 'gha_class_wishlist',
   ];
@@ -1441,6 +1464,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     tools: ['gha_competitions', 'gha_competition_entries', 'gha_projects', 'gha_quiz_questions', 'gha_quizzes'],
     subjects: ['gha_subjects', 'gha_subject_topics', 'gha_lesson_plans', 'gha_work_groups', 'gha_class_rules', 'gha_class_roles', 'gha_class_inventory', 'gha_class_wishlist'],
     worksheets: ['gha_worksheets'],
+    families: ['gha_families'],
     requirements: ['gha_requirements'],
     teachers: ['gha_teachers'],
     expenses: ['gha_expenses'],
@@ -1476,7 +1500,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       debtors, transportRoutes, salaryAdvances, payrollRecords, terms, todos, groceries, budgets, documents,
       galleryPhotos, libraryBooks, bookLoans,
       subjects, subjectTopics, lessonPlans, workGroups, classRules, classRoles, classInventory, classWishlist,
-      quizQuestions, worksheets]);
+      quizQuestions, worksheets, families]);
 
   // Apply changes arriving from other devices in real time
   useEffect(() => {
@@ -1500,7 +1524,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       gha_uniform_issues: setUniformIssues, gha_uniform_returns: setUniformReturns,
       gha_uniform_settings: setUniformSettings,
       gha_houses: setHouses, gha_competitions: setCompetitions, gha_competition_entries: setCompetitionEntries,
-      gha_projects: setProjects, gha_quiz_questions: setQuizQuestions, gha_quizzes: setQuizzes, gha_worksheets: setWorksheets,
+      gha_projects: setProjects, gha_quiz_questions: setQuizQuestions, gha_quizzes: setQuizzes, gha_worksheets: setWorksheets, gha_families: setFamilies,
       gha_subjects: setSubjects, gha_subject_topics: setSubjectTopics, gha_lesson_plans: setLessonPlans,
       gha_work_groups: setWorkGroups, gha_class_rules: setClassRules, gha_class_roles: setClassRoles,
       gha_class_inventory: setClassInventory, gha_class_wishlist: setClassWishlist,
@@ -1625,6 +1649,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       projects, addProject, updateProject, deleteProject,
       quizQuestions, addQuizQuestion, updateQuizQuestion, deleteQuizQuestion,
       worksheets, addWorksheet, updateWorksheet, deleteWorksheet,
+      families, addFamily, updateFamily, deleteFamily,
       quizzes, addQuiz, updateQuiz, deleteQuiz,
       subjects, addSubject, updateSubject, deleteSubject,
       subjectTopics, addSubjectTopic, updateSubjectTopic, deleteSubjectTopic,
