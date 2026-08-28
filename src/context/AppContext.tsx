@@ -36,6 +36,11 @@ export interface Payment {
   notes?: string;
   paymentMethod?: PaymentMethod;
   mobileNetwork?: string;
+  // Fee discounts / deductions. `amount` is the net (after discount); `grossAmount`
+  // is the original charge and `discount` is what was taken off, for the receipt.
+  grossAmount?: number;
+  discount?: number;
+  discountReason?: string;
 }
 
 export interface Uniform {
@@ -90,8 +95,9 @@ export interface PayrollRecord {
   feeDeduction: number; // school fees for teacher's own children
   otherDeductions: number;
   notes?: string;
-  status: 'pending' | 'paid';
+  status: 'pending' | 'partial' | 'paid';
   paidDate?: string;
+  amountPaid?: number; // how much has actually been paid (supports part-payments)
   paymentMethod?: 'Bank' | 'Cash' | 'Mobile Money';
 }
 

@@ -18,17 +18,30 @@ const METHODS: { value: PaymentMethod; label: string; icon: React.ReactNode; col
 ];
 
 const MOBILE_NETWORKS = ['MTN Mobile Money', 'Airtel Money', 'Zamtel Kwacha'];
+const DISCOUNT_REASONS = ['Early payment', 'Sibling discount', 'Bursary / Scholarship', 'Staff child', 'Hardship', 'Other'];
+
+// Work out the discount amount (clamped to the gross) for the chosen mode.
+function computeDiscount(gross: number, kind: string, value: string) {
+  const v = parseFloat(value) || 0;
+  if (kind === 'percent') return Math.min(gross, Math.max(0, (gross * v) / 100));
+  if (kind === 'amount') return Math.min(gross, Math.max(0, v));
+  return 0;
+}
 
 function buildPayment(formData: {
   studentId: string; type: string; amount: string; dueDate: string;
   status: string; term: string; receiptNumber: string; notes: string;
   paymentMethod: PaymentMethod; mobileNetwork: string;
+  discountKind: string; discountValue: string; discountReason: string;
 }) {
+  const gross = parseFloat(formData.amount) || 0;
+  const discount = computeDiscount(gross, formData.discountKind, formData.discountValue);
+  const net = Math.round((gross - discount) * 100) / 100;
   return {
     id: `payment-${Date.now()}`,
     studentId: formData.studentId,
     type: formData.type,
-    amount: parseFloat(formData.amount),
+    amount: net,
     dueDate: new Date(formData.dueDate).toISOString(),
     status: formData.status as 'paid' | 'pending' | 'overdue',
     paidDate: formData.status === 'paid' ? new Date().toISOString() : undefined,
@@ -38,6 +51,9 @@ function buildPayment(formData: {
     notes: formData.notes || undefined,
     paymentMethod: formData.paymentMethod,
     mobileNetwork: formData.paymentMethod === 'Mobile Money' ? (formData.mobileNetwork || undefined) : undefined,
+    grossAmount: discount > 0 ? gross : undefined,
+    discount: discount > 0 ? Math.round(discount * 100) / 100 : undefined,
+    discountReason: discount > 0 ? (formData.discountReason || 'Discount') : undefined,
   };
 }
 
@@ -55,7 +71,14 @@ export function PaymentModal({ onSave, onClose }: PaymentModalProps) {
     notes: '',
     paymentMethod: 'Cash' as PaymentMethod,
     mobileNetwork: '',
+    discountKind: 'none',
+    discountValue: '',
+    discountReason: DISCOUNT_REASONS[0],
   });
+
+  const gross = parseFloat(formData.amount) || 0;
+  const discountAmt = computeDiscount(gross, formData.discountKind, formData.discountValue);
+  const net = Math.round((gross - discountAmt) * 100) / 100;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -142,7 +165,7 @@ export function PaymentModal({ onSave, onClose }: PaymentModalProps) {
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Amount (K) *</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Amount charged (K) *</label>
               <input type="number" required min="0" step="0.01" placeholder="0.00"
                 value={formData.amount} onChange={e => setFormData({ ...formData, amount: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
@@ -156,6 +179,38 @@ export function PaymentModal({ onSave, onClose }: PaymentModalProps) {
                 <option value="overdue">Overdue</option>
               </select>
             </div>
+          </div>
+
+          {/* Discount / deduction */}
+          <div className="border border-gray-200 rounded-lg p-3 bg-gray-50/60 space-y-2">
+            <div className="flex items-center justify-between">
+              <label className="text-sm font-medium text-gray-700">Discount / deduction</label>
+              <div className="flex gap-1">
+                {[['none', 'None'], ['amount', 'K off'], ['percent', '% off']].map(([k, label]) => (
+                  <button key={k} type="button" onClick={() => setFormData({ ...formData, discountKind: k })}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-medium border ${formData.discountKind === k ? 'bg-blue-600 text-white border-blue-600' : 'border-gray-300 text-gray-600'}`}>{label}</button>
+                ))}
+              </div>
+            </div>
+            {formData.discountKind !== 'none' && (
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">{formData.discountKind === 'percent' ? 'Percentage (%)' : 'Amount off (K)'}</label>
+                  <input type="number" min="0" step="0.01" value={formData.discountValue} onChange={e => setFormData({ ...formData, discountValue: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder={formData.discountKind === 'percent' ? 'e.g. 10' : '0.00'} />
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Reason</label>
+                  <select value={formData.discountReason} onChange={e => setFormData({ ...formData, discountReason: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                    {DISCOUNT_REASONS.map(r => <option key={r} value={r}>{r}</option>)}
+                  </select>
+                </div>
+              </div>
+            )}
+            {discountAmt > 0 && (
+              <p className="text-xs text-gray-600">Charged <b>K{gross.toLocaleString()}</b> − discount <b className="text-amber-700">K{discountAmt.toLocaleString()}</b> = net <b className="text-green-700">K{net.toLocaleString()}</b></p>
+            )}
           </div>
 
           <div className="grid grid-cols-2 gap-4">
