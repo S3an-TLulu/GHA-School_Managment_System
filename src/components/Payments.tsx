@@ -103,6 +103,8 @@ function printReceipt(payment: Payment, student: Student | undefined, branding: 
         <span class="value">${payment.term || '—'}</span>
       </div>
       ${payment.notes ? `<div class="row"><span class="label">Notes</span><span class="value">${payment.notes}</span></div>` : ''}
+      ${payment.discount ? `<div class="row"><span class="label">Amount Charged</span><span class="value">K${(payment.grossAmount ?? (payment.amount + payment.discount)).toLocaleString()}</span></div>
+      <div class="row"><span class="label">Discount${payment.discountReason ? ` (${esc(payment.discountReason)})` : ''}</span><span class="value">− K${payment.discount.toLocaleString()}</span></div>` : ''}
 
       <div class="amount-box">
         <div class="amount-label">Amount Received</div>
@@ -271,7 +273,9 @@ export function Payments() {
                       <MethodBadge method={payment.paymentMethod} network={payment.mobileNetwork} />
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-xs text-gray-500">{payment.term || '—'}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">K{payment.amount.toLocaleString()}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">K{payment.amount.toLocaleString()}
+                      {!!payment.discount && <span className="block text-[10px] font-normal text-amber-600" title={payment.discountReason}>−K{payment.discount.toLocaleString()} discount</span>}
+                    </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
                       {new Date(payment.dueDate).toLocaleDateString()}
                     </td>

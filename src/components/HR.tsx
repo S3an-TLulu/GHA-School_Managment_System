@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Wallet, HandCoins, Baby, Trash2, Printer, Check, Search, CalendarClock, Eye, EyeOff, ListChecks, Landmark, Banknote, Smartphone, FileDown } from 'lucide-react';
+import { Wallet, HandCoins, Baby, Trash2, Printer, Check, Search, CalendarClock, Eye, EyeOff, ListChecks, Landmark, Banknote, Smartphone, FileDown, History, Save } from 'lucide-react';
 import { printHtml, exportPdf } from '../lib/print';
 import { useAppContext, Teacher, PayrollRecord } from '../context/AppContext';
 import { useToast } from './ToastProvider';
@@ -39,7 +39,7 @@ export function HR() {
   const { toast } = useToast();
   const tc = useThemeClasses();
 
-  const [tab, setTab] = useState<'payroll' | 'overview' | 'advances' | 'children'>('payroll');
+  const [tab, setTab] = useState<'payroll' | 'history' | 'overview' | 'advances' | 'children'>('payroll');
   const [month, setMonth] = useState(currentMonth);
   const [advForm, setAdvForm] = useState({ teacherId: '', amount: '', date: new Date().toISOString().split('T')[0], month: currentMonth(), notes: '' });
   const [childSearch, setChildSearch] = useState('');
@@ -82,6 +82,7 @@ export function HR() {
   const buildRecord = (t: Teacher, markPaid: boolean): PayrollRecord => {
     const d = draftFor(t);
     const existing = recordFor(t.id);
+    const net = (t.baseSalary ?? 0) + (parseFloat(d.allowances) || 0) - monthAdvances(t.id) - (parseFloat(d.feeDeduction) || 0) - (parseFloat(d.otherDeductions) || 0);
     return {
       id: existing?.id || `pay-${t.id}-${month}`,
       teacherId: t.id,
@@ -93,13 +94,31 @@ export function HR() {
       otherDeductions: parseFloat(d.otherDeductions) || 0,
       notes: d.notes || undefined,
       status: markPaid ? 'paid' : (existing?.status ?? 'pending'),
-      paidDate: markPaid ? new Date().toISOString() : existing?.paidDate,
+      paidDate: markPaid ? (existing?.paidDate || new Date().toISOString()) : existing?.paidDate,
+      amountPaid: markPaid ? net : existing?.amountPaid,
       paymentMethod: d.paymentMethod,
     };
   };
 
   const netPay = (r: PayrollRecord) =>
     r.baseSalary + r.allowances - r.advancesDeducted - r.feeDeduction - r.otherDeductions;
+  // How much of a record has actually been paid (legacy 'paid' rows = fully paid).
+  const paidOf = (r: PayrollRecord) => r.amountPaid ?? (r.status === 'paid' ? netPay(r) : 0);
+  const balanceOf = (r: PayrollRecord) => netPay(r) - paidOf(r);
+
+  // Record a (possibly partial) payment against a teacher's month, updating status.
+  const setPaidAmount = (t: Teacher, value: string) => {
+    const rec = buildRecord(t, false);
+    const net = netPay(rec);
+    const paid = Math.max(0, parseFloat(value) || 0);
+    const status: PayrollRecord['status'] = paid <= 0 ? 'pending' : paid + 0.001 >= net ? 'paid' : 'partial';
+    savePayrollRecord({ ...rec, amountPaid: paid, status, paidDate: paid > 0 ? (recordFor(t.id)?.paidDate || new Date().toISOString()) : undefined });
+  };
+  const setPaidDate = (t: Teacher, dateStr: string) => {
+    const ex = recordFor(t.id);
+    savePayrollRecord({ ...(ex || buildRecord(t, false)), paidDate: dateStr ? new Date(dateStr).toISOString() : undefined });
+  };
+  const saveAll = () => { activeTeachers.forEach(t => savePayrollRecord(buildRecord(t, false))); toast('Payroll saved for all staff.', 'success'); };
 
   const printPayslip = (t: Teacher, pdf = false) => {
     const r = buildRecord(t, false);
@@ -152,6 +171,7 @@ export function HR() {
 
   const totalNetForMonth = activeTeachers.reduce((sum, t) => sum + netPay(buildRecord(t, false)), 0);
   const paidCount = activeTeachers.filter(t => recordFor(t.id)?.status === 'paid').length;
+  const totalOwedForMonth = activeTeachers.reduce((sum, t) => { const r = recordFor(t.id); return sum + (r ? Math.max(0, balanceOf(r)) : 0); }, 0);
 
   return (
     <div className="space-y-6">
@@ -163,6 +183,7 @@ export function HR() {
         <div className="flex space-x-1 bg-gray-100 rounded-lg p-1">
           {[
             { id: 'payroll' as const, label: 'Payroll', icon: Wallet },
+            { id: 'history' as const, label: 'History', icon: History },
             { id: 'overview' as const, label: 'Salary Overview', icon: ListChecks },
             { id: 'advances' as const, label: 'Advances', icon: HandCoins },
             { id: 'children' as const, label: 'Staff Children', icon: Baby },
@@ -200,6 +221,10 @@ export function HR() {
               </div>
               <span className="text-gray-500">{paidCount} / {activeTeachers.length} paid</span>
               <span className="font-semibold text-gray-900">Total net: K{totalNetForMonth.toLocaleString()}</span>
+              {totalOwedForMonth > 0 && <span className="font-semibold text-red-600">Owed: K{totalOwedForMonth.toLocaleString()}</span>}
+              <button onClick={saveAll} className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg px-3 py-1.5 text-xs font-medium">
+                <Save className="h-3.5 w-3.5" />Save all
+              </button>
             </div>
           </div>
 
@@ -210,13 +235,18 @@ export function HR() {
               const rec = buildRecord(t, false);
               const net = netPay(rec);
               const children = teacherChildren(t.id);
-              const isPaid = existing?.status === 'paid';
+              const status = existing?.status ?? 'pending';
+              const isPaid = status === 'paid';
+              const isPartial = status === 'partial';
+              const paid = existing ? paidOf(existing) : 0;
+              const bal = net - paid;
               return (
-                <div key={t.id} className={`bg-white rounded-lg border shadow-sm overflow-hidden ${isPaid ? 'border-green-200' : 'border-gray-200'}`}>
-                  <div className={`px-5 py-3 flex items-center justify-between flex-wrap gap-2 ${isPaid ? 'bg-green-50' : 'bg-gray-50'}`}>
+                <div key={t.id} className={`bg-white rounded-lg border shadow-sm overflow-hidden ${isPaid ? 'border-green-200' : isPartial ? 'border-amber-200' : 'border-gray-200'}`}>
+                  <div className={`px-5 py-3 flex items-center justify-between flex-wrap gap-2 ${isPaid ? 'bg-green-50' : isPartial ? 'bg-amber-50' : 'bg-gray-50'}`}>
                     <div>
                       <p className="font-semibold text-gray-900">{t.name}
                         {isPaid && <span className="ml-2 text-xs bg-green-100 text-green-800 px-2 py-0.5 rounded-full font-medium">PAID{existing?.paidDate ? ` · ${new Date(existing.paidDate).toLocaleDateString('en-ZM', { day: 'numeric', month: 'short' })}` : ''}</span>}
+                        {isPartial && <span className="ml-2 text-xs bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full font-medium">PARTIAL · K{bal.toLocaleString()} owed</span>}
                       </p>
                       <p className="text-xs text-gray-500">{t.role}{t.assignedClass ? ` · ${t.assignedClass}` : ''}{children.length > 0 ? ` · ${children.length} child${children.length !== 1 ? 'ren' : ''} in school` : ''}</p>
                     </div>
@@ -233,13 +263,14 @@ export function HR() {
                         className="text-xs text-blue-600 border border-blue-200 hover:bg-blue-50 rounded-lg px-2.5 py-1.5">
                         Save
                       </button>
-                      {!isPaid ? (
-                        <button onClick={() => { savePayrollRecord(buildRecord(t, true)); toast(`${t.name} marked as paid — K${net.toLocaleString()}.`, 'success'); }}
+                      {status !== 'paid' && (
+                        <button onClick={() => { setPaidAmount(t, String(net)); toast(`${t.name} marked as paid — K${net.toLocaleString()}.`, 'success'); }}
                           className="flex items-center gap-1 text-xs bg-green-600 hover:bg-green-700 text-white rounded-lg px-2.5 py-1.5 font-medium">
-                          <Check className="h-3.5 w-3.5" />Mark Paid
+                          <Check className="h-3.5 w-3.5" />{isPartial ? 'Pay balance' : 'Mark Paid'}
                         </button>
-                      ) : (
-                        <button onClick={() => { savePayrollRecord({ ...buildRecord(t, false), status: 'pending', paidDate: undefined }); toast('Reverted to pending.', 'info'); }}
+                      )}
+                      {status !== 'pending' && (
+                        <button onClick={() => { setPaidAmount(t, '0'); toast('Reverted to pending.', 'info'); }}
                           className="text-xs text-gray-500 border border-gray-300 hover:bg-gray-100 rounded-lg px-2.5 py-1.5">
                           Undo
                         </button>
@@ -302,6 +333,29 @@ export function HR() {
                         placeholder="Notes for this month's payslip (optional)…"
                         className="flex-1 px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
                     </div>
+
+                    {/* Payment record: how much has been paid, when, and the balance owed */}
+                    <div className="col-span-2 md:col-span-6 flex flex-wrap items-end gap-3 border-t border-gray-100 pt-3">
+                      <div>
+                        <label className="block text-xs text-gray-500 mb-1">Amount paid (K)</label>
+                        <input type="number" min="0" defaultValue={existing?.amountPaid ?? (isPaid ? net : '')} key={`${t.id}-${paid}-${status}`}
+                          onBlur={e => setPaidAmount(t, e.target.value)}
+                          placeholder="0"
+                          className="w-32 px-2.5 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-gray-500 mb-1">Date paid</label>
+                        <input type="date" value={existing?.paidDate ? existing.paidDate.split('T')[0] : ''}
+                          onChange={e => setPaidDate(t, e.target.value)}
+                          className="px-2.5 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-gray-500 mb-1">Balance owed</label>
+                        <div className={`px-2.5 py-1.5 rounded-lg text-sm font-bold ${bal <= 0 ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>
+                          K{Math.max(0, bal).toLocaleString()}
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </div>
               );
@@ -314,6 +368,76 @@ export function HR() {
           </div>
         </>
       )}
+
+      {/* ---------------- PAYROLL HISTORY ---------------- */}
+      {tab === 'history' && (() => {
+        const byMonth = new Map<string, PayrollRecord[]>();
+        payrollRecords.forEach(r => { if (!byMonth.has(r.month)) byMonth.set(r.month, []); byMonth.get(r.month)!.push(r); });
+        const months = [...byMonth.keys()].sort().reverse();
+        const teacherName = (id: string) => teachers.find(t => t.id === id)?.name || 'Unknown';
+        return (
+          <div className="space-y-4">
+            {months.length === 0 && (
+              <p className="text-center py-12 text-gray-400 bg-white border border-dashed border-gray-200 rounded-lg">
+                No payroll saved yet. On the Payroll tab, use <b>Save all</b> (or Save per staff) to keep a record.
+              </p>
+            )}
+            {months.map((m, idx) => {
+              const recs = byMonth.get(m)!;
+              const net = recs.reduce((s, r) => s + netPay(r), 0);
+              const paid = recs.reduce((s, r) => s + paidOf(r), 0);
+              const owed = Math.max(0, net - paid);
+              const paidN = recs.filter(r => r.status === 'paid').length;
+              return (
+                <div key={m} className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
+                  <div className="px-5 py-3 bg-gray-50 flex items-center justify-between flex-wrap gap-2 border-b border-gray-100">
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold text-gray-900">{monthLabel(m)}</span>
+                      {idx === 0 && <span className="text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full font-medium">Last payroll</span>}
+                      <span className="text-xs text-gray-500">{recs.length} staff · {paidN} fully paid</span>
+                    </div>
+                    <div className="flex items-center gap-3 text-sm flex-wrap">
+                      <span className="text-gray-600">Net: <b className="text-gray-900">K{net.toLocaleString()}</b></span>
+                      <span className="text-green-600">Paid: <b>K{paid.toLocaleString()}</b></span>
+                      {owed > 0 && <span className="text-red-600">Owed: <b>K{owed.toLocaleString()}</b></span>}
+                      <button onClick={() => { setMonth(m); setDrafts({}); setTab('payroll'); }} className="text-xs text-blue-600 border border-blue-200 hover:bg-blue-50 rounded-lg px-2.5 py-1.5">Open</button>
+                    </div>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead><tr className="text-xs text-gray-500 border-b border-gray-100">
+                        <th className="text-left px-5 py-2 font-medium">Staff</th>
+                        <th className="text-right px-3 py-2 font-medium">Net</th>
+                        <th className="text-right px-3 py-2 font-medium">Paid</th>
+                        <th className="text-right px-3 py-2 font-medium">Balance</th>
+                        <th className="text-center px-3 py-2 font-medium">Status</th>
+                        <th className="text-left px-3 py-2 font-medium">Date paid</th>
+                      </tr></thead>
+                      <tbody>
+                        {recs.map(r => {
+                          const b = Math.max(0, netPay(r) - paidOf(r));
+                          return (
+                            <tr key={r.id} className="border-b border-gray-50 hover:bg-gray-50">
+                              <td className="px-5 py-2 text-gray-900">{teacherName(r.teacherId)}</td>
+                              <td className="px-3 py-2 text-right">K{netPay(r).toLocaleString()}</td>
+                              <td className="px-3 py-2 text-right text-green-700">K{paidOf(r).toLocaleString()}</td>
+                              <td className={`px-3 py-2 text-right font-medium ${b > 0 ? 'text-red-600' : 'text-gray-400'}`}>K{b.toLocaleString()}</td>
+                              <td className="px-3 py-2 text-center">
+                                <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${r.status === 'paid' ? 'bg-green-100 text-green-800' : r.status === 'partial' ? 'bg-amber-100 text-amber-800' : 'bg-gray-100 text-gray-600'}`}>{r.status}</span>
+                              </td>
+                              <td className="px-3 py-2 text-gray-500 text-xs">{r.paidDate ? new Date(r.paidDate).toLocaleDateString('en-GB') : '—'}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        );
+      })()}
 
       {/* ---------------- SALARY OVERVIEW ---------------- */}
       {tab === 'overview' && (() => {
