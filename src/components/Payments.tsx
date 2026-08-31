@@ -28,9 +28,41 @@ function MethodBadge({ method, network }: { method?: PaymentMethod; network?: st
 
 
 // Escape user-entered strings before injecting into the receipt HTML.
-function printReceipt(payment: Payment, student: Student | undefined, branding: SchoolBranding, pdf = false) {
+function printReceipt(payment: Payment, student: Student | undefined, branding: SchoolBranding, studentPayments: Payment[] = [], pdf = false) {
   const contactBits = [branding.address, branding.phone ? `Tel: ${branding.phone}` : ''].filter(Boolean).join(' | ');
   const hasBank = branding.bankName || branding.bankAccountNumber;
+
+  // Full payment history for this child, oldest first, so the receipt doubles
+  // as a running statement.
+  const history = studentPayments.slice().sort((a, b) =>
+    new Date(a.paidDate || a.dueDate).getTime() - new Date(b.paidDate || b.dueDate).getTime());
+  const histTotalPaid = history.filter(p => p.status === 'paid').reduce((s, p) => s + p.amount, 0);
+  const histOutstanding = history.filter(p => p.status !== 'paid').reduce((s, p) => s + p.amount, 0);
+  const statusColor = (s: string) => s === 'paid' ? '#15803d' : s === 'overdue' ? '#b91c1c' : '#b45309';
+  const historyRows = history.map(p => {
+    const isThis = p.id === payment.id;
+    const d = p.paidDate || p.dueDate;
+    return `<tr style="${isThis ? 'background:#eff6ff;font-weight:600;' : ''}">
+      <td>${d ? new Date(d).toLocaleDateString('en-GB') : '—'}${isThis ? ' ◄' : ''}</td>
+      <td>${esc(p.type)}</td>
+      <td>${esc(p.term || '—')}</td>
+      <td>${esc(p.paymentMethod === 'Mobile Money' && p.mobileNetwork ? p.mobileNetwork : (p.paymentMethod || 'Cash'))}</td>
+      <td style="text-align:right">K${p.amount.toLocaleString()}</td>
+      <td style="color:${statusColor(p.status)};text-transform:capitalize">${p.status}</td>
+    </tr>`;
+  }).join('');
+  const historySection = history.length ? `
+      <div class="hist">
+        <div class="hist-title">Payment History — ${esc(student?.name || '')}</div>
+        <table class="hist-table">
+          <thead><tr><th>Date</th><th>Type</th><th>Term</th><th>Method</th><th style="text-align:right">Amount</th><th>Status</th></tr></thead>
+          <tbody>${historyRows}</tbody>
+          <tfoot>
+            <tr><td colspan="4">Total Paid</td><td style="text-align:right">K${histTotalPaid.toLocaleString()}</td><td></td></tr>
+            ${histOutstanding > 0 ? `<tr><td colspan="4">Outstanding</td><td style="text-align:right;color:#b91c1c">K${histOutstanding.toLocaleString()}</td><td></td></tr>` : ''}
+          </tfoot>
+        </table>
+      </div>` : '';
   const printContent = `
     <!DOCTYPE html>
     <html>
@@ -38,7 +70,7 @@ function printReceipt(payment: Payment, student: Student | undefined, branding: 
       <title>Receipt - ${payment.receiptNumber || payment.id}</title>
       <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: Arial, sans-serif; background: #fff; color: #1f2937; padding: 40px; max-width: 480px; margin: 0 auto; }
+        body { font-family: Arial, sans-serif; background: #fff; color: #1f2937; padding: 40px; max-width: 560px; margin: 0 auto; }
         .header { text-align: center; margin-bottom: 24px; }
         .school-name { font-size: 20px; font-weight: bold; color: #1d4ed8; }
         .school-sub { font-size: 11px; color: #6b7280; margin-top: 4px; }
@@ -56,6 +88,12 @@ function printReceipt(payment: Payment, student: Student | undefined, branding: 
         .footer { text-align: center; margin-top: 24px; font-size: 10px; color: #9ca3af; }
         .bank-box { background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 6px; padding: 12px; margin-top: 16px; font-size: 11px; color: #1e40af; }
         .bank-title { font-weight: bold; margin-bottom: 4px; }
+        .hist { margin-top: 24px; }
+        .hist-title { font-size: 13px; font-weight: bold; color: #374151; border-bottom: 2px solid #e5e7eb; padding-bottom: 4px; margin-bottom: 8px; }
+        .hist-table { width: 100%; border-collapse: collapse; font-size: 10.5px; }
+        .hist-table th { text-align: left; color: #6b7280; padding: 4px 6px; border-bottom: 1px solid #e5e7eb; font-weight: 600; }
+        .hist-table td { padding: 4px 6px; border-bottom: 1px solid #f3f4f6; }
+        .hist-table tfoot td { font-weight: 700; border-top: 2px solid #d1d5db; color: #111827; }
         @media print { body { padding: 20px; } }
       </style>
     </head>
@@ -117,6 +155,7 @@ function printReceipt(payment: Payment, student: Student | undefined, branding: 
         Account Name: ${esc(branding.schoolName)}<br>
         ${branding.bankAccountNumber ? `Account No: ${esc(branding.bankAccountNumber)} &nbsp;|&nbsp; Currency: ZMW` : ''}
       </div>` : ''}
+      ${historySection}
 
       <div class="sig-section">
         <div><div class="sig-line">${esc(branding.principalName) ? `Received By (${esc(branding.principalName)})` : 'Received By'}</div></div>
@@ -301,14 +340,14 @@ export function Payments() {
                           </button>
                         )}
                         <button
-                          onClick={() => printReceipt(payment, student, branding)}
+                          onClick={() => printReceipt(payment, student, branding, payments.filter(p => p.studentId === payment.studentId))}
                           className="p-1.5 text-gray-500 hover:bg-gray-100 rounded"
                           title="Print Receipt"
                         >
                           <Printer className="h-3.5 w-3.5" />
                         </button>
                         <button
-                          onClick={() => printReceipt(payment, student, branding, true)}
+                          onClick={() => printReceipt(payment, student, branding, payments.filter(p => p.studentId === payment.studentId), true)}
                           className="p-1.5 text-gray-500 hover:bg-gray-100 rounded"
                           title="Export Receipt to PDF"
                         >
