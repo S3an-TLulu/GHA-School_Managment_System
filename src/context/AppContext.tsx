@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
-import { getCloudConfig, pushToCloud, isLiveSyncEnabled, pushKeyLive, subscribeLive } from '../lib/supabase';
+import { getCloudConfig, pushToCloud, isLiveSyncEnabled, pushKeyLive, subscribeLive, pullAllLive } from '../lib/supabase';
 import { logAudit } from '../lib/audit';
 
 export interface Student {
@@ -1540,13 +1540,25 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       gha_gallery: setGalleryPhotos,
     } as Record<string, (v: never) => void>;
 
-    const unsubscribe = subscribeLive((key, data) => {
+    // Apply one incoming key from the cloud without echoing it straight back.
+    const applyRemote = (key: string, data: unknown) => {
       const setter = SETTERS[key];
       if (!setter || data === null || data === undefined) return;
       liveSuppress.current.add(key);
       setter(data as never);
-    });
-    return unsubscribe;
+    };
+
+    // Initial catch-up: pull the whole current cloud state on load so a device
+    // that opens after others made changes converges immediately, instead of
+    // only receiving deltas that happen while it is open.
+    let cancelled = false;
+    pullAllLive().then(all => {
+      if (cancelled || !all) return;
+      Object.entries(all).forEach(([key, data]) => applyRemote(key, data));
+    }).catch(() => {});
+
+    const unsubscribe = subscribeLive((key, data) => applyRemote(key, data));
+    return () => { cancelled = true; unsubscribe(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

@@ -563,7 +563,9 @@ export function Settings() {
                     <p className={`text-sm mt-1 ${liveOn ? 'text-green-700' : 'text-purple-700'}`}>
                       Changes sync between computers automatically within seconds — each section
                       syncs on its own, so two people can work in different sections at the same time.
-                      Run the Live Sync SQL below once before enabling.
+                      Each device also pulls the latest automatically when the app opens, so a
+                      computer that was closed catches up on its own. Run the Live Sync SQL below
+                      once (on every device that will sync), and turn Live Sync on here on each one.
                     </p>
                   </div>
                   <label className="flex items-center gap-2 text-sm font-medium cursor-pointer">
