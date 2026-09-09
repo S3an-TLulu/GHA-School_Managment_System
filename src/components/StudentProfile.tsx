@@ -1,4 +1,4 @@
-import { Student, useAppContext } from '../context/AppContext';
+import { Student, Payment, useAppContext } from '../context/AppContext';
 import { X, User, Printer, GraduationCap, FileDown } from 'lucide-react';
 import { printHtml, exportPdf } from '../lib/print';
 import { useThemeClasses } from '../hooks/useThemeClasses';
@@ -18,10 +18,11 @@ interface StudentProfileProps {
 }
 
 export function StudentProfile({ student, onClose }: StudentProfileProps) {
-  const { payments, uniforms, requirements, results } = useAppContext();
+  const { payments, uniforms, requirements, results, updatePayment } = useAppContext();
   const tc = useThemeClasses();
 
-  const studentPayments = payments.filter(p => p.studentId === student.id);
+  const studentPayments = payments.filter(p => p.studentId === student.id)
+    .sort((a, b) => (a.paidDate || a.dueDate || '').localeCompare(b.paidDate || b.dueDate || ''));
   const studentUniforms = uniforms.filter(u => u.studentId === student.id);
   const studentRequirements = requirements.filter(r => r.studentId === student.id);
   const studentResults = results
@@ -31,6 +32,23 @@ export function StudentProfile({ student, onClose }: StudentProfileProps) {
   const totalPaid = studentPayments.filter(p => p.status === 'paid').reduce((s, p) => s + p.amount, 0);
   const totalPending = studentPayments.filter(p => p.status === 'pending').reduce((s, p) => s + p.amount, 0);
   const totalOverdue = studentPayments.filter(p => p.status === 'overdue').reduce((s, p) => s + p.amount, 0);
+  const totalCharged = studentPayments.reduce((s, p) => s + p.amount, 0);
+  const outstanding = totalPending + totalOverdue;
+
+  // Payments tabulated by term for a quick statement view.
+  const terms = [...new Set(studentPayments.map(p => p.term || '—'))];
+  const byTerm = terms.map(t => {
+    const ps = studentPayments.filter(p => (p.term || '—') === t);
+    const charged = ps.reduce((s, p) => s + p.amount, 0);
+    const paid = ps.filter(p => p.status === 'paid').reduce((s, p) => s + p.amount, 0);
+    return { term: t, charged, paid, balance: charged - paid };
+  });
+
+  const toInput = (iso?: string) => (iso ? iso.split('T')[0] : '');
+  const setDate = (id: string, field: 'dueDate' | 'paidDate', val: string) =>
+    updatePayment(id, { [field]: val ? new Date(val).toISOString() : undefined });
+  const setStatus = (p: Payment, status: Payment['status']) =>
+    updatePayment(p.id, { status, paidDate: status === 'paid' ? (p.paidDate || new Date().toISOString()) : p.paidDate });
   const uniformSpend = studentUniforms.reduce((s, u) => s + u.price, 0);
   const requirementsDone = studentRequirements.filter(r => r.status === 'provided').length;
 
@@ -117,18 +135,23 @@ export function StudentProfile({ student, onClose }: StudentProfileProps) {
         <div class="section">
           <div class="section-title">Payment History</div>
           <table>
-            <thead><tr><th>Type</th><th>Term</th><th>Amount</th><th>Due Date</th><th>Status</th><th>Receipt</th></tr></thead>
+            <thead><tr><th>Type</th><th>Term</th><th>Amount</th><th>Due Date</th><th>Date Paid</th><th>Status</th><th>Receipt</th></tr></thead>
             <tbody>
-              ${studentPayments.length === 0 ? '<tr><td colspan="6" style="text-align:center;color:#9ca3af">No payment records</td></tr>' :
+              ${studentPayments.length === 0 ? '<tr><td colspan="7" style="text-align:center;color:#9ca3af">No payment records</td></tr>' :
                 studentPayments.map(p => `<tr>
                   <td>${p.type}</td>
                   <td>${p.term || '—'}</td>
                   <td>K${p.amount.toLocaleString()}</td>
                   <td>${new Date(p.dueDate).toLocaleDateString()}</td>
+                  <td>${p.paidDate ? new Date(p.paidDate).toLocaleDateString() : '—'}</td>
                   <td><span class="badge ${p.status}">${p.status}</span></td>
                   <td>${p.receiptNumber || '—'}</td>
                 </tr>`).join('')}
             </tbody>
+            ${studentPayments.length ? `<tfoot><tr style="font-weight:bold;background:#f9fafb">
+              <td colspan="2">Total</td><td>K${totalCharged.toLocaleString()}</td><td colspan="2">Paid: K${totalPaid.toLocaleString()}</td>
+              <td colspan="2" style="color:${outstanding > 0 ? '#dc2626' : '#059669'}">Outstanding: K${outstanding.toLocaleString()}</td>
+            </tr></tfoot>` : ''}
           </table>
         </div>
 
@@ -254,37 +277,82 @@ export function StudentProfile({ student, onClose }: StudentProfileProps) {
           </div>
 
           <div>
-            <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wider mb-3">Payment History</h3>
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wider">Payment History</h3>
+              <span className="text-xs text-gray-400">Dates &amp; status are editable — changes save automatically</span>
+            </div>
             {studentPayments.length === 0 ? (
               <p className="text-sm text-gray-400 text-center py-4">No payment records</p>
             ) : (
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200 text-sm">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      {['Type', 'Term', 'Amount', 'Due Date', 'Status', 'Receipt'].map(h => (
-                        <th key={h} className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">{h}</th>
+              <>
+                {/* Tabulated by term */}
+                <div className="overflow-x-auto mb-3">
+                  <table className="min-w-full text-sm border border-gray-100 rounded-lg overflow-hidden">
+                    <thead className="bg-gray-50">
+                      <tr>{['Term', 'Charged', 'Paid', 'Balance'].map(h => <th key={h} className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">{h}</th>)}</tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {byTerm.map(t => (
+                        <tr key={t.term}>
+                          <td className="px-3 py-1.5 text-gray-700">{t.term}</td>
+                          <td className="px-3 py-1.5 text-gray-900">K{t.charged.toLocaleString()}</td>
+                          <td className="px-3 py-1.5 text-green-700">K{t.paid.toLocaleString()}</td>
+                          <td className={`px-3 py-1.5 font-medium ${t.balance > 0 ? 'text-red-600' : 'text-gray-400'}`}>K{t.balance.toLocaleString()}</td>
+                        </tr>
                       ))}
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {studentPayments.map(p => (
-                      <tr key={p.id}>
-                        <td className="px-3 py-2 text-gray-900">{p.type}</td>
-                        <td className="px-3 py-2 text-gray-500 text-xs">{p.term || '—'}</td>
-                        <td className="px-3 py-2 font-bold text-gray-900">K{p.amount.toLocaleString()}</td>
-                        <td className="px-3 py-2 text-gray-500 text-xs">{new Date(p.dueDate).toLocaleDateString()}</td>
-                        <td className="px-3 py-2">
-                          <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${paymentStatusColors[p.status]}`}>
-                            {p.status.charAt(0).toUpperCase() + p.status.slice(1)}
-                          </span>
-                        </td>
-                        <td className="px-3 py-2 text-xs text-gray-500">{p.receiptNumber || '—'}</td>
+                    </tbody>
+                    <tfoot className="bg-gray-50 font-semibold">
+                      <tr>
+                        <td className="px-3 py-2 text-gray-700">Total</td>
+                        <td className="px-3 py-2 text-gray-900">K{totalCharged.toLocaleString()}</td>
+                        <td className="px-3 py-2 text-green-700">K{totalPaid.toLocaleString()}</td>
+                        <td className={`px-3 py-2 ${outstanding > 0 ? 'text-red-600' : 'text-gray-400'}`}>K{outstanding.toLocaleString()}</td>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                    </tfoot>
+                  </table>
+                </div>
+                {/* Detailed, editable */}
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200 text-sm">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        {['Type', 'Term', 'Amount', 'Method', 'Due Date', 'Date Paid', 'Status', 'Receipt'].map(h => (
+                          <th key={h} className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {studentPayments.map(p => (
+                        <tr key={p.id}>
+                          <td className="px-3 py-2 text-gray-900 whitespace-nowrap">{p.type}</td>
+                          <td className="px-3 py-2 text-gray-500 text-xs">{p.term || '—'}</td>
+                          <td className="px-3 py-2 font-bold text-gray-900 whitespace-nowrap">K{p.amount.toLocaleString()}
+                            {!!p.discount && <span className="block text-[10px] font-normal text-amber-600">−K{p.discount.toLocaleString()}</span>}
+                          </td>
+                          <td className="px-3 py-2 text-gray-500 text-xs whitespace-nowrap">{p.paymentMethod === 'Mobile Money' && p.mobileNetwork ? p.mobileNetwork : (p.paymentMethod || 'Cash')}</td>
+                          <td className="px-3 py-2">
+                            <input type="date" value={toInput(p.dueDate)} onChange={e => setDate(p.id, 'dueDate', e.target.value)}
+                              className="text-xs border border-gray-200 rounded px-1.5 py-1 focus:ring-1 focus:ring-blue-400" />
+                          </td>
+                          <td className="px-3 py-2">
+                            <input type="date" value={toInput(p.paidDate)} onChange={e => setDate(p.id, 'paidDate', e.target.value)}
+                              className="text-xs border border-gray-200 rounded px-1.5 py-1 focus:ring-1 focus:ring-blue-400" />
+                          </td>
+                          <td className="px-3 py-2">
+                            <select value={p.status} onChange={e => setStatus(p, e.target.value as Payment['status'])}
+                              className={`text-xs px-1.5 py-1 rounded-full font-medium border-0 focus:ring-1 focus:ring-blue-400 ${paymentStatusColors[p.status]}`}>
+                              <option value="pending">Pending</option>
+                              <option value="paid">Paid</option>
+                              <option value="overdue">Overdue</option>
+                            </select>
+                          </td>
+                          <td className="px-3 py-2 text-xs text-gray-500 whitespace-nowrap">{p.receiptNumber || '—'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </>
             )}
           </div>
 

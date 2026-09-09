@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { School, ArrowLeft, UserCircle, CreditCard, GraduationCap, Shirt, LogOut, Printer } from 'lucide-react';
+import { School, ArrowLeft, UserCircle, CreditCard, GraduationCap, Shirt, LogOut, Printer, CalendarCheck, Megaphone, Users } from 'lucide-react';
 import { useAppContext, Student } from '../context/AppContext';
 import { normalizeZmPhone } from '../lib/notify';
 
@@ -9,7 +9,7 @@ import { normalizeZmPhone } from '../lib/notify';
 // read-only — nothing can be changed here. This is light privacy on a
 // client-side app, not strong authentication (noted for the school).
 export function ParentPortal({ onBack }: { onBack: () => void }) {
-  const { students, payments, results, uniformIssues, uniformItems, branding } = useAppContext();
+  const { students, payments, results, uniformIssues, uniformItems, branding, attendance, announcements } = useAppContext();
   const [adm, setAdm] = useState('');
   const [phone, setPhone] = useState('');
   const [student, setStudent] = useState<Student | null>(null);
@@ -58,6 +58,10 @@ export function ParentPortal({ onBack }: { onBack: () => void }) {
   }
 
   // ---- Signed-in view ----
+  // Siblings: other children on the same guardian phone, so a parent can switch.
+  const guardianKey = normalizeZmPhone(student.guardianPhone || '');
+  const siblings = students.filter(s => normalizeZmPhone(s.guardianPhone || '') === guardianKey && (!s.status || s.status === 'active'));
+
   const myPayments = payments.filter(p => p.studentId === student.id);
   const paid = myPayments.filter(p => p.status === 'paid').reduce((a, p) => a + p.amount, 0);
   const owing = myPayments.filter(p => p.status !== 'paid').reduce((a, p) => a + p.amount, 0);
@@ -66,6 +70,19 @@ export function ParentPortal({ onBack }: { onBack: () => void }) {
   const resultAvg = myResult ? (() => { const v = Object.values(myResult.subjects); return v.length ? Math.round(v.reduce((a, b) => a + b, 0) / v.length) : 0; })() : null;
   const myUniforms = uniformIssues.filter(i => i.studentId === student.id);
   const itemName = (id: string) => uniformItems.find(i => i.id === id)?.name || id;
+
+  // Attendance summary for this child.
+  const myAttendance = attendance.filter(a => a.studentId === student.id);
+  const attCount = (st: string) => myAttendance.filter(a => a.status === st).length;
+  const present = attCount('present'), absent = attCount('absent'), late = attCount('late'), excused = attCount('excused');
+  const attRate = myAttendance.length ? Math.round(((present + late) / myAttendance.length) * 100) : null;
+
+  // Announcements a parent should see.
+  const parentAnnouncements = announcements
+    .filter(a => a.targetAudience === 'All' || a.targetAudience === 'Parents')
+    .sort((a, b) => (b.date || '').localeCompare(a.date || ''))
+    .slice(0, 4);
+  const priColor: Record<string, string> = { urgent: 'border-red-300 bg-red-50', important: 'border-amber-300 bg-amber-50', normal: 'border-gray-200 bg-gray-50' };
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -78,6 +95,19 @@ export function ParentPortal({ onBack }: { onBack: () => void }) {
       </header>
 
       <main className="max-w-2xl mx-auto p-4 space-y-5">
+        {siblings.length > 1 && (
+          <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-3">
+            <p className="text-xs text-gray-500 mb-2 flex items-center gap-1"><Users className="h-3.5 w-3.5" />Your children</p>
+            <div className="flex flex-wrap gap-2">
+              {siblings.map(s => (
+                <button key={s.id} onClick={() => setStudent(s)}
+                  className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors ${s.id === student.id ? 'bg-blue-600 text-white border-blue-600' : 'border-gray-300 text-gray-700 hover:border-blue-300'}`}>
+                  {s.name} <span className={`text-xs ${s.id === student.id ? 'text-blue-100' : 'text-gray-400'}`}>· {s.grade}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5 flex items-center gap-4">
           {student.photoUrl ? <img src={student.photoUrl} alt="" className="w-16 h-16 rounded-full object-cover border-2 border-gray-100" /> : <div className="w-16 h-16 rounded-full bg-blue-50 flex items-center justify-center"><UserCircle className="h-9 w-9 text-blue-400" /></div>}
           <div><p className="text-lg font-bold text-gray-900">{student.name}</p><p className="text-sm text-gray-500">{student.grade}{student.admissionNumber ? ` · ${student.admissionNumber}` : ''}</p></div>
@@ -94,12 +124,40 @@ export function ParentPortal({ onBack }: { onBack: () => void }) {
             {myPayments.length === 0 ? <p className="px-4 py-6 text-sm text-gray-400 text-center">No payment records.</p> :
               [...myPayments].sort((a, b) => (b.paidDate || b.dueDate || '').localeCompare(a.paidDate || a.dueDate || '')).map(p => (
                 <div key={p.id} className="px-4 py-2.5 flex items-center justify-between text-sm">
-                  <div className="min-w-0"><p className="text-gray-900 truncate">{p.type}</p><p className="text-xs text-gray-400">{p.term || ''}{p.receiptNumber ? ` · ${p.receiptNumber}` : ''}</p></div>
+                  <div className="min-w-0"><p className="text-gray-900 truncate">{p.type}</p><p className="text-xs text-gray-400">{[p.term, p.paidDate ? `Paid ${new Date(p.paidDate).toLocaleDateString('en-GB')}` : (p.dueDate ? `Due ${new Date(p.dueDate).toLocaleDateString('en-GB')}` : ''), p.paymentMethod, p.receiptNumber].filter(Boolean).join(' · ')}</p></div>
                   <div className="text-right flex-shrink-0"><p className="font-medium text-gray-900">K{p.amount.toLocaleString()}</p><span className={`text-xs px-1.5 py-0.5 rounded-full ${p.status === 'paid' ? 'bg-green-100 text-green-700' : p.status === 'overdue' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'}`}>{p.status}</span></div>
                 </div>
               ))}
           </div>
         </div>
+
+        {myAttendance.length > 0 && (
+          <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+            <div className="px-4 py-3 border-b border-gray-100 font-semibold text-gray-900 text-sm flex items-center gap-2">
+              <CalendarCheck className="h-4 w-4 text-blue-600" />Attendance
+              {attRate !== null && <span className={`ml-auto text-xs px-2 py-0.5 rounded-full ${attRate >= 90 ? 'bg-green-100 text-green-700' : attRate >= 75 ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700'}`}>{attRate}% present</span>}
+            </div>
+            <div className="grid grid-cols-4 divide-x divide-gray-50 text-center">
+              {[['Present', present, 'text-green-600'], ['Absent', absent, 'text-red-600'], ['Late', late, 'text-amber-600'], ['Excused', excused, 'text-gray-500']].map(([label, n, c]) => (
+                <div key={label as string} className="px-2 py-3"><p className={`text-xl font-bold ${c}`}>{n as number}</p><p className="text-xs text-gray-400">{label}</p></div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {parentAnnouncements.length > 0 && (
+          <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+            <div className="px-4 py-3 border-b border-gray-100 font-semibold text-gray-900 text-sm flex items-center gap-2"><Megaphone className="h-4 w-4 text-blue-600" />School announcements</div>
+            <div className="p-3 space-y-2">
+              {parentAnnouncements.map(a => (
+                <div key={a.id} className={`rounded-lg border p-3 ${priColor[a.priority] || priColor.normal}`}>
+                  <div className="flex items-center justify-between gap-2"><p className="font-medium text-gray-900 text-sm">{a.title}</p><span className="text-xs text-gray-400 flex-shrink-0">{a.date ? new Date(a.date).toLocaleDateString('en-GB') : ''}</span></div>
+                  <p className="text-sm text-gray-600 mt-0.5 whitespace-pre-line">{a.message}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {myResult && (
           <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
