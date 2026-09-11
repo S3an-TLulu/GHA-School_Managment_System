@@ -558,12 +558,27 @@ export interface Family {
 export interface LunchRecord {
   id: string;
   studentId: string;
-  period: string;        // term or month label, e.g. "Term 1 2026" or "September 2026"
+  period: string;        // period label, e.g. "Month 1" or "Term 1 2026" — kept for the register/back-compat
+  periodId?: string;     // link to a LunchPeriod (its date range); falls back to matching by label
   amountDue: number;
   amountPaid: number;
   method?: string;
   date?: string;         // ISO date of the last payment
+  coveredFrom?: string;  // ISO date the paid-up lunch coverage starts (usually the payment date)
+  coveredUntil?: string; // ISO date the paid-up lunch coverage runs to (defaults to the period end)
   notes?: string;
+}
+
+// A named lunch period with an explicit date range, e.g. "Month 1" from 1 Sep to
+// 30 Sep. Periods give the lunch list a clear, categorised span to bill for and
+// let a payment say exactly how long the pupil is covered. Each can carry its own
+// default fee so new pupils added to that period are billed the right amount.
+export interface LunchPeriod {
+  id: string;
+  label: string;         // e.g. "Month 1", "September 2026", "Term 1 2026"
+  startDate: string;     // ISO date (inclusive)
+  endDate: string;       // ISO date (inclusive)
+  defaultFee?: number;   // default lunch fee for pupils added to this period
 }
 
 // ---- Worksheet generator (Academics) ----
@@ -747,6 +762,10 @@ interface AppContextType {
   addLunchRecord: (r: LunchRecord) => void;
   updateLunchRecord: (id: string, r: Partial<LunchRecord>) => void;
   deleteLunchRecord: (id: string) => void;
+  lunchPeriods: LunchPeriod[];
+  addLunchPeriod: (p: LunchPeriod) => void;
+  updateLunchPeriod: (id: string, p: Partial<LunchPeriod>) => void;
+  deleteLunchPeriod: (id: string) => void;
   quizzes: Quiz[];
   addQuiz: (q: Quiz) => void;
   updateQuiz: (id: string, q: Partial<Quiz>) => void;
@@ -978,6 +997,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [worksheets, setWorksheets] = useState<Worksheet[]>(() => loadFromStorage('gha_worksheets', []));
   const [families, setFamilies] = useState<Family[]>(() => loadFromStorage('gha_families', []));
   const [lunchRecords, setLunchRecords] = useState<LunchRecord[]>(() => loadFromStorage('gha_lunch', []));
+  const [lunchPeriods, setLunchPeriods] = useState<LunchPeriod[]>(() => loadFromStorage('gha_lunch_periods', []));
   const [quizzes, setQuizzes] = useState<Quiz[]>(() => loadFromStorage('gha_quizzes', []));
   // Subjects hub (Academics). Subjects seed from the school's standard list.
   const [subjects, setSubjects] = useState<Subject[]>(() => loadFromStorage('gha_subjects',
@@ -1062,6 +1082,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => { localStorage.setItem('gha_worksheets', JSON.stringify(worksheets)); queueLiveSync('gha_worksheets'); }, [worksheets]);
   useEffect(() => { localStorage.setItem('gha_families', JSON.stringify(families)); queueLiveSync('gha_families'); }, [families]);
   useEffect(() => { localStorage.setItem('gha_lunch', JSON.stringify(lunchRecords)); queueLiveSync('gha_lunch'); }, [lunchRecords]);
+  useEffect(() => { localStorage.setItem('gha_lunch_periods', JSON.stringify(lunchPeriods)); queueLiveSync('gha_lunch_periods'); }, [lunchPeriods]);
   useEffect(() => { localStorage.setItem('gha_quizzes', JSON.stringify(quizzes)); queueLiveSync('gha_quizzes'); }, [quizzes]);
   useEffect(() => { localStorage.setItem('gha_subjects', JSON.stringify(subjects)); queueLiveSync('gha_subjects'); }, [subjects]);
   useEffect(() => { localStorage.setItem('gha_subject_topics', JSON.stringify(subjectTopics)); queueLiveSync('gha_subject_topics'); }, [subjectTopics]);
@@ -1335,6 +1356,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const addLunchRecord = (r: LunchRecord) => setLunchRecords(prev => [...prev, r]);
   const updateLunchRecord = (id: string, u: Partial<LunchRecord>) => setLunchRecords(prev => prev.map(r => r.id === id ? { ...r, ...u } : r));
   const deleteLunchRecord = (id: string) => setLunchRecords(prev => prev.filter(r => r.id !== id));
+  const addLunchPeriod = (p: LunchPeriod) => setLunchPeriods(prev => [...prev, p]);
+  const updateLunchPeriod = (id: string, u: Partial<LunchPeriod>) => setLunchPeriods(prev => prev.map(p => p.id === id ? { ...p, ...u } : p));
+  const deleteLunchPeriod = (id: string) => setLunchPeriods(prev => prev.filter(p => p.id !== id));
   const addQuiz = (q: Quiz) => setQuizzes(prev => [q, ...prev]);
   const updateQuiz = (id: string, u: Partial<Quiz>) => setQuizzes(prev => prev.map(q => q.id === id ? { ...q, ...u } : q));
   const deleteQuiz = (id: string) => setQuizzes(prev => prev.filter(q => q.id !== id));
@@ -1454,7 +1478,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     'gha_student_measurements', 'gha_measurement_history', 'gha_uniform_issues', 'gha_uniform_returns',
     'gha_uniform_settings',
     'gha_houses', 'gha_competitions', 'gha_competition_entries',
-    'gha_projects', 'gha_quiz_questions', 'gha_quizzes', 'gha_worksheets', 'gha_families', 'gha_lunch',
+    'gha_projects', 'gha_quiz_questions', 'gha_quizzes', 'gha_worksheets', 'gha_families', 'gha_lunch', 'gha_lunch_periods',
     'gha_subjects', 'gha_subject_topics', 'gha_lesson_plans', 'gha_work_groups',
     'gha_class_rules', 'gha_class_roles', 'gha_class_inventory', 'gha_class_wishlist',
   ];
@@ -1495,7 +1519,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     subjects: ['gha_subjects', 'gha_subject_topics', 'gha_lesson_plans', 'gha_work_groups', 'gha_class_rules', 'gha_class_roles', 'gha_class_inventory', 'gha_class_wishlist'],
     worksheets: ['gha_worksheets'],
     families: ['gha_families'],
-    lunch: ['gha_lunch'],
+    lunch: ['gha_lunch', 'gha_lunch_periods'],
     requirements: ['gha_requirements'],
     teachers: ['gha_teachers'],
     expenses: ['gha_expenses'],
@@ -1531,7 +1555,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       debtors, transportRoutes, salaryAdvances, payrollRecords, terms, todos, groceries, budgets, documents,
       galleryPhotos, libraryBooks, bookLoans,
       subjects, subjectTopics, lessonPlans, workGroups, classRules, classRoles, classInventory, classWishlist,
-      quizQuestions, worksheets, families, lunchRecords]);
+      quizQuestions, worksheets, families, lunchRecords, lunchPeriods]);
 
   // Apply changes arriving from other devices in real time
   useEffect(() => {
@@ -1555,7 +1579,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       gha_uniform_issues: setUniformIssues, gha_uniform_returns: setUniformReturns,
       gha_uniform_settings: setUniformSettings,
       gha_houses: setHouses, gha_competitions: setCompetitions, gha_competition_entries: setCompetitionEntries,
-      gha_projects: setProjects, gha_quiz_questions: setQuizQuestions, gha_quizzes: setQuizzes, gha_worksheets: setWorksheets, gha_families: setFamilies, gha_lunch: setLunchRecords,
+      gha_projects: setProjects, gha_quiz_questions: setQuizQuestions, gha_quizzes: setQuizzes, gha_worksheets: setWorksheets, gha_families: setFamilies, gha_lunch: setLunchRecords, gha_lunch_periods: setLunchPeriods,
       gha_subjects: setSubjects, gha_subject_topics: setSubjectTopics, gha_lesson_plans: setLessonPlans,
       gha_work_groups: setWorkGroups, gha_class_rules: setClassRules, gha_class_roles: setClassRoles,
       gha_class_inventory: setClassInventory, gha_class_wishlist: setClassWishlist,
@@ -1694,6 +1718,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       worksheets, addWorksheet, updateWorksheet, deleteWorksheet,
       families, addFamily, updateFamily, deleteFamily,
       lunchRecords, addLunchRecord, updateLunchRecord, deleteLunchRecord,
+      lunchPeriods, addLunchPeriod, updateLunchPeriod, deleteLunchPeriod,
       quizzes, addQuiz, updateQuiz, deleteQuiz,
       subjects, addSubject, updateSubject, deleteSubject,
       subjectTopics, addSubjectTopic, updateSubjectTopic, deleteSubjectTopic,
