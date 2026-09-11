@@ -4,7 +4,7 @@ import {
   BarChart3, UserCheck, TrendingDown, Package, Calendar,
   DollarSign, Bell, MonitorCheck, ClipboardCheck, CalendarDays,
   Palette, Building2, LayoutTemplate, Clock, Layers, GraduationCap,
-  ChevronDown, ChevronsLeft, ChevronsRight, Heart, Bus, UserX, Settings as SettingsIcon, Briefcase, ChefHat, UserCircle, Camera, BookOpen, MessageSquare, HelpCircle, Wallet, Wrench, PencilRuler
+  ChevronDown, ChevronsLeft, ChevronsRight, Heart, Bus, UserX, Settings as SettingsIcon, Briefcase, ChefHat, UserCircle, Camera, BookOpen, MessageSquare, HelpCircle, Wallet, Wrench, PencilRuler, Utensils
 } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
@@ -39,6 +39,7 @@ const menuGroups = [
       { id: 'cashier',     label: 'Office Cashier',      icon: MonitorCheck },
       { id: 'cashbook',    label: 'Daily Cashbook',      icon: Wallet },
       { id: 'payments',    label: 'Fees & Payments',     icon: CreditCard },
+      { id: 'lunch',       label: 'Lunch List',          icon: Utensils },
       { id: 'bulkfees',    label: 'Bulk Fee Collection', icon: Layers },
       { id: 'feestructure',label: 'Fee Structure',       icon: DollarSign },
       { id: 'debtors',     label: 'Debtors',             icon: UserX },
