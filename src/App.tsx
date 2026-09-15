@@ -50,6 +50,7 @@ const Messaging = named(() => import('./components/Messaging'), 'Messaging');
 const HelpGuide = named(() => import('./components/HelpGuide'), 'HelpGuide');
 const CashBook = named(() => import('./components/CashBook'), 'CashBook');
 const Lunch = named(() => import('./components/Lunch'), 'Lunch');
+const ClassFees = named(() => import('./components/ClassFees'), 'ClassFees');
 const Tools = named(() => import('./components/Tools'), 'Tools');
 const Results = named(() => import('./components/Results'), 'Results');
 const Subjects = named(() => import('./components/Subjects'), 'Subjects');
@@ -138,6 +139,7 @@ function AppContent() {
       case 'help':         return <HelpGuide />;
       case 'cashbook':     return <CashBook />;
       case 'lunch':        return <Lunch />;
+      case 'classfees':    return <ClassFees />;
       case 'tools':        return <Tools />;
       default:             return <Dashboard />;
     }

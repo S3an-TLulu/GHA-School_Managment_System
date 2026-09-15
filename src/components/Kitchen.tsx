@@ -18,7 +18,7 @@ const UNITS = ['pcs', 'kg', 'g', 'litres', 'ml', 'bags', 'boxes', 'crates', 'bun
 export function Kitchen() {
   const {
     groceries, addGrocery, deleteGrocery, markGroceryBought,
-    payments, expenses, students, budgets, setBudget,
+    payments, expenses, students, budgets, setBudget, lunchRecords,
   } = useAppContext();
   const { toast } = useToast();
   const tc = useThemeClasses();
@@ -39,8 +39,11 @@ export function Kitchen() {
   const inMonth = (iso?: string) => !!iso && iso.slice(0, 7) === month;
 
   const lunchPayments = payments.filter(p => p.type === 'Lunch' && p.status === 'paid' && inMonth(p.paidDate));
-  const lunchRevenue = lunchPayments.reduce((s, p) => s + p.amount, 0);
-  const paidChildren = new Set(lunchPayments.map(p => p.studentId)).size;
+  // Also fold in collections recorded through the Lunch List section, attributed
+  // to the month of their last payment date, so both routes feed one figure.
+  const lunchListPaid = lunchRecords.filter(r => (r.amountPaid || 0) > 0 && inMonth(r.date));
+  const lunchRevenue = lunchPayments.reduce((s, p) => s + p.amount, 0) + lunchListPaid.reduce((s, r) => s + (r.amountPaid || 0), 0);
+  const paidChildren = new Set([...lunchPayments.map(p => p.studentId), ...lunchListPaid.map(r => r.studentId)]).size;
   const lunchStudents = students.filter(s => (!s.status || s.status === 'active')).length;
 
   const foodSpend = expenses.filter(e => e.category === 'Food' && inMonth(e.date)).reduce((s, e) => s + e.amount, 0);

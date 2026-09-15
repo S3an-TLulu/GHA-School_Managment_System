@@ -39,6 +39,7 @@ const menuGroups = [
       { id: 'cashier',     label: 'Office Cashier',      icon: MonitorCheck },
       { id: 'cashbook',    label: 'Daily Cashbook',      icon: Wallet },
       { id: 'payments',    label: 'Fees & Payments',     icon: CreditCard },
+      { id: 'classfees',   label: 'Fees by Class',       icon: DollarSign },
       { id: 'lunch',       label: 'Lunch List',          icon: Utensils },
       { id: 'bulkfees',    label: 'Bulk Fee Collection', icon: Layers },
       { id: 'feestructure',label: 'Fee Structure',       icon: DollarSign },
