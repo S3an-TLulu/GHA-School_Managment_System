@@ -1,8 +1,10 @@
 import { useState } from 'react';
-import { Plus, Pencil, Trash2, X, Bus, MapPin, Users, Phone, Wallet, Fuel } from 'lucide-react';
+import { Plus, Pencil, Trash2, X, Bus, MapPin, Users, Phone, Wallet, Fuel, GraduationCap } from 'lucide-react';
 import { useAppContext, TransportRoute } from '../context/AppContext';
 import { useToast } from './ToastProvider';
 import { useThemeClasses } from '../hooks/useThemeClasses';
+
+const GRADES = ['Baby Class', 'Middle Class', 'Reception', 'Grade 1', 'Grade 2', 'Grade 3', 'Grade 4', 'Grade 5', 'Grade 6', 'Grade 7'];
 
 function RouteModal({ route, onSave, onClose }: {
   route: TransportRoute | null;
@@ -103,6 +105,17 @@ export function Transport() {
   const totalRiders = activeStudents.filter(s => s.transportRouteId).length;
   const monthlyRevenue = transportRoutes.reduce((sum, r) => sum + r.monthlyFee * ridersByRoute(r.id).length, 0);
 
+  // Which classes have children on transport, and which don't.
+  const gradesPresent = [
+    ...GRADES.filter(g => activeStudents.some(s => s.grade === g)),
+    ...[...new Set(activeStudents.map(s => s.grade))].filter(g => g && !GRADES.includes(g)),
+  ];
+  const transportBreakdown = gradesPresent.map(g => {
+    const studs = activeStudents.filter(s => s.grade === g);
+    const riding = studs.filter(s => s.transportRouteId).length;
+    return { grade: g, total: studs.length, riding, notRiding: studs.length - riding };
+  });
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
@@ -146,6 +159,24 @@ export function Transport() {
         </div>
       </div>
 
+
+      {/* Who rides, by class */}
+      <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-4">
+        <div className="flex items-center gap-2 mb-3"><GraduationCap className={`h-5 w-5 ${tc.text}`} /><p className="font-semibold text-gray-900">On transport by class</p><span className="text-xs text-gray-400">who uses the bus and who doesn’t</span></div>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
+          {transportBreakdown.map(b => (
+            <div key={b.grade} className="rounded-lg border border-gray-200 p-3">
+              <p className="text-sm font-medium text-gray-900 truncate">{b.grade}</p>
+              <p className="text-xs mt-1"><span className="font-semibold text-green-700">{b.riding} ride</span> · <span className="text-gray-500">{b.notRiding} don’t</span></p>
+              <div className="mt-1.5 h-1.5 w-full bg-gray-100 rounded-full overflow-hidden">
+                <div className="h-1.5 bg-green-500 rounded-full" style={{ width: `${b.total ? (b.riding / b.total) * 100 : 0}%` }} />
+              </div>
+              <p className="text-[11px] text-gray-400 mt-1">{b.total} pupils</p>
+            </div>
+          ))}
+          {transportBreakdown.length === 0 && <p className="text-sm text-gray-400 col-span-full">No active pupils yet.</p>}
+        </div>
+      </div>
 
       {/* Transport money — this month */}
       <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-5 space-y-4">

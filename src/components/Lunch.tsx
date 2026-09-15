@@ -1,11 +1,16 @@
 import { useState } from 'react';
-import { Utensils, Printer, FileDown, Search, Check, CalendarRange, Plus, Trash2, Pencil, ChefHat } from 'lucide-react';
+import { Utensils, Printer, FileDown, Search, Check, CalendarRange, Plus, Trash2, Pencil, ChefHat, GraduationCap, School } from 'lucide-react';
 import { useAppContext, LunchRecord, LunchPeriod } from '../context/AppContext';
 import { useThemeClasses } from '../hooks/useThemeClasses';
 import { useToast } from './ToastProvider';
 import { esc, emitDoc, DOC_FONT } from '../lib/print';
 
 const METHODS = ['Cash', 'Mobile Money', 'Bank Transfer', 'Other'];
+const GRADES = ['Baby Class', 'Middle Class', 'Reception', 'Grade 1', 'Grade 2', 'Grade 3', 'Grade 4', 'Grade 5', 'Grade 6', 'Grade 7'];
+// Grades in school order, but only those that actually have active pupils, plus
+// any custom class labels used on students that aren't in the standard list.
+const orderGrades = (all: string[]) =>
+  [...GRADES.filter(g => all.includes(g)), ...[...new Set(all)].filter(g => g && !GRADES.includes(g))];
 
 const money = (n: number) => `K${(n || 0).toLocaleString()}`;
 const today = () => new Date().toISOString().slice(0, 10);
@@ -39,6 +44,8 @@ export function Lunch() {
   const [search, setSearch] = useState('');
   const [onlyOnLunch, setOnlyOnLunch] = useState(false);
   const [showPeriods, setShowPeriods] = useState(false);
+  const [scope, setScope] = useState<'school' | 'class'>('school');
+  const [classFilter, setClassFilter] = useState('');
 
   // Resolve the current selection into an ActivePeriod.
   const active: ActivePeriod = (() => {
@@ -50,11 +57,24 @@ export function Lunch() {
   })();
 
   const activeStudents = students.filter(s => !s.status || s.status === 'active');
+  const gradesPresent = orderGrades(activeStudents.map(s => s.grade));
+  const activeClass = scope === 'class' ? (classFilter || gradesPresent[0] || '') : '';
+  const scopedStudents = activeClass ? activeStudents.filter(s => s.grade === activeClass) : activeStudents;
+
   const belongs = (r: LunchRecord) => active.id
     ? (r.periodId === active.id || (!r.periodId && r.period === active.label))
     : (!r.periodId && r.period === active.label);
   const recordFor = (studentId: string) => lunchRecords.find(r => r.studentId === studentId && belongs(r));
-  const periodRecords = lunchRecords.filter(belongs);
+  const periodRecordsAll = lunchRecords.filter(belongs);            // whole school, this period
+  const scopedIds = new Set(scopedStudents.map(s => s.id));
+  const periodRecords = periodRecordsAll.filter(r => scopedIds.has(r.studentId)); // current view
+
+  // Per-grade eating / not-eating breakdown for this period (always school-wide).
+  const gradeBreakdown = gradesPresent.map(g => {
+    const studs = activeStudents.filter(s => s.grade === g);
+    const eating = studs.filter(s => periodRecordsAll.some(r => r.studentId === s.id)).length;
+    return { grade: g, total: studs.length, eating, notEating: studs.length - eating };
+  });
 
   const defaultFee = () => parseFloat(fee) || active.defaultFee || 0;
 
@@ -109,11 +129,12 @@ export function Lunch() {
 
   const studentOf = (id: string) => students.find(s => s.id === id);
 
-  const rows = activeStudents
+  const rows = scopedStudents
     .filter(s => !search || s.name.toLowerCase().includes(search.toLowerCase()) || (s.admissionNumber || '').toLowerCase().includes(search.toLowerCase()) || (s.guardianName || '').toLowerCase().includes(search.toLowerCase()))
     .filter(s => !onlyOnLunch || recordFor(s.id));
 
   const rangeLabel = hasRange ? `${fmtDate(active.startDate)} – ${fmtDate(active.endDate)}` : 'no dates set';
+  const scopeLabel = activeClass || 'Whole school';
 
   // ---- Period management ----
   const [pForm, setPForm] = useState({ label: '', startDate: '', endDate: '', defaultFee: '' });
@@ -186,7 +207,7 @@ export function Lunch() {
         <div style="text-align:center;margin-bottom:10px">
           ${branding.logoUrl ? `<img src="${branding.logoUrl}" style="height:44px;width:44px;object-fit:contain" />` : ''}
           <div style="font-size:16pt;font-weight:700">${esc(branding.schoolName) || 'School'}</div>
-          <div style="font-size:12pt;font-weight:600">Lunch List — ${esc(active.label)}</div>
+          <div style="font-size:12pt;font-weight:600">Lunch List — ${esc(scopeLabel)} — ${esc(active.label)}</div>
           <div style="font-size:10pt;color:#555">${hasRange ? esc(rangeLabel) + ' · ' : ''}${list.length} pupils · Collected ${money(collected)} · Outstanding ${money(outstanding)}</div>
         </div>
         <table>
@@ -196,7 +217,7 @@ export function Lunch() {
         <p style="margin-top:14px;font-size:10px;color:#888">Printed ${new Date().toLocaleDateString('en-GB')}</p>
         <script>window.onload=function(){setTimeout(function(){window.print()},250)}</script>
       </body></html>`;
-    emitDoc(html, `Lunch_List_${active.label.replace(/\s+/g, '_')}`, pdf ? 'pdf' : 'print');
+    emitDoc(html, `Lunch_List_${scopeLabel.replace(/\s+/g, '_')}_${active.label.replace(/\s+/g, '_')}`, pdf ? 'pdf' : 'print');
   };
 
   const inp = 'px-2.5 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent';
@@ -283,9 +304,42 @@ export function Lunch() {
         </div>
       )}
 
+      {/* Scope: whole school vs a single class */}
+      <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 flex flex-wrap items-center gap-3">
+        <div className="flex rounded-lg border border-gray-200 overflow-hidden">
+          <button onClick={() => setScope('school')} className={`flex items-center gap-1.5 px-3 py-2 text-sm font-medium ${scope === 'school' ? `${tc.btn} text-white` : 'bg-white text-gray-600 hover:bg-gray-50'}`}><School className="h-4 w-4" />Whole school</button>
+          <button onClick={() => { setScope('class'); if (!classFilter) setClassFilter(gradesPresent[0] || ''); }} className={`flex items-center gap-1.5 px-3 py-2 text-sm font-medium ${scope === 'class' ? `${tc.btn} text-white` : 'bg-white text-gray-600 hover:bg-gray-50'}`}><GraduationCap className="h-4 w-4" />By class</button>
+        </div>
+        {scope === 'class' && (
+          <select value={activeClass} onChange={e => setClassFilter(e.target.value)} className={inp}>
+            {gradesPresent.map(g => <option key={g} value={g}>{g}</option>)}
+          </select>
+        )}
+        <span className="text-xs text-gray-400 ml-auto">Showing the <strong className="text-gray-600">{scopeLabel.toLowerCase() === 'whole school' ? 'whole-school' : scopeLabel}</strong> lunch list.</span>
+      </div>
+
+      {/* Who eats, by class */}
+      <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
+        <div className="flex items-center gap-2 mb-3"><GraduationCap className={`h-5 w-5 ${tc.text}`} /><p className="font-semibold text-gray-900">On lunch by class</p><span className="text-xs text-gray-400">{active.label} · click a class to open its list</span></div>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
+          {gradeBreakdown.map(b => (
+            <button key={b.grade} onClick={() => { setScope('class'); setClassFilter(b.grade); }}
+              className={`text-left rounded-lg border p-3 hover:shadow-sm transition ${activeClass === b.grade ? 'border-blue-400 ring-1 ring-blue-300' : 'border-gray-200'}`}>
+              <p className="text-sm font-medium text-gray-900 truncate">{b.grade}</p>
+              <p className="text-xs mt-1"><span className="font-semibold text-green-700">{b.eating} eat</span> · <span className="text-gray-500">{b.notEating} don’t</span></p>
+              <div className="mt-1.5 h-1.5 w-full bg-gray-100 rounded-full overflow-hidden">
+                <div className="h-1.5 bg-green-500 rounded-full" style={{ width: `${b.total ? (b.eating / b.total) * 100 : 0}%` }} />
+              </div>
+              <p className="text-[11px] text-gray-400 mt-1">{b.total} pupils</p>
+            </button>
+          ))}
+          {gradeBreakdown.length === 0 && <p className="text-sm text-gray-400 col-span-full">No active pupils yet.</p>}
+        </div>
+      </div>
+
       {/* Summary */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <div className="bg-white border border-gray-200 rounded-lg p-4"><p className="text-sm text-gray-500">On lunch</p><p className="text-2xl font-bold text-gray-900">{onLunchCount}</p><p className="text-xs text-gray-400 mt-0.5">{active.label}</p></div>
+        <div className="bg-white border border-gray-200 rounded-lg p-4"><p className="text-sm text-gray-500">On lunch</p><p className="text-2xl font-bold text-gray-900">{onLunchCount}</p><p className="text-xs text-gray-400 mt-0.5">{scopeLabel} · {active.label}</p></div>
         <div className="bg-green-50 border border-green-200 rounded-lg p-4"><p className="text-sm text-green-700">Collected</p><p className="text-2xl font-bold text-green-800">{money(collected)}</p></div>
         <div className={`rounded-lg border p-4 ${outstanding > 0 ? 'bg-red-50 border-red-200' : 'bg-white border-gray-200'}`}><p className="text-sm text-gray-500">Outstanding</p><p className={`text-2xl font-bold ${outstanding > 0 ? 'text-red-700' : 'text-gray-900'}`}>{money(outstanding)}</p></div>
         <div className={`rounded-lg border p-4 ${netKitchen >= 0 ? 'bg-blue-50 border-blue-200' : 'bg-amber-50 border-amber-200'}`}>
