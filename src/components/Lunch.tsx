@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Utensils, Printer, FileDown, Search, Check, CalendarRange, Plus, Trash2, Pencil, ChefHat, GraduationCap, School } from 'lucide-react';
+import { Utensils, Printer, FileDown, Search, Check, CalendarRange, Plus, Trash2, Pencil, ChefHat, GraduationCap, School, Eye, EyeOff, UserCheck } from 'lucide-react';
 import { useAppContext, LunchRecord, LunchPeriod } from '../context/AppContext';
 import { useThemeClasses } from '../hooks/useThemeClasses';
 import { useToast } from './ToastProvider';
@@ -23,7 +23,7 @@ interface ActivePeriod { id?: string; label: string; startDate?: string; endDate
 
 export function Lunch() {
   const {
-    students, terms, currentTerm, branding, expenses,
+    students, teachers, terms, currentTerm, branding, expenses,
     lunchRecords, addLunchRecord, updateLunchRecord, deleteLunchRecord,
     lunchPeriods, addLunchPeriod, updateLunchPeriod, deleteLunchPeriod,
   } = useAppContext();
@@ -46,6 +46,8 @@ export function Lunch() {
   const [showPeriods, setShowPeriods] = useState(false);
   const [scope, setScope] = useState<'school' | 'class'>('school');
   const [classFilter, setClassFilter] = useState('');
+  const [kitchenView, setKitchenView] = useState(false);   // hide money, show who eats
+  const [onlyEating, setOnlyEating] = useState(false);      // kitchen view: only those who will eat
 
   // Resolve the current selection into an ActivePeriod.
   const active: ActivePeriod = (() => {
@@ -99,7 +101,6 @@ export function Lunch() {
     });
   };
   const setMethod = (r: LunchRecord, m: string) => updateLunchRecord(r.id, { method: m });
-  const setDate = (r: LunchRecord, v: string) => updateLunchRecord(r.id, { date: v ? new Date(v).toISOString() : undefined });
   const setCoveredUntil = (r: LunchRecord, v: string) => updateLunchRecord(r.id, { coveredUntil: v || undefined });
   const markPaid = (r: LunchRecord) => updateLunchRecord(r.id, {
     amountPaid: r.amountDue,
@@ -129,12 +130,61 @@ export function Lunch() {
 
   const studentOf = (id: string) => students.find(s => s.id === id);
 
+  // Staff (teacher) children — covered by the staff lunch plan when flagged.
+  const isStaffChild = (studentId: string) => !!students.find(s => s.id === studentId)?.teacherParentId;
+  const staffParentName = (studentId: string) => {
+    const pid = students.find(s => s.id === studentId)?.teacherParentId;
+    return pid ? (teachers.find(t => t.id === pid)?.name || 'Staff') : '';
+  };
+  const balOf = (r?: LunchRecord) => r ? Math.max(0, (r.amountDue || 0) - (r.amountPaid || 0)) : 0;
+  // Kitchen status: who actually eats this period.
+  type Status = 'none' | 'staff' | 'paid' | 'part' | 'unpaid';
+  const statusOf = (r?: LunchRecord): Status => {
+    if (!r) return 'none';
+    if (r.staffCovered) return 'staff';
+    if (balOf(r) <= 0 && ((r.amountPaid || 0) > 0 || (r.amountDue || 0) > 0)) return 'paid';
+    if ((r.amountPaid || 0) > 0) return 'part';
+    return 'unpaid';
+  };
+  const willEat = (r?: LunchRecord) => { const st = statusOf(r); return st === 'staff' || st === 'paid'; };
+
+  const eatingCount = periodRecords.filter(willEat).length;
+  const awaitingCount = periodRecords.length - eatingCount;
+
+  const setNote = (r: LunchRecord, v: string) => updateLunchRecord(r.id, { notes: v || undefined });
+  // Put a staff child on the plan (create a covered, fee-free record) or toggle it off.
+  const toggleStaffCover = (studentId: string) => {
+    const r = recordFor(studentId);
+    if (!r) {
+      addLunchRecord({
+        id: `lunch-${studentId}-${Date.now()}`, studentId, period: active.label, periodId: active.id,
+        amountDue: 0, amountPaid: 0, staffCovered: true,
+        coveredFrom: active.startDate || today(), coveredUntil: active.endDate,
+      });
+      return;
+    }
+    const cover = !r.staffCovered;
+    updateLunchRecord(r.id, cover
+      ? { staffCovered: true, amountDue: 0, coveredFrom: r.coveredFrom || active.startDate || today(), coveredUntil: r.coveredUntil || active.endDate }
+      : { staffCovered: false });
+  };
+
+  const gradeRank = (g: string) => { const i = GRADES.indexOf(g); return i === -1 ? 999 : i; };
   const rows = scopedStudents
     .filter(s => !search || s.name.toLowerCase().includes(search.toLowerCase()) || (s.admissionNumber || '').toLowerCase().includes(search.toLowerCase()) || (s.guardianName || '').toLowerCase().includes(search.toLowerCase()))
-    .filter(s => !onlyOnLunch || recordFor(s.id));
+    .filter(s => !onlyOnLunch || recordFor(s.id))
+    .filter(s => !(kitchenView && onlyEating) || willEat(recordFor(s.id)))
+    .sort((a, b) => gradeRank(a.grade) - gradeRank(b.grade) || a.name.localeCompare(b.name));
 
   const rangeLabel = hasRange ? `${fmtDate(active.startDate)} – ${fmtDate(active.endDate)}` : 'no dates set';
   const scopeLabel = activeClass || 'Whole school';
+  const STATUS_PILL: Record<Status, { label: string; cls: string }> = {
+    staff: { label: 'Staff — covered', cls: 'bg-teal-100 text-teal-800' },
+    paid: { label: 'Paid ✓', cls: 'bg-green-100 text-green-800' },
+    part: { label: 'Part paid', cls: 'bg-amber-100 text-amber-800' },
+    unpaid: { label: 'Not paid', cls: 'bg-gray-100 text-gray-500' },
+    none: { label: '—', cls: 'bg-gray-50 text-gray-400' },
+  };
 
   // ---- Period management ----
   const [pForm, setPForm] = useState({ label: '', startDate: '', endDate: '', defaultFee: '' });
@@ -182,42 +232,63 @@ export function Lunch() {
   };
 
   const printList = (pdf = false) => {
-    const list = periodRecords
+    // Kitchen register only lists pupils who will actually eat; the full list
+    // shows everyone on lunch with the money detail. Both are ordered by class.
+    let list = periodRecords
       .map(r => ({ r, s: studentOf(r.studentId) }))
-      .filter(x => x.s)
-      .sort((a, b) => (a.s!.name).localeCompare(b.s!.name));
-    if (!list.length) { toast('No pupils on the lunch list for this period yet.', 'warning'); return; }
+      .filter((x): x is { r: LunchRecord; s: NonNullable<typeof x.s> } => !!x.s)
+      .sort((a, b) => gradeRank(a.s.grade) - gradeRank(b.s.grade) || a.s.name.localeCompare(b.s.name));
+    if (kitchenView) list = list.filter(x => willEat(x.r));
+    if (!list.length) { toast('No pupils to print for this period yet.', 'warning'); return; }
+
+    const head = (cols: string[]) => `<thead><tr>${cols.map(c => `<th${c.startsWith('~') ? ' style="text-align:right"' : ''}>${esc(c.replace(/^~/, ''))}</th>`).join('')}</tr></thead>`;
     const body = list.map(({ r, s }, i) => {
-      const bal = Math.max(0, (r.amountDue || 0) - (r.amountPaid || 0));
+      const st = STATUS_PILL[statusOf(r)].label;
+      const staff = s.teacherParentId ? ` <span style="color:#0d9488">(staff)</span>` : '';
+      if (kitchenView) {
+        return `<tr>
+          <td style="border:1px solid #ccc;padding:6px 8px">${i + 1}</td>
+          <td style="border:1px solid #ccc;padding:6px 8px">${esc(s.name)}${staff}</td>
+          <td style="border:1px solid #ccc;padding:6px 8px">${esc(s.grade)}</td>
+          <td style="border:1px solid #ccc;padding:6px 8px">${esc(st)}</td>
+          <td style="border:1px solid #ccc;padding:6px 8px">${esc(r.notes || '')}</td>
+        </tr>`;
+      }
+      const bal = balOf(r);
       return `<tr>
         <td style="border:1px solid #ccc;padding:6px 8px">${i + 1}</td>
-        <td style="border:1px solid #ccc;padding:6px 8px">${esc(s!.name)}<div style="font-size:9px;color:#777">${esc(s!.guardianName || '')}${s!.guardianPhone ? ' · ' + esc(s!.guardianPhone) : ''}</div></td>
-        <td style="border:1px solid #ccc;padding:6px 8px">${esc(s!.grade)}</td>
-        <td style="border:1px solid #ccc;padding:6px 8px;text-align:right">${money(r.amountDue || 0)}</td>
+        <td style="border:1px solid #ccc;padding:6px 8px">${esc(s.name)}${staff}<div style="font-size:9px;color:#777">${esc(s.guardianName || '')}${s.guardianPhone ? ' · ' + esc(s.guardianPhone) : ''}</div></td>
+        <td style="border:1px solid #ccc;padding:6px 8px">${esc(s.grade)}</td>
+        <td style="border:1px solid #ccc;padding:6px 8px;text-align:right">${r.staffCovered ? 'covered' : money(r.amountDue || 0)}</td>
         <td style="border:1px solid #ccc;padding:6px 8px;text-align:right;color:#15803d">${money(r.amountPaid || 0)}</td>
         <td style="border:1px solid #ccc;padding:6px 8px;text-align:right;color:${bal > 0 ? '#b91c1c' : '#6b7280'}">${money(bal)}</td>
         <td style="border:1px solid #ccc;padding:6px 8px">${esc(r.method || '')}</td>
-        <td style="border:1px solid #ccc;padding:6px 8px">${r.date ? new Date(r.date).toLocaleDateString('en-GB') : ''}</td>
         <td style="border:1px solid #ccc;padding:6px 8px">${r.coveredUntil ? new Date(r.coveredUntil).toLocaleDateString('en-GB') : ''}</td>
+        <td style="border:1px solid #ccc;padding:6px 8px">${esc(r.notes || '')}</td>
       </tr>`;
     }).join('');
-    const html = `<!DOCTYPE html><html><head><title>Lunch List – ${esc(active.label)}</title>
+
+    const title = kitchenView ? 'Kitchen Eating List' : 'Lunch List';
+    const sub = kitchenView
+      ? `${hasRange ? esc(rangeLabel) + ' · ' : ''}${list.length} pupils eating`
+      : `${hasRange ? esc(rangeLabel) + ' · ' : ''}${list.length} pupils · Collected ${money(collected)} · Outstanding ${money(outstanding)}`;
+    const cols = kitchenView
+      ? ['#', 'Pupil', 'Class', 'Status', 'Note']
+      : ['#', 'Pupil / Guardian', 'Class', '~Fee', '~Paid', '~Balance', 'Method', 'Covered to', 'Note'];
+    const html = `<!DOCTYPE html><html><head><title>${esc(title)} – ${esc(active.label)}</title>
       <style>@page{size:A4 landscape;margin:12mm}body{font-family:${DOC_FONT};color:#111}table{border-collapse:collapse;width:100%;font-size:12px}th{background:#f0f0f0;border:1px solid #ccc;padding:6px 8px;text-align:left}@media print{button{display:none}}</style></head>
       <body>
         <div style="text-align:center;margin-bottom:10px">
           ${branding.logoUrl ? `<img src="${branding.logoUrl}" style="height:44px;width:44px;object-fit:contain" />` : ''}
           <div style="font-size:16pt;font-weight:700">${esc(branding.schoolName) || 'School'}</div>
-          <div style="font-size:12pt;font-weight:600">Lunch List — ${esc(scopeLabel)} — ${esc(active.label)}</div>
-          <div style="font-size:10pt;color:#555">${hasRange ? esc(rangeLabel) + ' · ' : ''}${list.length} pupils · Collected ${money(collected)} · Outstanding ${money(outstanding)}</div>
+          <div style="font-size:12pt;font-weight:600">${esc(title)} — ${esc(scopeLabel)} — ${esc(active.label)}</div>
+          <div style="font-size:10pt;color:#555">${sub}</div>
         </div>
-        <table>
-          <thead><tr><th>#</th><th>Pupil / Guardian</th><th>Class</th><th style="text-align:right">Fee</th><th style="text-align:right">Paid</th><th style="text-align:right">Balance</th><th>Method</th><th>Date paid</th><th>Covered to</th></tr></thead>
-          <tbody>${body}</tbody>
-        </table>
+        <table>${head(cols)}<tbody>${body}</tbody></table>
         <p style="margin-top:14px;font-size:10px;color:#888">Printed ${new Date().toLocaleDateString('en-GB')}</p>
         <script>window.onload=function(){setTimeout(function(){window.print()},250)}</script>
       </body></html>`;
-    emitDoc(html, `Lunch_List_${scopeLabel.replace(/\s+/g, '_')}_${active.label.replace(/\s+/g, '_')}`, pdf ? 'pdf' : 'print');
+    emitDoc(html, `${kitchenView ? 'Kitchen_List' : 'Lunch_List'}_${scopeLabel.replace(/\s+/g, '_')}_${active.label.replace(/\s+/g, '_')}`, pdf ? 'pdf' : 'print');
   };
 
   const inp = 'px-2.5 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent';
@@ -230,8 +301,12 @@ export function Lunch() {
           <p className="text-gray-600">Track who is on lunch, what they’ve paid and how long they’re covered — and how that money feeds the kitchen</p>
         </div>
         <div className="flex gap-2">
-          <button onClick={() => printList()} className={`flex items-center gap-1.5 ${tc.btn} text-white px-3 py-2 rounded-lg text-sm`}><Printer className="h-4 w-4" />Print list</button>
-          <button title="Export lunch list to PDF" onClick={() => printList(true)} className="flex items-center border border-gray-300 text-gray-700 px-2 py-2 rounded-lg text-sm hover:bg-gray-50"><FileDown className="h-4 w-4" /></button>
+          <button onClick={() => setKitchenView(v => !v)} title={kitchenView ? 'Show payment amounts' : 'Hide amounts — kitchen eating list'}
+            className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm border ${kitchenView ? 'bg-teal-600 text-white border-teal-600' : 'border-gray-300 text-gray-700 hover:bg-gray-50'}`}>
+            {kitchenView ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}{kitchenView ? 'Kitchen view' : 'Kitchen view'}
+          </button>
+          <button onClick={() => printList()} className={`flex items-center gap-1.5 ${tc.btn} text-white px-3 py-2 rounded-lg text-sm`}><Printer className="h-4 w-4" />{kitchenView ? 'Print eating list' : 'Print list'}</button>
+          <button title="Export to PDF" onClick={() => printList(true)} className="flex items-center border border-gray-300 text-gray-700 px-2 py-2 rounded-lg text-sm hover:bg-gray-50"><FileDown className="h-4 w-4" /></button>
         </div>
       </div>
 
@@ -338,22 +413,30 @@ export function Lunch() {
       </div>
 
       {/* Summary */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <div className="bg-white border border-gray-200 rounded-lg p-4"><p className="text-sm text-gray-500">On lunch</p><p className="text-2xl font-bold text-gray-900">{onLunchCount}</p><p className="text-xs text-gray-400 mt-0.5">{scopeLabel} · {active.label}</p></div>
-        <div className="bg-green-50 border border-green-200 rounded-lg p-4"><p className="text-sm text-green-700">Collected</p><p className="text-2xl font-bold text-green-800">{money(collected)}</p></div>
-        <div className={`rounded-lg border p-4 ${outstanding > 0 ? 'bg-red-50 border-red-200' : 'bg-white border-gray-200'}`}><p className="text-sm text-gray-500">Outstanding</p><p className={`text-2xl font-bold ${outstanding > 0 ? 'text-red-700' : 'text-gray-900'}`}>{money(outstanding)}</p></div>
-        <div className={`rounded-lg border p-4 ${netKitchen >= 0 ? 'bg-blue-50 border-blue-200' : 'bg-amber-50 border-amber-200'}`}>
-          <p className="text-sm text-gray-600 flex items-center gap-1"><ChefHat className="h-3.5 w-3.5" />Kitchen use</p>
-          {hasRange ? (
-            <>
-              <p className={`text-2xl font-bold ${netKitchen >= 0 ? 'text-blue-800' : 'text-amber-800'}`}>{money(foodSpend)}</p>
-              <p className="text-xs text-gray-500 mt-0.5">spent on food · {netKitchen >= 0 ? `${money(netKitchen)} left` : `over by ${money(-netKitchen)}`}</p>
-            </>
-          ) : <p className="text-xs text-gray-400 mt-2">Set period dates to link food spend</p>}
+      {kitchenView ? (
+        <div className="grid grid-cols-3 gap-4">
+          <div className="bg-white border border-gray-200 rounded-lg p-4"><p className="text-sm text-gray-500">On lunch</p><p className="text-2xl font-bold text-gray-900">{onLunchCount}</p><p className="text-xs text-gray-400 mt-0.5">{scopeLabel} · {active.label}</p></div>
+          <div className="bg-green-50 border border-green-200 rounded-lg p-4"><p className="text-sm text-green-700">Will eat</p><p className="text-2xl font-bold text-green-800">{eatingCount}</p><p className="text-xs text-green-600 mt-0.5">paid up or staff-covered</p></div>
+          <div className={`rounded-lg border p-4 ${awaitingCount > 0 ? 'bg-amber-50 border-amber-200' : 'bg-white border-gray-200'}`}><p className="text-sm text-gray-500">Awaiting payment</p><p className={`text-2xl font-bold ${awaitingCount > 0 ? 'text-amber-700' : 'text-gray-900'}`}>{awaitingCount}</p><p className="text-xs text-gray-400 mt-0.5">not fully paid</p></div>
         </div>
-      </div>
+      ) : (
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          <div className="bg-white border border-gray-200 rounded-lg p-4"><p className="text-sm text-gray-500">On lunch</p><p className="text-2xl font-bold text-gray-900">{onLunchCount}</p><p className="text-xs text-gray-400 mt-0.5">{scopeLabel} · {active.label}</p></div>
+          <div className="bg-green-50 border border-green-200 rounded-lg p-4"><p className="text-sm text-green-700">Collected</p><p className="text-2xl font-bold text-green-800">{money(collected)}</p></div>
+          <div className={`rounded-lg border p-4 ${outstanding > 0 ? 'bg-red-50 border-red-200' : 'bg-white border-gray-200'}`}><p className="text-sm text-gray-500">Outstanding</p><p className={`text-2xl font-bold ${outstanding > 0 ? 'text-red-700' : 'text-gray-900'}`}>{money(outstanding)}</p></div>
+          <div className={`rounded-lg border p-4 ${netKitchen >= 0 ? 'bg-blue-50 border-blue-200' : 'bg-amber-50 border-amber-200'}`}>
+            <p className="text-sm text-gray-600 flex items-center gap-1"><ChefHat className="h-3.5 w-3.5" />Kitchen use</p>
+            {hasRange ? (
+              <>
+                <p className={`text-2xl font-bold ${netKitchen >= 0 ? 'text-blue-800' : 'text-amber-800'}`}>{money(foodSpend)}</p>
+                <p className="text-xs text-gray-500 mt-0.5">spent on food · {netKitchen >= 0 ? `${money(netKitchen)} left` : `over by ${money(-netKitchen)}`}</p>
+              </>
+            ) : <p className="text-xs text-gray-400 mt-2">Set period dates to link food spend</p>}
+          </div>
+        </div>
+      )}
 
-      {hasRange && collected > 0 && (
+      {!kitchenView && hasRange && collected > 0 && (
         <div className="bg-white border border-gray-200 rounded-lg p-4">
           <div className="flex items-center justify-between text-sm mb-2">
             <span className="text-gray-600">Lunch money used on food ({rangeLabel})</span>
@@ -374,75 +457,129 @@ export function Lunch() {
             <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search pupil, admission no. or guardian…" className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
           </div>
           <label className="flex items-center gap-1.5 text-sm text-gray-600"><input type="checkbox" checked={onlyOnLunch} onChange={e => setOnlyOnLunch(e.target.checked)} />On lunch only</label>
+          {kitchenView && <label className="flex items-center gap-1.5 text-sm text-gray-600"><input type="checkbox" checked={onlyEating} onChange={e => setOnlyEating(e.target.checked)} />Only those eating</label>}
+          {kitchenView && <span className="text-xs text-teal-700 bg-teal-50 border border-teal-200 rounded-full px-2.5 py-1">Kitchen view — amounts hidden, ordered by class</span>}
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-white" style={{ background: 'var(--gha-primary, #1d4ed8)' }}>
-                <th className="py-3 px-4 text-left font-medium">Pupil / Guardian</th>
-                <th className="py-3 px-3 text-left font-medium">Class</th>
-                <th className="py-3 px-3 text-center font-medium">On lunch</th>
-                <th className="py-3 px-3 text-right font-medium">Fee (K)</th>
-                <th className="py-3 px-3 text-right font-medium">Paid (K)</th>
-                <th className="py-3 px-3 text-right font-medium">Balance</th>
-                <th className="py-3 px-3 text-left font-medium">Method</th>
-                <th className="py-3 px-3 text-left font-medium">Date paid</th>
-                <th className="py-3 px-3 text-left font-medium">Covered until</th>
-                <th className="py-3 px-3 text-center font-medium"></th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map(s => {
-                const r = recordFor(s.id);
-                const bal = r ? Math.max(0, (r.amountDue || 0) - (r.amountPaid || 0)) : 0;
-                const lapsed = !!(r?.coveredUntil && dayOf(r.coveredUntil) < today());
-                return (
-                  <tr key={s.id} className={`border-b border-gray-100 ${r ? '' : 'opacity-70'}`}>
-                    <td className="py-2 px-4">
-                      <p className="font-medium text-gray-900 text-xs">{s.name}</p>
-                      <p className="text-xs text-gray-400">{s.admissionNumber ? `#${s.admissionNumber} · ` : ''}{s.guardianName || ''}{s.guardianPhone ? ` · ${s.guardianPhone}` : ''}</p>
-                    </td>
-                    <td className="py-2 px-3 text-xs text-gray-500">{s.grade}</td>
-                    <td className="py-2 px-3 text-center">
-                      <input type="checkbox" checked={!!r} onChange={() => toggleLunch(s.id)} className="h-4 w-4" />
-                    </td>
-                    {r ? (
-                      <>
-                        <td className="py-2 px-3 text-right">
-                          <input type="number" min="0" defaultValue={r.amountDue || 0} key={`d-${r.id}-${r.amountDue}`} onBlur={e => setDue(r, e.target.value)} className="w-20 border border-gray-200 rounded px-1.5 py-1 text-right text-xs" />
+          {kitchenView ? (
+            /* ---- Kitchen eating list: no money, ordered by class ---- */
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-white" style={{ background: 'var(--gha-primary, #1d4ed8)' }}>
+                  <th className="py-3 px-4 text-left font-medium">Pupil</th>
+                  <th className="py-3 px-3 text-left font-medium">Class</th>
+                  <th className="py-3 px-3 text-left font-medium">Status</th>
+                  <th className="py-3 px-3 text-left font-medium">Note</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map(s => {
+                  const r = recordFor(s.id);
+                  const st = statusOf(r);
+                  return (
+                    <tr key={s.id} className={`border-b border-gray-100 ${r ? '' : 'opacity-60'}`}>
+                      <td className="py-2 px-4">
+                        <p className="font-medium text-gray-900 text-sm">{s.name}</p>
+                        {isStaffChild(s.id) && <p className="text-[11px] text-teal-700">Staff child · {staffParentName(s.id)}</p>}
+                      </td>
+                      <td className="py-2 px-3 text-xs text-gray-500">{s.grade}</td>
+                      <td className="py-2 px-3">
+                        {r ? <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${STATUS_PILL[st].cls}`}>{STATUS_PILL[st].label}</span>
+                           : <span className="text-xs text-gray-400">not on lunch</span>}
+                      </td>
+                      <td className="py-2 px-3">
+                        {r ? <input defaultValue={r.notes || ''} key={`kn-${r.id}-${r.notes || ''}`} onBlur={e => setNote(r, e.target.value)} placeholder="note…" className="w-48 border border-gray-200 rounded px-1.5 py-1 text-xs" /> : null}
+                      </td>
+                    </tr>
+                  );
+                })}
+                {rows.length === 0 && <tr><td colSpan={4} className="py-12 text-center text-gray-400">No pupils match.</td></tr>}
+              </tbody>
+            </table>
+          ) : (
+            /* ---- Full office list with money detail ---- */
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-white" style={{ background: 'var(--gha-primary, #1d4ed8)' }}>
+                  <th className="py-3 px-4 text-left font-medium">Pupil / Guardian</th>
+                  <th className="py-3 px-3 text-left font-medium">Class</th>
+                  <th className="py-3 px-3 text-center font-medium">On lunch</th>
+                  <th className="py-3 px-3 text-right font-medium">Fee (K)</th>
+                  <th className="py-3 px-3 text-right font-medium">Paid (K)</th>
+                  <th className="py-3 px-3 text-right font-medium">Balance</th>
+                  <th className="py-3 px-3 text-left font-medium">Method</th>
+                  <th className="py-3 px-3 text-left font-medium">Covered until</th>
+                  <th className="py-3 px-3 text-left font-medium">Note</th>
+                  <th className="py-3 px-3 text-center font-medium"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map(s => {
+                  const r = recordFor(s.id);
+                  const bal = balOf(r);
+                  const lapsed = !!(r?.coveredUntil && dayOf(r.coveredUntil) < today());
+                  const staff = isStaffChild(s.id);
+                  return (
+                    <tr key={s.id} className={`border-b border-gray-100 ${r ? '' : 'opacity-70'}`}>
+                      <td className="py-2 px-4">
+                        <p className="font-medium text-gray-900 text-xs">{s.name}</p>
+                        <p className="text-xs text-gray-400">{s.admissionNumber ? `#${s.admissionNumber} · ` : ''}{s.guardianName || ''}{s.guardianPhone ? ` · ${s.guardianPhone}` : ''}</p>
+                        <div className="flex gap-1 mt-0.5">
+                          {staff && <span className="text-[10px] text-teal-700 bg-teal-50 border border-teal-200 rounded px-1.5">Staff · {staffParentName(s.id)}</span>}
+                          {r?.staffCovered && <span className="text-[10px] text-teal-800 bg-teal-100 rounded px-1.5">Lunch covered</span>}
+                        </div>
+                      </td>
+                      <td className="py-2 px-3 text-xs text-gray-500">{s.grade}</td>
+                      <td className="py-2 px-3 text-center">
+                        <input type="checkbox" checked={!!r} onChange={() => toggleLunch(s.id)} className="h-4 w-4" />
+                      </td>
+                      {r ? (
+                        <>
+                          <td className="py-2 px-3 text-right">
+                            {r.staffCovered ? <span className="text-xs text-teal-700">covered</span>
+                              : <input type="number" min="0" defaultValue={r.amountDue || 0} key={`d-${r.id}-${r.amountDue}`} onBlur={e => setDue(r, e.target.value)} className="w-20 border border-gray-200 rounded px-1.5 py-1 text-right text-xs" />}
+                          </td>
+                          <td className="py-2 px-3 text-right">
+                            {r.staffCovered ? <span className="text-xs text-gray-400">—</span>
+                              : <input type="number" min="0" defaultValue={r.amountPaid || 0} key={`p-${r.id}-${r.amountPaid}`} onBlur={e => setPaid(r, e.target.value)} className="w-20 border border-gray-200 rounded px-1.5 py-1 text-right text-xs" />}
+                          </td>
+                          <td className={`py-2 px-3 text-right font-medium text-xs ${bal > 0 ? 'text-red-600' : 'text-green-600'}`}>{r.staffCovered ? '—' : money(bal)}</td>
+                          <td className="py-2 px-3">
+                            <select value={r.method || ''} onChange={e => setMethod(r, e.target.value)} className="border border-gray-200 rounded px-1.5 py-1 text-xs" disabled={r.staffCovered}>
+                              <option value="">—</option>{METHODS.map(m => <option key={m} value={m}>{m}</option>)}
+                            </select>
+                          </td>
+                          <td className="py-2 px-3">
+                            <input type="date" value={dayOf(r.coveredUntil)} onChange={e => setCoveredUntil(r, e.target.value)} className={`border rounded px-1.5 py-1 text-xs ${lapsed ? 'border-red-300 text-red-600' : 'border-gray-200'}`} />
+                            {lapsed && <p className="text-[10px] text-red-500 mt-0.5">lapsed</p>}
+                          </td>
+                          <td className="py-2 px-3">
+                            <input defaultValue={r.notes || ''} key={`n-${r.id}-${r.notes || ''}`} onBlur={e => setNote(r, e.target.value)} placeholder="note…" className="w-32 border border-gray-200 rounded px-1.5 py-1 text-xs" />
+                          </td>
+                          <td className="py-2 px-3 text-center">
+                            <div className="flex items-center justify-center gap-1">
+                              {!r.staffCovered && bal > 0 && <button onClick={() => markPaid(r)} title="Mark fully paid" className="inline-flex items-center gap-1 text-xs text-green-700 border border-green-200 hover:bg-green-50 rounded px-2 py-1"><Check className="h-3 w-3" />Paid</button>}
+                              {staff && <button onClick={() => toggleStaffCover(s.id)} title={r.staffCovered ? 'Remove from staff plan' : 'Cover under staff plan'} className={`inline-flex items-center gap-1 text-xs rounded px-2 py-1 border ${r.staffCovered ? 'text-teal-700 border-teal-300 bg-teal-50' : 'text-gray-600 border-gray-200 hover:bg-gray-50'}`}><UserCheck className="h-3 w-3" />Staff</button>}
+                            </div>
+                          </td>
+                        </>
+                      ) : (
+                        <td colSpan={7} className="py-2 px-3 text-xs text-gray-400">
+                          Not on the lunch list this period
+                          {staff && <button onClick={() => toggleStaffCover(s.id)} className="ml-2 inline-flex items-center gap-1 text-xs text-teal-700 border border-teal-200 hover:bg-teal-50 rounded px-2 py-0.5"><UserCheck className="h-3 w-3" />Put on staff plan</button>}
                         </td>
-                        <td className="py-2 px-3 text-right">
-                          <input type="number" min="0" defaultValue={r.amountPaid || 0} key={`p-${r.id}-${r.amountPaid}`} onBlur={e => setPaid(r, e.target.value)} className="w-20 border border-gray-200 rounded px-1.5 py-1 text-right text-xs" />
-                        </td>
-                        <td className={`py-2 px-3 text-right font-medium text-xs ${bal > 0 ? 'text-red-600' : 'text-green-600'}`}>{money(bal)}</td>
-                        <td className="py-2 px-3">
-                          <select value={r.method || ''} onChange={e => setMethod(r, e.target.value)} className="border border-gray-200 rounded px-1.5 py-1 text-xs">
-                            <option value="">—</option>{METHODS.map(m => <option key={m} value={m}>{m}</option>)}
-                          </select>
-                        </td>
-                        <td className="py-2 px-3">
-                          <input type="date" value={r.date ? r.date.split('T')[0] : ''} onChange={e => setDate(r, e.target.value)} className="border border-gray-200 rounded px-1.5 py-1 text-xs" />
-                        </td>
-                        <td className="py-2 px-3">
-                          <input type="date" value={dayOf(r.coveredUntil)} onChange={e => setCoveredUntil(r, e.target.value)} className={`border rounded px-1.5 py-1 text-xs ${lapsed ? 'border-red-300 text-red-600' : 'border-gray-200'}`} />
-                          {lapsed && <p className="text-[10px] text-red-500 mt-0.5">lapsed</p>}
-                        </td>
-                        <td className="py-2 px-3 text-center">
-                          {bal > 0 && <button onClick={() => markPaid(r)} title="Mark fully paid" className="inline-flex items-center gap-1 text-xs text-green-700 border border-green-200 hover:bg-green-50 rounded px-2 py-1"><Check className="h-3 w-3" />Paid</button>}
-                        </td>
-                      </>
-                    ) : (
-                      <td colSpan={7} className="py-2 px-3 text-xs text-gray-400">Not on the lunch list this period</td>
-                    )}
-                  </tr>
-                );
-              })}
-              {rows.length === 0 && <tr><td colSpan={10} className="py-12 text-center text-gray-400">No pupils match.</td></tr>}
-            </tbody>
-          </table>
+                      )}
+                    </tr>
+                  );
+                })}
+                {rows.length === 0 && <tr><td colSpan={10} className="py-12 text-center text-gray-400">No pupils match.</td></tr>}
+              </tbody>
+            </table>
+          )}
         </div>
       </div>
-      {periodRecords.length > 0 && <p className="text-xs text-gray-400">Tip: “Covered until” shows how long a payment keeps a pupil on lunch — it defaults to the period’s end date and turns red once it lapses. Use “On lunch only”, then Print list for the kitchen.</p>}
+      {periodRecords.length > 0 && !kitchenView && <p className="text-xs text-gray-400">Tip: use <strong>Kitchen view</strong> to hand the kitchen an eating list with no money on it. Staff children can be put on the lunch plan (fee-free) with the <strong>Staff</strong> button. “Covered until” turns red once a payment lapses.</p>}
+      {kitchenView && <p className="text-xs text-gray-400">This is the kitchen’s eating list — payment amounts are hidden. “Will eat” means paid up or staff-covered. Print it for the kitchen.</p>}
     </div>
   );
 }

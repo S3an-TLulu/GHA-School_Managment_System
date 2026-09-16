@@ -566,6 +566,7 @@ export interface LunchRecord {
   date?: string;         // ISO date of the last payment
   coveredFrom?: string;  // ISO date the paid-up lunch coverage starts (usually the payment date)
   coveredUntil?: string; // ISO date the paid-up lunch coverage runs to (defaults to the period end)
+  staffCovered?: boolean; // a staff member's child, covered by the staff lunch plan (no fee)
   notes?: string;
 }
 
