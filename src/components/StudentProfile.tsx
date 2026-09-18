@@ -1,8 +1,14 @@
-import { Student, Payment, useAppContext } from '../context/AppContext';
-import { X, User, Printer, GraduationCap, FileDown } from 'lucide-react';
+import { useState, useMemo } from 'react';
+import { Student, Payment, PaymentMethod, useAppContext } from '../context/AppContext';
+import { X, User, Printer, GraduationCap, FileDown, Pencil, Plus, Receipt, Percent, FileText } from 'lucide-react';
 import { printHtml, exportPdf } from '../lib/print';
+import { printReceipt, printStatement } from '../lib/receipt';
 import { useThemeClasses } from '../hooks/useThemeClasses';
+import { useToast } from './ToastProvider';
 import { PersonDocuments } from './PersonDocs';
+
+const PAYMENT_TYPES = ['Tuition Fee', 'Enrollment Form', 'Lunch', 'Transport', 'Water', 'Assessment Tests', 'Uniform', 'Other'];
+const METHODS: PaymentMethod[] = ['Cash', 'Mobile Money', 'Bank Transfer', 'Cheque', 'Other'];
 
 function getGrade(mark: number): { letter: string; color: string } {
   if (mark >= 80) return { letter: 'A', color: 'text-green-600' };
@@ -15,11 +21,50 @@ function getGrade(mark: number): { letter: string; color: string } {
 interface StudentProfileProps {
   student: Student;
   onClose: () => void;
+  onEdit?: (student: Student) => void;
 }
 
-export function StudentProfile({ student, onClose }: StudentProfileProps) {
-  const { payments, uniforms, requirements, results, updatePayment } = useAppContext();
+export function StudentProfile({ student, onClose, onEdit }: StudentProfileProps) {
+  const { payments, uniforms, requirements, results, updatePayment, addPayment, updateStudent, feeStructure, branding, currentTerm } = useAppContext();
   const tc = useThemeClasses();
+  const { toast } = useToast();
+
+  const classFee = feeStructure.find(f => f.className === student.grade)?.cashFee || 0;
+
+  // Record-a-payment panel.
+  const [showPay, setShowPay] = useState(false);
+  const [pay, setPay] = useState({ type: 'Tuition Fee', amount: '', method: 'Cash' as PaymentMethod, receipt: `RCP-${Date.now().toString().slice(-5)}`, discount: '', reason: '', notes: '' });
+  const gross = parseFloat(pay.amount) || 0;
+  const discountAmt = parseFloat(pay.discount) || 0;
+  const netPay = Math.max(0, gross - discountAmt);
+  const suggested = useMemo(() => (pay.type === 'Tuition Fee' && classFee ? classFee : 0), [pay.type, classFee]);
+
+  const recordPayment = () => {
+    if (netPay <= 0) { toast('Enter an amount greater than zero.', 'warning'); return; }
+    const id = `payment-${Date.now()}`;
+    const now = new Date().toISOString();
+    addPayment({
+      id, studentId: student.id, type: pay.type, amount: netPay,
+      dueDate: now, status: 'paid', paidDate: now, createdDate: now,
+      term: currentTerm, receiptNumber: pay.receipt || undefined, notes: pay.notes || undefined,
+      paymentMethod: pay.method,
+      ...(discountAmt > 0 ? { grossAmount: gross, discount: discountAmt, discountReason: pay.reason || undefined } : {}),
+    });
+    toast(`K${netPay.toLocaleString()} recorded for ${student.name}.`, 'success');
+    setPay({ type: 'Tuition Fee', amount: '', method: 'Cash', receipt: `RCP-${Date.now().toString().slice(-5)}`, discount: '', reason: '', notes: '' });
+    setShowPay(false);
+  };
+
+  // Persistent tuition discount for this pupil (bursary / staff).
+  const [tuitionDraft, setTuitionDraft] = useState(student.tuitionFee != null ? String(student.tuitionFee) : '');
+  const [reasonDraft, setReasonDraft] = useState(student.tuitionDiscountReason || '');
+  const saveTuition = () => {
+    const v = tuitionDraft.trim() === '' ? undefined : Math.max(0, parseFloat(tuitionDraft) || 0);
+    updateStudent(student.id, { tuitionFee: v, tuitionDiscountReason: v != null ? (reasonDraft || undefined) : undefined });
+    toast(v == null ? 'Tuition reset to class price.' : `Tuition set to K${v.toLocaleString()} for ${student.name}.`, 'success');
+  };
+  const effTuition = student.tuitionFee ?? classFee;
+  const isDiscounted = student.tuitionFee != null && classFee > 0 && student.tuitionFee < classFee;
 
   const studentPayments = payments.filter(p => p.studentId === student.id)
     .sort((a, b) => (a.paidDate || a.dueDate || '').localeCompare(b.paidDate || b.dueDate || ''));
@@ -100,8 +145,8 @@ export function StudentProfile({ student, onClose }: StudentProfileProps) {
       </head>
       <body>
         <div class="header">
-          <div class="school-name">Great Highway Academy</div>
-          <div class="school-sub">Lusaka, Zambia | Tel: +260-XXX-XXXXXX | gha.edu.zm</div>
+          <div class="school-name">${branding.schoolName || 'School'}</div>
+          <div class="school-sub">${[branding.address, branding.phone, branding.email].filter(Boolean).join(' | ')}</div>
           <div class="profile-title">STUDENT PROFILE REPORT</div>
         </div>
 
@@ -199,16 +244,28 @@ export function StudentProfile({ student, onClose }: StudentProfileProps) {
               </div>
             </div>
           </div>
-          <div className="flex items-center space-x-2">
-            <button onClick={() => handlePrint()}
-              className="flex items-center space-x-2 bg-gray-100 text-gray-700 px-3 py-2 rounded-lg hover:bg-gray-200 transition-colors text-sm">
-              <Printer className="h-4 w-4" />
-              <span>Print Profile</span>
+          <div className="flex items-center gap-2 flex-wrap justify-end">
+            {onEdit && (
+              <button onClick={() => onEdit(student)}
+                className={`flex items-center gap-1.5 ${tc.btn} text-white px-3 py-2 rounded-lg text-sm`}>
+                <Pencil className="h-4 w-4" /><span>Edit info</span>
+              </button>
+            )}
+            <button onClick={() => setShowPay(v => !v)}
+              className="flex items-center gap-1.5 bg-green-600 text-white px-3 py-2 rounded-lg hover:bg-green-700 transition-colors text-sm">
+              <Plus className="h-4 w-4" /><span>Record payment</span>
             </button>
-            <button onClick={() => handlePrint(true)} title="Export profile to PDF"
-              className="flex items-center space-x-2 bg-gray-100 text-gray-700 px-3 py-2 rounded-lg hover:bg-gray-200 transition-colors text-sm">
+            <button onClick={() => printStatement(student, studentPayments, branding)}
+              className="flex items-center gap-1.5 bg-gray-100 text-gray-700 px-3 py-2 rounded-lg hover:bg-gray-200 transition-colors text-sm">
+              <FileText className="h-4 w-4" /><span>Statement</span>
+            </button>
+            <button onClick={() => printStatement(student, studentPayments, branding, true)} title="Export statement to PDF"
+              className="flex items-center gap-1.5 bg-gray-100 text-gray-700 px-2.5 py-2 rounded-lg hover:bg-gray-200 transition-colors text-sm">
               <FileDown className="h-4 w-4" />
-              <span>PDF</span>
+            </button>
+            <button onClick={() => handlePrint()} title="Print full profile report"
+              className="flex items-center gap-1.5 bg-gray-100 text-gray-700 px-3 py-2 rounded-lg hover:bg-gray-200 transition-colors text-sm">
+              <Printer className="h-4 w-4" /><span className="hidden sm:inline">Profile</span>
             </button>
             <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-lg">
               <X className="h-5 w-5 text-gray-500" />
@@ -230,6 +287,65 @@ export function StudentProfile({ student, onClose }: StudentProfileProps) {
                 <p className={`text-lg font-bold ${stat.color}`}>{stat.value}</p>
               </div>
             ))}
+          </div>
+
+          {/* Record a payment */}
+          {showPay && (
+            <div className="border border-green-200 bg-green-50/50 rounded-xl p-4">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-semibold text-green-800 flex items-center gap-2"><Receipt className="h-4 w-4" />Record a payment</h3>
+                <button onClick={() => setShowPay(false)} className="text-gray-400 hover:text-gray-600"><X className="h-4 w-4" /></button>
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <label className="text-xs font-medium text-gray-500">Type
+                  <select value={pay.type} onChange={e => setPay({ ...pay, type: e.target.value, amount: '' })} className="block mt-1 w-full px-2.5 py-2 border border-gray-300 rounded-lg text-sm">
+                    {PAYMENT_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                  </select>
+                </label>
+                <label className="text-xs font-medium text-gray-500">Amount (K)
+                  <input type="number" min="0" value={pay.amount} onChange={e => setPay({ ...pay, amount: e.target.value })} placeholder={suggested ? String(suggested) : '0'} className="block mt-1 w-full px-2.5 py-2 border border-gray-300 rounded-lg text-sm" />
+                  {suggested > 0 && <button onClick={() => setPay({ ...pay, amount: String(suggested) })} className="text-[11px] text-blue-600 hover:underline mt-0.5">Use class fee K{suggested.toLocaleString()}{isDiscounted ? ` (pupil’s tuition K${effTuition.toLocaleString()})` : ''}</button>}
+                </label>
+                <label className="text-xs font-medium text-gray-500">Method
+                  <select value={pay.method} onChange={e => setPay({ ...pay, method: e.target.value as PaymentMethod })} className="block mt-1 w-full px-2.5 py-2 border border-gray-300 rounded-lg text-sm">
+                    {METHODS.map(m => <option key={m} value={m}>{m}</option>)}
+                  </select>
+                </label>
+                <label className="text-xs font-medium text-gray-500">Receipt No.
+                  <input value={pay.receipt} onChange={e => setPay({ ...pay, receipt: e.target.value })} className="block mt-1 w-full px-2.5 py-2 border border-gray-300 rounded-lg text-sm" />
+                </label>
+                <label className="text-xs font-medium text-gray-500">Discount (K)
+                  <input type="number" min="0" value={pay.discount} onChange={e => setPay({ ...pay, discount: e.target.value })} placeholder="0" className="block mt-1 w-full px-2.5 py-2 border border-gray-300 rounded-lg text-sm" />
+                </label>
+                <label className="text-xs font-medium text-gray-500 md:col-span-2">Discount reason
+                  <input value={pay.reason} onChange={e => setPay({ ...pay, reason: e.target.value })} placeholder="e.g. staff, bursary, sibling" className="block mt-1 w-full px-2.5 py-2 border border-gray-300 rounded-lg text-sm" />
+                </label>
+                <label className="text-xs font-medium text-gray-500">Notes
+                  <input value={pay.notes} onChange={e => setPay({ ...pay, notes: e.target.value })} placeholder="optional" className="block mt-1 w-full px-2.5 py-2 border border-gray-300 rounded-lg text-sm" />
+                </label>
+              </div>
+              <div className="flex items-center justify-between mt-3">
+                <p className="text-sm text-gray-600">{discountAmt > 0 ? <>Gross K{gross.toLocaleString()} − discount K{discountAmt.toLocaleString()} = <strong className="text-gray-900">K{netPay.toLocaleString()}</strong></> : <>Total <strong className="text-gray-900">K{netPay.toLocaleString()}</strong></>}</p>
+                <button onClick={recordPayment} disabled={netPay <= 0} className="flex items-center gap-1.5 bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-green-700 disabled:opacity-40"><Receipt className="h-4 w-4" />Record K{netPay.toLocaleString()}</button>
+              </div>
+            </div>
+          )}
+
+          {/* Tuition & discount (persistent, for this pupil) */}
+          <div className="border border-gray-200 rounded-xl p-4">
+            <h3 className="text-sm font-semibold text-gray-700 flex items-center gap-2 mb-3"><Percent className="h-4 w-4" />Tuition &amp; discount</h3>
+            <div className="flex flex-wrap items-end gap-3">
+              <div className="text-xs text-gray-500">Class price<p className="text-sm font-semibold text-gray-900 mt-1">{classFee ? `K${classFee.toLocaleString()}` : '— (set in Fee Structure)'}</p></div>
+              <label className="text-xs font-medium text-gray-500">This pupil’s tuition (K)
+                <input type="number" min="0" value={tuitionDraft} onChange={e => setTuitionDraft(e.target.value)} placeholder={classFee ? `${classFee} (class price)` : 'class price'} className="block mt-1 w-40 px-2.5 py-2 border border-gray-300 rounded-lg text-sm" />
+              </label>
+              <label className="text-xs font-medium text-gray-500 flex-1 min-w-[160px]">Reason
+                <input value={reasonDraft} onChange={e => setReasonDraft(e.target.value)} placeholder="e.g. staff child, bursary" className="block mt-1 w-full px-2.5 py-2 border border-gray-300 rounded-lg text-sm" />
+              </label>
+              <button onClick={saveTuition} className={`${tc.btn} text-white px-4 py-2 rounded-lg text-sm`}>Save</button>
+              {student.tuitionFee != null && <button onClick={() => { setTuitionDraft(''); setReasonDraft(''); updateStudent(student.id, { tuitionFee: undefined, tuitionDiscountReason: undefined }); toast('Tuition reset to class price.', 'info'); }} className="text-sm text-gray-500 hover:text-gray-700 px-2 py-2">Reset</button>}
+            </div>
+            {isDiscounted && <p className="text-xs text-amber-700 mt-2">Discounted by K{(classFee - (student.tuitionFee || 0)).toLocaleString()}{student.tuitionDiscountReason ? ` · ${student.tuitionDiscountReason}` : ''}. This lowers what the class is billed in Fees by Class.</p>}
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -319,6 +435,7 @@ export function StudentProfile({ student, onClose }: StudentProfileProps) {
                         {['Type', 'Term', 'Amount', 'Method', 'Due Date', 'Date Paid', 'Status', 'Receipt'].map(h => (
                           <th key={h} className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">{h}</th>
                         ))}
+                        <th className="px-3 py-2"></th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
@@ -347,6 +464,12 @@ export function StudentProfile({ student, onClose }: StudentProfileProps) {
                             </select>
                           </td>
                           <td className="px-3 py-2 text-xs text-gray-500 whitespace-nowrap">{p.receiptNumber || '—'}</td>
+                          <td className="px-3 py-2 whitespace-nowrap">
+                            <button onClick={() => printReceipt(p, student, branding)} title="Print receipt"
+                              className="inline-flex items-center gap-1 text-xs text-gray-600 border border-gray-200 hover:bg-gray-50 rounded px-2 py-1">
+                              <Receipt className="h-3 w-3" />Receipt
+                            </button>
+                          </td>
                         </tr>
                       ))}
                     </tbody>

@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { Search, Printer, Plus, CheckCircle, Clock, Receipt, X, Banknote, Smartphone, Building2, FileText, FileDown } from 'lucide-react';
 import { printHtml, exportPdf } from '../lib/print';
+import { printReceipt } from '../lib/receipt';
 import { useAppContext, PaymentMethod } from '../context/AppContext';
 import { useToast } from './ToastProvider';
 import { useThemeClasses } from '../hooks/useThemeClasses';
@@ -12,7 +13,7 @@ function todayISO() {
 }
 
 export function OfficeCashier() {
-  const { students, payments, feeStructure, addPayment, currentTerm } = useAppContext();
+  const { students, payments, feeStructure, addPayment, updateStudent, branding, currentTerm } = useAppContext();
   const { toast } = useToast();
   const tc = useThemeClasses();
 
@@ -21,10 +22,17 @@ export function OfficeCashier() {
   const [paymentType, setPaymentType] = useState('Tuition Fee');
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('Cash');
   const [amount, setAmount] = useState('');
+  const [discount, setDiscount] = useState('');
+  const [discountReason, setDiscountReason] = useState('');
+  const [saveAsTuition, setSaveAsTuition] = useState(false);
   const [receiptNumber, setReceiptNumber] = useState(`RCP-${Date.now().toString().slice(-5)}`);
   const [notes, setNotes] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
   const [sessionIds, setSessionIds] = useState<string[]>([]);
+
+  const grossAmt = parseFloat(amount) || 0;
+  const discountAmt = parseFloat(discount) || 0;
+  const netAmt = Math.max(0, grossAmt - discountAmt);
 
   const activeStudents = students.filter(s => !s.status || s.status === 'active');
 
@@ -53,6 +61,7 @@ export function OfficeCashier() {
 
   const suggestedAmount = useMemo(() => {
     if (!selectedStudent || paymentType !== 'Tuition Fee') return '';
+    if (selectedStudent.tuitionFee != null) return String(selectedStudent.tuitionFee);
     const fee = feeStructure.find(f => f.className === selectedStudent.grade);
     return fee ? String(fee.cashFee) : '';
   }, [selectedStudent, paymentType, feeStructure]);
@@ -68,14 +77,14 @@ export function OfficeCashier() {
   };
 
   const handleRecord = () => {
-    if (!selectedStudent || !amount || parseFloat(amount) <= 0) return;
+    if (!selectedStudent || netAmt <= 0) return;
 
     const id = `payment-${Date.now()}`;
     addPayment({
       id,
       studentId: selectedStudent.id,
       type: paymentType,
-      amount: parseFloat(amount),
+      amount: netAmt,
       dueDate: new Date().toISOString(),
       status: 'paid',
       paidDate: new Date().toISOString(),
@@ -84,14 +93,20 @@ export function OfficeCashier() {
       receiptNumber: receiptNumber || undefined,
       notes: notes || undefined,
       paymentMethod,
+      ...(discountAmt > 0 ? { grossAmount: grossAmt, discount: discountAmt, discountReason: discountReason || undefined } : {}),
     });
 
+    // Optionally remember this as the pupil's tuition (a persistent discount).
+    if (saveAsTuition && paymentType === 'Tuition Fee') {
+      updateStudent(selectedStudent.id, { tuitionFee: netAmt, tuitionDiscountReason: discountReason || undefined });
+    }
+
     setSessionIds(prev => [...prev, id]);
-    toast(`K${parseFloat(amount).toLocaleString()} recorded for ${selectedStudent.name}.`, 'success');
-    setSuccessMessage(`K${parseFloat(amount).toLocaleString()} recorded for ${selectedStudent.name}`);
+    toast(`K${netAmt.toLocaleString()} recorded for ${selectedStudent.name}.`, 'success');
+    setSuccessMessage(`K${netAmt.toLocaleString()} recorded for ${selectedStudent.name}`);
     setTimeout(() => setSuccessMessage(''), 3000);
 
-    setAmount('');
+    setAmount(''); setDiscount(''); setDiscountReason(''); setSaveAsTuition(false);
     setReceiptNumber(`RCP-${Date.now().toString().slice(-5)}`);
     setNotes('');
     setSelectedStudent(null);
@@ -317,6 +332,28 @@ export function OfficeCashier() {
               </div>
             </div>
 
+            {/* Discount */}
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Discount (K)</label>
+                <input type="number" min="0" placeholder="0" value={discount} onChange={e => setDiscount(e.target.value)}
+                  className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Discount reason</label>
+                <input type="text" placeholder="e.g. staff, bursary, sibling" value={discountReason} onChange={e => setDiscountReason(e.target.value)}
+                  className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+              </div>
+            </div>
+            {discountAmt > 0 && (
+              <div className="flex items-center justify-between text-sm bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                <span className="text-amber-800">Gross K{grossAmt.toLocaleString()} − discount K{discountAmt.toLocaleString()} = <strong>K{netAmt.toLocaleString()}</strong></span>
+                {paymentType === 'Tuition Fee' && (
+                  <label className="flex items-center gap-1.5 text-xs text-amber-800"><input type="checkbox" checked={saveAsTuition} onChange={e => setSaveAsTuition(e.target.checked)} />Remember as pupil’s tuition</label>
+                )}
+              </div>
+            )}
+
             {/* Receipt & Notes */}
             <div className="grid grid-cols-2 gap-4">
               <div>
@@ -333,10 +370,10 @@ export function OfficeCashier() {
 
             <button
               onClick={handleRecord}
-              disabled={!selectedStudent || !amount || parseFloat(amount) <= 0}
+              disabled={!selectedStudent || netAmt <= 0}
               className="w-full bg-green-600 text-white py-3 rounded-lg font-semibold text-lg hover:bg-green-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center space-x-2">
               <Receipt className="h-5 w-5" />
-              <span>Record Payment — {amount ? `K${parseFloat(amount).toLocaleString()}` : 'Enter Amount'}</span>
+              <span>Record Payment — {netAmt ? `K${netAmt.toLocaleString()}` : 'Enter Amount'}</span>
             </button>
           </div>
         </div>
@@ -392,7 +429,10 @@ export function OfficeCashier() {
                           <p className="font-medium text-gray-900">{student?.name}</p>
                           <p className="text-xs text-gray-500">{p.type} • {p.paymentMethod || 'Cash'} • {p.receiptNumber || 'no receipt'}</p>
                         </div>
-                        <span className="font-bold text-green-700 ml-2 whitespace-nowrap">K{p.amount.toLocaleString()}</span>
+                        <div className="text-right ml-2 whitespace-nowrap">
+                          <span className="font-bold text-green-700 block">K{p.amount.toLocaleString()}</span>
+                          {student && <button onClick={() => printReceipt(p, student, branding)} className="text-xs text-blue-600 hover:underline inline-flex items-center gap-1"><Receipt className="h-3 w-3" />Receipt</button>}
+                        </div>
                       </div>
                     );
                   })}

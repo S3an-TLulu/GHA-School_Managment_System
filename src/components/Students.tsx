@@ -23,8 +23,15 @@ export function Students() {
   const [editingStudent, setEditingStudent] = useState<Student | null>(null);
   const [profileStudent, setProfileStudent] = useState<Student | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [gradeFilter, setGradeFilter] = useState('');
   const [deleteConfirm, setDeleteConfirm] = useState<Student | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
+
+  const GRADES = ['Baby Class', 'Middle Class', 'Reception', 'Grade 1', 'Grade 2', 'Grade 3', 'Grade 4', 'Grade 5', 'Grade 6', 'Grade 7'];
+  const gradesPresent = [
+    ...GRADES.filter(g => students.some(s => s.grade === g)),
+    ...[...new Set(students.map(s => s.grade))].filter(g => g && !GRADES.includes(g)),
+  ];
 
   const handleExport = () => {
     if (students.length === 0) { toast('No students to export.', 'warning'); return; }
@@ -67,11 +74,13 @@ export function Students() {
     reader.readAsText(file);
   };
 
-  const filteredStudents = students.filter(s =>
-    s.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    s.grade.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (s.admissionNumber || '').toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredStudents = students
+    .filter(s => !gradeFilter || s.grade === gradeFilter)
+    .filter(s =>
+      s.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      s.grade.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (s.admissionNumber || '').toLowerCase().includes(searchTerm.toLowerCase())
+    );
 
   const handleEdit = (student: Student) => {
     setEditingStudent(student);
@@ -166,8 +175,8 @@ export function Students() {
 
       {/* Table card */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-        <div className="p-4 border-b border-gray-100">
-          <div className="relative">
+        <div className="p-4 border-b border-gray-100 flex flex-col sm:flex-row gap-3">
+          <div className="relative flex-1">
             <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
             <input
               type="text"
@@ -178,6 +187,12 @@ export function Students() {
               style={{ '--tw-ring-color': 'var(--gha-primary, #3b82f6)' } as React.CSSProperties}
             />
           </div>
+          <select value={gradeFilter} onChange={e => setGradeFilter(e.target.value)}
+            className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 sm:w-56"
+            style={{ '--tw-ring-color': 'var(--gha-primary, #3b82f6)' } as React.CSSProperties}>
+            <option value="">All classes</option>
+            {gradesPresent.map(g => <option key={g} value={g}>{g}</option>)}
+          </select>
         </div>
 
         <div className="overflow-x-auto">
@@ -274,6 +289,7 @@ export function Students() {
         <StudentProfile
           student={profileStudent}
           onClose={() => setProfileStudent(null)}
+          onEdit={s => { setProfileStudent(null); handleEdit(s); }}
         />
       )}
 
