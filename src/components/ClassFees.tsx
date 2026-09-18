@@ -1,5 +1,5 @@
-import { useState, Fragment } from 'react';
-import { GraduationCap, Utensils, Bus, Printer, FileDown, ChevronRight, Percent, RotateCcw } from 'lucide-react';
+import { useState } from 'react';
+import { GraduationCap, Utensils, Bus, Printer, FileDown, Percent } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 import { useThemeClasses } from '../hooks/useThemeClasses';
 import { useToast } from './ToastProvider';
@@ -17,13 +17,12 @@ type Tab = 'fees' | 'lunch' | 'transport';
 export function ClassFees() {
   const {
     students, feeStructure, payments, lunchRecords, transportRoutes, terms, currentTerm, branding,
-    addFeeStructureItem, updateFeeStructureItem, updateStudent,
+    addFeeStructureItem, updateFeeStructureItem,
   } = useAppContext();
   const tc = useThemeClasses();
   const { toast } = useToast();
   const [tab, setTab] = useState<Tab>('fees');
   const [term, setTerm] = useState(currentTerm || terms[0] || 'All terms');
-  const [expanded, setExpanded] = useState<string | null>(null);
 
   const activeStudents = students.filter(s => !s.status || s.status === 'active');
   const gradesPresent = [
@@ -74,14 +73,6 @@ export function ClassFees() {
   });
 
   const sum = <T,>(rows: T[], k: (r: T) => number) => rows.reduce((s, r) => s + k(r), 0);
-
-  // ---- Per-student tuition edit ----
-  const setStudentTuition = (id: string, raw: string) => {
-    const v = raw.trim() === '' ? undefined : Math.max(0, parseFloat(raw) || 0);
-    updateStudent(id, { tuitionFee: v });
-  };
-  const resetStudentTuition = (id: string) => updateStudent(id, { tuitionFee: undefined, tuitionDiscountReason: undefined });
-  const setStudentReason = (id: string, v: string) => updateStudent(id, { tuitionDiscountReason: v || undefined });
 
   const TABS: { id: Tab; label: string; icon: typeof GraduationCap }[] = [
     { id: 'fees', label: 'School Fees', icon: GraduationCap },
@@ -181,53 +172,24 @@ export function ClassFees() {
                 </thead>
                 <tbody>
                   {feeRows.map(r => (
-                    <Fragment key={r.grade}>
-                      <tr className="border-b border-gray-100 hover:bg-gray-50">
-                        <td className="py-2 px-3 font-medium text-gray-900">
-                          <button onClick={() => setExpanded(expanded === r.grade ? null : r.grade)} className="inline-flex items-center gap-1 hover:text-blue-600">
-                            <ChevronRight className={`h-4 w-4 transition-transform ${expanded === r.grade ? 'rotate-90' : ''}`} />{r.grade}
-                          </button>
-                        </td>
-                        <td className={`${numCell} text-gray-600`}>{r.pupils}</td>
-                        <td className={numCell}>
-                          <div className="inline-flex items-center">
-                            <span className="text-gray-400 text-xs mr-1">K</span>
-                            <input type="number" min="0" defaultValue={r.price} key={`price-${r.grade}-${r.price}`} onBlur={e => setClassFee(r.grade, parseFloat(e.target.value) || 0)} className="w-24 border border-gray-200 rounded px-1.5 py-1 text-right text-xs" />
-                          </div>
-                        </td>
-                        <td className={`${numCell} text-gray-700`}>{money(r.billed)}</td>
-                        <td className={`${numCell} text-green-700 font-medium`}>{money(r.received)}</td>
-                        <td className={`${numCell} font-medium ${r.owed > 0 ? 'text-red-600' : 'text-gray-400'}`}>{money(r.owed)}</td>
-                        <td className="py-2 px-3 text-center">
-                          {r.discounted > 0
-                            ? <span className="inline-flex items-center gap-1 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-full px-2 py-0.5"><Percent className="h-3 w-3" />{r.discounted}</span>
-                            : <span className="text-xs text-gray-300">—</span>}
-                        </td>
-                      </tr>
-                      {expanded === r.grade && (
-                        <tr className="bg-gray-50/60">
-                          <td colSpan={7} className="px-4 py-3">
-                            <p className="text-xs font-semibold text-gray-500 mb-2">Set a pupil’s tuition (leave blank = class price {money(r.price)}). A lower amount is a discount / bursary.</p>
-                            <div className="space-y-1.5">
-                              {r.studs.map(s => {
-                                const disc = s.tuitionFee != null && s.tuitionFee < r.price;
-                                return (
-                                  <div key={s.id} className="flex items-center gap-2 flex-wrap text-sm">
-                                    <span className="min-w-[160px] text-gray-900">{s.name}</span>
-                                    <span className="text-gray-400 text-xs">K</span>
-                                    <input type="number" min="0" defaultValue={s.tuitionFee ?? ''} key={`tf-${s.id}-${s.tuitionFee ?? ''}`} placeholder={String(r.price)} onBlur={e => setStudentTuition(s.id, e.target.value)} className={`w-24 border rounded px-1.5 py-1 text-right text-xs ${disc ? 'border-amber-300 bg-amber-50' : 'border-gray-200'}`} />
-                                    <input defaultValue={s.tuitionDiscountReason || ''} key={`tr-${s.id}-${s.tuitionDiscountReason || ''}`} placeholder="reason (e.g. staff, bursary)" onBlur={e => setStudentReason(s.id, e.target.value)} className="flex-1 min-w-[160px] border border-gray-200 rounded px-1.5 py-1 text-xs" />
-                                    {disc && <span className="text-xs text-amber-700">−{money(r.price - (s.tuitionFee || 0))}</span>}
-                                    {s.tuitionFee != null && <button onClick={() => resetStudentTuition(s.id)} title="Reset to class price" className="p-1 text-gray-400 hover:text-gray-700"><RotateCcw className="h-3.5 w-3.5" /></button>}
-                                  </div>
-                                );
-                              })}
-                              {r.studs.length === 0 && <p className="text-xs text-gray-400">No pupils in this class.</p>}
-                            </div>
-                          </td>
-                        </tr>
-                      )}
-                    </Fragment>
+                    <tr key={r.grade} className="border-b border-gray-100 hover:bg-gray-50">
+                      <td className="py-2 px-3 font-medium text-gray-900">{r.grade}</td>
+                      <td className={`${numCell} text-gray-600`}>{r.pupils}</td>
+                      <td className={numCell}>
+                        <div className="inline-flex items-center">
+                          <span className="text-gray-400 text-xs mr-1">K</span>
+                          <input type="number" min="0" defaultValue={r.price} key={`price-${r.grade}-${r.price}`} onBlur={e => setClassFee(r.grade, parseFloat(e.target.value) || 0)} className="w-24 border border-gray-200 rounded px-1.5 py-1 text-right text-xs" />
+                        </div>
+                      </td>
+                      <td className={`${numCell} text-gray-700`}>{money(r.billed)}</td>
+                      <td className={`${numCell} text-green-700 font-medium`}>{money(r.received)}</td>
+                      <td className={`${numCell} font-medium ${r.owed > 0 ? 'text-red-600' : 'text-gray-400'}`}>{money(r.owed)}</td>
+                      <td className="py-2 px-3 text-center">
+                        {r.discounted > 0
+                          ? <span className="inline-flex items-center gap-1 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-full px-2 py-0.5"><Percent className="h-3 w-3" />{r.discounted}</span>
+                          : <span className="text-xs text-gray-300">—</span>}
+                      </td>
+                    </tr>
                   ))}
                   {feeRows.length === 0 && <tr><td colSpan={7} className="py-12 text-center text-gray-400">No classes with active pupils yet.</td></tr>}
                 </tbody>
@@ -247,7 +209,7 @@ export function ClassFees() {
               </table>
             </div>
           </div>
-          <p className="text-xs text-gray-400">“Tuition price” edits the class fee (Fee Structure). Expand a class to give a pupil a discounted tuition — that lowers what the class is billed. “Received” = Tuition &amp; Enrollment payments for the selected term; “Owed” = billed − received.</p>
+          <p className="text-xs text-gray-400">“Tuition price” edits the class fee (Fee Structure). Per-pupil discounts are set on the pupil’s profile (Students → view) or at the Office Cashier; they lower what the class is billed and show in the Discounts column. “Received” = Tuition &amp; Enrollment payments for the selected term; “Owed” = billed − received.</p>
         </>
       )}
 
