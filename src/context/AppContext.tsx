@@ -18,6 +18,10 @@ export interface Student {
   transportRouteId?: string;
   teacherParentId?: string;
   photoUrl?: string;
+  // Per-pupil tuition override: when set, this is the tuition charged for this
+  // pupil instead of the class price (used for bursaries / staff discounts).
+  tuitionFee?: number;
+  tuitionDiscountReason?: string;
 }
 
 export type PaymentMethod = 'Cash' | 'Mobile Money' | 'Bank Transfer' | 'Cheque' | 'Other';

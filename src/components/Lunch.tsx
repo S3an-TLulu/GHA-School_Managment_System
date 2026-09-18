@@ -238,7 +238,9 @@ export function Lunch() {
       .map(r => ({ r, s: studentOf(r.studentId) }))
       .filter((x): x is { r: LunchRecord; s: NonNullable<typeof x.s> } => !!x.s)
       .sort((a, b) => gradeRank(a.s.grade) - gradeRank(b.s.grade) || a.s.name.localeCompare(b.s.name));
-    if (kitchenView) list = list.filter(x => willEat(x.r));
+    // Kitchen list prints everyone on lunch (so not-yet-paid eaters still show,
+    // marked as such) unless "only those eating" is ticked.
+    if (kitchenView && onlyEating) list = list.filter(x => willEat(x.r));
     if (!list.length) { toast('No pupils to print for this period yet.', 'warning'); return; }
 
     const head = (cols: string[]) => `<thead><tr>${cols.map(c => `<th${c.startsWith('~') ? ' style="text-align:right"' : ''}>${esc(c.replace(/^~/, ''))}</th>`).join('')}</tr></thead>`;

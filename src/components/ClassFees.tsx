@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Wallet, GraduationCap, Utensils, Bus, Printer, FileDown } from 'lucide-react';
+import { useState, Fragment } from 'react';
+import { GraduationCap, Utensils, Bus, Printer, FileDown, ChevronRight, Percent, RotateCcw } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 import { useThemeClasses } from '../hooks/useThemeClasses';
 import { useToast } from './ToastProvider';
@@ -8,15 +8,22 @@ import { esc, emitDoc, DOC_FONT } from '../lib/print';
 const GRADES = ['Baby Class', 'Middle Class', 'Reception', 'Grade 1', 'Grade 2', 'Grade 3', 'Grade 4', 'Grade 5', 'Grade 6', 'Grade 7'];
 const money = (n: number) => `K${Math.round(n || 0).toLocaleString()}`;
 
-// School fees are kept deliberately separate from lunch and transport here so the
-// office can read each class's tuition position without the extras muddying it.
-// "School fees" = payments of type "Tuition Fee" (+ Enrollment Form); lunch comes
-// from the Lunch List records; transport from bus assignments and Transport fees.
+type Tab = 'fees' | 'lunch' | 'transport';
+
+// School fees, lunch and transport are shown on their own tabs so each stream
+// reads cleanly per class and school-wide. School fees = "Tuition Fee" (+
+// "Enrollment Form") payments; the amount billed comes from the class tuition
+// price, with per-pupil overrides for bursaries / staff discounts.
 export function ClassFees() {
-  const { students, feeStructure, payments, lunchRecords, transportRoutes, terms, currentTerm, branding } = useAppContext();
+  const {
+    students, feeStructure, payments, lunchRecords, transportRoutes, terms, currentTerm, branding,
+    addFeeStructureItem, updateFeeStructureItem, updateStudent,
+  } = useAppContext();
   const tc = useThemeClasses();
   const { toast } = useToast();
+  const [tab, setTab] = useState<Tab>('fees');
   const [term, setTerm] = useState(currentTerm || terms[0] || 'All terms');
+  const [expanded, setExpanded] = useState<string | null>(null);
 
   const activeStudents = students.filter(s => !s.status || s.status === 'active');
   const gradesPresent = [
@@ -24,101 +31,107 @@ export function ClassFees() {
     ...[...new Set(activeStudents.map(s => s.grade))].filter(g => g && !GRADES.includes(g)),
   ];
 
-  const feeFor = (grade: string) => feeStructure.find(f => f.className === grade)?.cashFee || 0;
+  const classFee = (grade: string) => feeStructure.find(f => f.className === grade)?.cashFee || 0;
+  const effTuition = (s: typeof students[number]) => s.tuitionFee ?? classFee(s.grade);
   const routeFee = (routeId?: string) => transportRoutes.find(r => r.id === routeId)?.monthlyFee || 0;
   const matchesTerm = (t?: string) => term === 'All terms' || !t || t === term;
   const isSchoolFee = (type: string) => type === 'Tuition Fee' || type === 'Enrollment Form';
 
-  const rows = gradesPresent.map(grade => {
+  const setClassFee = (grade: string, v: number) => {
+    const item = feeStructure.find(f => f.className === grade);
+    if (item) updateFeeStructureItem(item.id, { cashFee: v });
+    else addFeeStructureItem({ id: `fee-${Date.now()}`, className: grade, description: '', cashFee: v, installmentFee: v });
+  };
+
+  // ---- School fees per class ----
+  const feeRows = gradesPresent.map(grade => {
     const studs = activeStudents.filter(s => s.grade === grade);
     const ids = new Set(studs.map(s => s.id));
-    const pupils = studs.length;
-
-    // School fees — expected per term from the fee structure, paid from tuition payments.
-    const feeExpected = feeFor(grade) * pupils;
-    const feePaid = payments
-      .filter(p => ids.has(p.studentId) && isSchoolFee(p.type) && p.status === 'paid' && matchesTerm(p.term))
-      .reduce((s, p) => s + p.amount, 0);
-    const feeOwing = Math.max(0, feeExpected - feePaid);
-
-    // Lunch — from the Lunch List records (all periods), kept separate from fees.
-    const lunchRecs = lunchRecords.filter(r => ids.has(r.studentId));
-    const lunchDue = lunchRecs.reduce((s, r) => s + (r.amountDue || 0), 0);
-    const lunchPaid = lunchRecs.reduce((s, r) => s + (r.amountPaid || 0), 0);
-    const lunchOwing = Math.max(0, lunchDue - lunchPaid);
-
-    // Transport — expected monthly from bus assignments, paid from transport fees.
-    const transportExpected = studs.reduce((s, st) => s + routeFee(st.transportRouteId), 0);
-    const transportRiders = studs.filter(s => s.transportRouteId).length;
-    const transportPaid = payments
-      .filter(p => ids.has(p.studentId) && p.type === 'Transport' && p.status === 'paid' && matchesTerm(p.term))
-      .reduce((s, p) => s + p.amount, 0);
-
-    return { grade, pupils, feeExpected, feePaid, feeOwing, lunchDue, lunchPaid, lunchOwing, transportExpected, transportRiders, transportPaid };
+    const price = classFee(grade);
+    const billed = studs.reduce((s, st) => s + effTuition(st), 0);
+    const received = payments.filter(p => ids.has(p.studentId) && isSchoolFee(p.type) && p.status === 'paid' && matchesTerm(p.term)).reduce((s, p) => s + p.amount, 0);
+    const owed = Math.max(0, billed - received);
+    const discounted = studs.filter(s => s.tuitionFee != null && s.tuitionFee < price).length;
+    return { grade, studs, pupils: studs.length, price, billed, received, owed, discounted };
+  });
+  // ---- Lunch per class (all periods) ----
+  const lunchRows = gradesPresent.map(grade => {
+    const ids = new Set(activeStudents.filter(s => s.grade === grade).map(s => s.id));
+    const recs = lunchRecords.filter(r => ids.has(r.studentId));
+    const onLunch = new Set(recs.map(r => r.studentId)).size;
+    const received = recs.reduce((s, r) => s + (r.amountPaid || 0), 0);
+    const owed = recs.reduce((s, r) => s + Math.max(0, (r.amountDue || 0) - (r.amountPaid || 0)), 0);
+    return { grade, onLunch, received, owed, billed: received + owed };
+  });
+  // ---- Transport per class ----
+  const transportRows = gradesPresent.map(grade => {
+    const studs = activeStudents.filter(s => s.grade === grade);
+    const ids = new Set(studs.map(s => s.id));
+    const riders = studs.filter(s => s.transportRouteId).length;
+    const expected = studs.reduce((s, st) => s + routeFee(st.transportRouteId), 0);
+    const received = payments.filter(p => ids.has(p.studentId) && p.type === 'Transport' && p.status === 'paid' && matchesTerm(p.term)).reduce((s, p) => s + p.amount, 0);
+    return { grade, riders, received, expected, owed: Math.max(0, expected - received) };
   });
 
-  const tot = rows.reduce((a, r) => ({
-    pupils: a.pupils + r.pupils, feeExpected: a.feeExpected + r.feeExpected, feePaid: a.feePaid + r.feePaid, feeOwing: a.feeOwing + r.feeOwing,
-    lunchDue: a.lunchDue + r.lunchDue, lunchPaid: a.lunchPaid + r.lunchPaid, lunchOwing: a.lunchOwing + r.lunchOwing,
-    transportExpected: a.transportExpected + r.transportExpected, transportRiders: a.transportRiders + r.transportRiders, transportPaid: a.transportPaid + r.transportPaid,
-  }), { pupils: 0, feeExpected: 0, feePaid: 0, feeOwing: 0, lunchDue: 0, lunchPaid: 0, lunchOwing: 0, transportExpected: 0, transportRiders: 0, transportPaid: 0 });
+  const sum = <T,>(rows: T[], k: (r: T) => number) => rows.reduce((s, r) => s + k(r), 0);
+
+  // ---- Per-student tuition edit ----
+  const setStudentTuition = (id: string, raw: string) => {
+    const v = raw.trim() === '' ? undefined : Math.max(0, parseFloat(raw) || 0);
+    updateStudent(id, { tuitionFee: v });
+  };
+  const resetStudentTuition = (id: string) => updateStudent(id, { tuitionFee: undefined, tuitionDiscountReason: undefined });
+  const setStudentReason = (id: string, v: string) => updateStudent(id, { tuitionDiscountReason: v || undefined });
+
+  const TABS: { id: Tab; label: string; icon: typeof GraduationCap }[] = [
+    { id: 'fees', label: 'School Fees', icon: GraduationCap },
+    { id: 'lunch', label: 'Lunch', icon: Utensils },
+    { id: 'transport', label: 'Transport', icon: Bus },
+  ];
 
   const print = (pdf = false) => {
-    if (!rows.length) { toast('No classes with pupils yet.', 'warning'); return; }
-    const body = rows.map(r => `<tr>
-      <td style="border:1px solid #ccc;padding:5px 7px">${esc(r.grade)}</td>
-      <td style="border:1px solid #ccc;padding:5px 7px;text-align:center">${r.pupils}</td>
-      <td style="border:1px solid #ccc;padding:5px 7px;text-align:right">${money(r.feeExpected)}</td>
-      <td style="border:1px solid #ccc;padding:5px 7px;text-align:right;color:#15803d">${money(r.feePaid)}</td>
-      <td style="border:1px solid #ccc;padding:5px 7px;text-align:right;color:${r.feeOwing > 0 ? '#b91c1c' : '#6b7280'}">${money(r.feeOwing)}</td>
-      <td style="border:1px solid #ccc;padding:5px 7px;text-align:right">${money(r.lunchPaid)}</td>
-      <td style="border:1px solid #ccc;padding:5px 7px;text-align:right;color:${r.lunchOwing > 0 ? '#b91c1c' : '#6b7280'}">${money(r.lunchOwing)}</td>
-      <td style="border:1px solid #ccc;padding:5px 7px;text-align:right">${money(r.transportPaid)}</td>
-      <td style="border:1px solid #ccc;padding:5px 7px;text-align:right">${money(r.transportExpected)}/mo</td>
-    </tr>`).join('');
-    const html = `<!DOCTYPE html><html><head><title>Class Fees – ${esc(term)}</title>
-      <style>@page{size:A4 landscape;margin:12mm}body{font-family:${DOC_FONT};color:#111}table{border-collapse:collapse;width:100%;font-size:11px}th{background:#f0f0f0;border:1px solid #ccc;padding:5px 7px;text-align:left}@media print{button{display:none}}</style></head>
+    let cols: string[] = [], body = '', foot = '', title = '';
+    if (tab === 'fees') {
+      title = 'School Fees by Class';
+      cols = ['Class', '~Pupils', '~Tuition price', '~Billed (class total)', '~Received', '~Owed'];
+      body = feeRows.map(r => `<tr><td>${esc(r.grade)}</td><td style="text-align:right">${r.pupils}${r.discounted ? ` (${r.discounted} disc.)` : ''}</td><td style="text-align:right">${money(r.price)}</td><td style="text-align:right">${money(r.billed)}</td><td style="text-align:right;color:#15803d">${money(r.received)}</td><td style="text-align:right;color:${r.owed > 0 ? '#b91c1c' : '#6b7280'}">${money(r.owed)}</td></tr>`).join('');
+      foot = `<tr style="font-weight:700;background:#f7f7f7"><td>Whole school</td><td style="text-align:right">${sum(feeRows, r => r.pupils)}</td><td></td><td style="text-align:right">${money(sum(feeRows, r => r.billed))}</td><td style="text-align:right">${money(sum(feeRows, r => r.received))}</td><td style="text-align:right">${money(sum(feeRows, r => r.owed))}</td></tr>`;
+    } else if (tab === 'lunch') {
+      title = 'Lunch by Class';
+      cols = ['Class', '~On lunch', '~Received', '~Owed', '~Total'];
+      body = lunchRows.map(r => `<tr><td>${esc(r.grade)}</td><td style="text-align:right">${r.onLunch}</td><td style="text-align:right;color:#15803d">${money(r.received)}</td><td style="text-align:right;color:${r.owed > 0 ? '#b91c1c' : '#6b7280'}">${money(r.owed)}</td><td style="text-align:right">${money(r.billed)}</td></tr>`).join('');
+      foot = `<tr style="font-weight:700;background:#f7f7f7"><td>Whole school</td><td style="text-align:right">${sum(lunchRows, r => r.onLunch)}</td><td style="text-align:right">${money(sum(lunchRows, r => r.received))}</td><td style="text-align:right">${money(sum(lunchRows, r => r.owed))}</td><td style="text-align:right">${money(sum(lunchRows, r => r.billed))}</td></tr>`;
+    } else {
+      title = 'Transport by Class';
+      cols = ['Class', '~Riders', '~Received', '~Expected/mo', '~Owed'];
+      body = transportRows.map(r => `<tr><td>${esc(r.grade)}</td><td style="text-align:right">${r.riders}</td><td style="text-align:right;color:#15803d">${money(r.received)}</td><td style="text-align:right">${money(r.expected)}</td><td style="text-align:right;color:${r.owed > 0 ? '#b91c1c' : '#6b7280'}">${money(r.owed)}</td></tr>`).join('');
+      foot = `<tr style="font-weight:700;background:#f7f7f7"><td>Whole school</td><td style="text-align:right">${sum(transportRows, r => r.riders)}</td><td style="text-align:right">${money(sum(transportRows, r => r.received))}</td><td style="text-align:right">${money(sum(transportRows, r => r.expected))}</td><td style="text-align:right">${money(sum(transportRows, r => r.owed))}</td></tr>`;
+    }
+    if (!gradesPresent.length) { toast('No classes with pupils yet.', 'warning'); return; }
+    const head = `<thead><tr>${cols.map(c => `<th${c.startsWith('~') ? ' style="text-align:right"' : ''}>${esc(c.replace(/^~/, ''))}</th>`).join('')}</tr></thead>`;
+    const html = `<!DOCTYPE html><html><head><title>${esc(title)} – ${esc(term)}</title>
+      <style>@page{size:A4 landscape;margin:12mm}body{font-family:${DOC_FONT};color:#111}table{border-collapse:collapse;width:100%;font-size:12px}th,td{border:1px solid #ccc;padding:6px 8px;text-align:left}th{background:#f0f0f0}@media print{button{display:none}}</style></head>
       <body>
         <div style="text-align:center;margin-bottom:10px">
           ${branding.logoUrl ? `<img src="${branding.logoUrl}" style="height:44px;width:44px;object-fit:contain" />` : ''}
           <div style="font-size:16pt;font-weight:700">${esc(branding.schoolName) || 'School'}</div>
-          <div style="font-size:12pt;font-weight:600">Fees by Class — ${esc(term)}</div>
-          <div style="font-size:9pt;color:#555">School fees shown separately from lunch and transport</div>
+          <div style="font-size:12pt;font-weight:600">${esc(title)} — ${esc(term)}</div>
         </div>
-        <table>
-          <thead><tr>
-            <th>Class</th><th style="text-align:center">Pupils</th>
-            <th style="text-align:right">Fees expected/term</th><th style="text-align:right">Fees paid</th><th style="text-align:right">Fees owing</th>
-            <th style="text-align:right">Lunch paid</th><th style="text-align:right">Lunch owing</th>
-            <th style="text-align:right">Transport paid</th><th style="text-align:right">Transport expected</th>
-          </tr></thead>
-          <tbody>${body}</tbody>
-          <tfoot><tr style="font-weight:700;background:#f7f7f7">
-            <td style="border:1px solid #ccc;padding:5px 7px">Total</td>
-            <td style="border:1px solid #ccc;padding:5px 7px;text-align:center">${tot.pupils}</td>
-            <td style="border:1px solid #ccc;padding:5px 7px;text-align:right">${money(tot.feeExpected)}</td>
-            <td style="border:1px solid #ccc;padding:5px 7px;text-align:right">${money(tot.feePaid)}</td>
-            <td style="border:1px solid #ccc;padding:5px 7px;text-align:right">${money(tot.feeOwing)}</td>
-            <td style="border:1px solid #ccc;padding:5px 7px;text-align:right">${money(tot.lunchPaid)}</td>
-            <td style="border:1px solid #ccc;padding:5px 7px;text-align:right">${money(tot.lunchOwing)}</td>
-            <td style="border:1px solid #ccc;padding:5px 7px;text-align:right">${money(tot.transportPaid)}</td>
-            <td style="border:1px solid #ccc;padding:5px 7px;text-align:right">${money(tot.transportExpected)}/mo</td>
-          </tr></tfoot>
-        </table>
-        <p style="margin-top:12px;font-size:9px;color:#888">Printed ${new Date().toLocaleDateString('en-GB')}. Fees = Tuition &amp; Enrollment payments; lunch across all periods; transport from bus assignments.</p>
+        <table>${head}<tbody>${body}</tbody><tfoot>${foot}</tfoot></table>
+        <p style="margin-top:12px;font-size:9px;color:#888">Printed ${new Date().toLocaleDateString('en-GB')}</p>
         <script>window.onload=function(){setTimeout(function(){window.print()},250)}</script>
       </body></html>`;
-    emitDoc(html, `Class_Fees_${term.replace(/\s+/g, '_')}`, pdf ? 'pdf' : 'print');
+    emitDoc(html, `${title.replace(/\s+/g, '_')}_${term.replace(/\s+/g, '_')}`, pdf ? 'pdf' : 'print');
   };
 
-  const th = 'py-2.5 px-3 text-right font-medium';
+  const numCell = 'py-2 px-3 text-right';
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2"><Wallet className="h-6 w-6" />Fees by Class</h1>
-          <p className="text-gray-600">School fees per class, kept separate from lunch and transport</p>
+          <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2"><GraduationCap className="h-6 w-6" />Fees by Class</h1>
+          <p className="text-gray-600">School fees, lunch and transport per class — on their own tabs</p>
         </div>
         <div className="flex items-center gap-2">
           <label className="text-sm text-gray-600">Term
@@ -132,84 +145,190 @@ export function ClassFees() {
         </div>
       </div>
 
-      {/* Separated school-wide totals */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-          <div className="flex items-center gap-2 mb-1"><GraduationCap className="h-4 w-4 text-blue-600" /><p className="text-sm text-blue-700 font-medium">School fees</p></div>
-          <p className="text-2xl font-bold text-blue-900">{money(tot.feePaid)} <span className="text-sm font-normal text-blue-600">paid</span></p>
-          <p className="text-xs text-blue-600 mt-0.5">{money(tot.feeOwing)} owing of {money(tot.feeExpected)} expected</p>
-        </div>
-        <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
-          <div className="flex items-center gap-2 mb-1"><Utensils className="h-4 w-4 text-amber-600" /><p className="text-sm text-amber-700 font-medium">Lunch</p></div>
-          <p className="text-2xl font-bold text-amber-900">{money(tot.lunchPaid)} <span className="text-sm font-normal text-amber-600">paid</span></p>
-          <p className="text-xs text-amber-600 mt-0.5">{money(tot.lunchOwing)} owing · all periods</p>
-        </div>
-        <div className="bg-teal-50 border border-teal-200 rounded-lg p-4">
-          <div className="flex items-center gap-2 mb-1"><Bus className="h-4 w-4 text-teal-600" /><p className="text-sm text-teal-700 font-medium">Transport</p></div>
-          <p className="text-2xl font-bold text-teal-900">{money(tot.transportPaid)} <span className="text-sm font-normal text-teal-600">paid</span></p>
-          <p className="text-xs text-teal-600 mt-0.5">{money(tot.transportExpected)}/mo expected · {tot.transportRiders} riders</p>
-        </div>
+      {/* Tabs */}
+      <div className="flex gap-1 bg-gray-100 rounded-lg p-1 w-fit">
+        {TABS.map(t => (
+          <button key={t.id} onClick={() => setTab(t.id)}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${tab === t.id ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}>
+            <t.icon className="h-4 w-4" />{t.label}
+          </button>
+        ))}
       </div>
 
-      {/* Per-class table with the three streams clearly separated */}
-      <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+      {/* ---------------- SCHOOL FEES ---------------- */}
+      {tab === 'fees' && (
+        <>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            <div className="bg-white border border-gray-200 rounded-lg p-4"><p className="text-sm text-gray-500">Pupils</p><p className="text-2xl font-bold text-gray-900">{sum(feeRows, r => r.pupils)}</p></div>
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4"><p className="text-sm text-blue-700">Billed (all classes)</p><p className="text-2xl font-bold text-blue-900">{money(sum(feeRows, r => r.billed))}</p></div>
+            <div className="bg-green-50 border border-green-200 rounded-lg p-4"><p className="text-sm text-green-700">Received</p><p className="text-2xl font-bold text-green-800">{money(sum(feeRows, r => r.received))}</p></div>
+            <div className={`rounded-lg border p-4 ${sum(feeRows, r => r.owed) > 0 ? 'bg-red-50 border-red-200' : 'bg-white border-gray-200'}`}><p className="text-sm text-gray-500">Owed</p><p className={`text-2xl font-bold ${sum(feeRows, r => r.owed) > 0 ? 'text-red-700' : 'text-gray-900'}`}>{money(sum(feeRows, r => r.owed))}</p></div>
+          </div>
+
+          <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-xs text-gray-500 bg-gray-50 border-b border-gray-200">
+                    <th className="py-2.5 px-3 text-left font-medium">Class</th>
+                    <th className="py-2.5 px-3 text-right font-medium">Pupils</th>
+                    <th className="py-2.5 px-3 text-right font-medium">Tuition price</th>
+                    <th className="py-2.5 px-3 text-right font-medium">Billed (class total)</th>
+                    <th className="py-2.5 px-3 text-right font-medium">Received</th>
+                    <th className="py-2.5 px-3 text-right font-medium">Owed</th>
+                    <th className="py-2.5 px-3 text-center font-medium">Discounts</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {feeRows.map(r => (
+                    <Fragment key={r.grade}>
+                      <tr className="border-b border-gray-100 hover:bg-gray-50">
+                        <td className="py-2 px-3 font-medium text-gray-900">
+                          <button onClick={() => setExpanded(expanded === r.grade ? null : r.grade)} className="inline-flex items-center gap-1 hover:text-blue-600">
+                            <ChevronRight className={`h-4 w-4 transition-transform ${expanded === r.grade ? 'rotate-90' : ''}`} />{r.grade}
+                          </button>
+                        </td>
+                        <td className={`${numCell} text-gray-600`}>{r.pupils}</td>
+                        <td className={numCell}>
+                          <div className="inline-flex items-center">
+                            <span className="text-gray-400 text-xs mr-1">K</span>
+                            <input type="number" min="0" defaultValue={r.price} key={`price-${r.grade}-${r.price}`} onBlur={e => setClassFee(r.grade, parseFloat(e.target.value) || 0)} className="w-24 border border-gray-200 rounded px-1.5 py-1 text-right text-xs" />
+                          </div>
+                        </td>
+                        <td className={`${numCell} text-gray-700`}>{money(r.billed)}</td>
+                        <td className={`${numCell} text-green-700 font-medium`}>{money(r.received)}</td>
+                        <td className={`${numCell} font-medium ${r.owed > 0 ? 'text-red-600' : 'text-gray-400'}`}>{money(r.owed)}</td>
+                        <td className="py-2 px-3 text-center">
+                          {r.discounted > 0
+                            ? <span className="inline-flex items-center gap-1 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-full px-2 py-0.5"><Percent className="h-3 w-3" />{r.discounted}</span>
+                            : <span className="text-xs text-gray-300">—</span>}
+                        </td>
+                      </tr>
+                      {expanded === r.grade && (
+                        <tr className="bg-gray-50/60">
+                          <td colSpan={7} className="px-4 py-3">
+                            <p className="text-xs font-semibold text-gray-500 mb-2">Set a pupil’s tuition (leave blank = class price {money(r.price)}). A lower amount is a discount / bursary.</p>
+                            <div className="space-y-1.5">
+                              {r.studs.map(s => {
+                                const disc = s.tuitionFee != null && s.tuitionFee < r.price;
+                                return (
+                                  <div key={s.id} className="flex items-center gap-2 flex-wrap text-sm">
+                                    <span className="min-w-[160px] text-gray-900">{s.name}</span>
+                                    <span className="text-gray-400 text-xs">K</span>
+                                    <input type="number" min="0" defaultValue={s.tuitionFee ?? ''} key={`tf-${s.id}-${s.tuitionFee ?? ''}`} placeholder={String(r.price)} onBlur={e => setStudentTuition(s.id, e.target.value)} className={`w-24 border rounded px-1.5 py-1 text-right text-xs ${disc ? 'border-amber-300 bg-amber-50' : 'border-gray-200'}`} />
+                                    <input defaultValue={s.tuitionDiscountReason || ''} key={`tr-${s.id}-${s.tuitionDiscountReason || ''}`} placeholder="reason (e.g. staff, bursary)" onBlur={e => setStudentReason(s.id, e.target.value)} className="flex-1 min-w-[160px] border border-gray-200 rounded px-1.5 py-1 text-xs" />
+                                    {disc && <span className="text-xs text-amber-700">−{money(r.price - (s.tuitionFee || 0))}</span>}
+                                    {s.tuitionFee != null && <button onClick={() => resetStudentTuition(s.id)} title="Reset to class price" className="p-1 text-gray-400 hover:text-gray-700"><RotateCcw className="h-3.5 w-3.5" /></button>}
+                                  </div>
+                                );
+                              })}
+                              {r.studs.length === 0 && <p className="text-xs text-gray-400">No pupils in this class.</p>}
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </Fragment>
+                  ))}
+                  {feeRows.length === 0 && <tr><td colSpan={7} className="py-12 text-center text-gray-400">No classes with active pupils yet.</td></tr>}
+                </tbody>
+                {feeRows.length > 0 && (
+                  <tfoot>
+                    <tr className="bg-gray-50 font-semibold text-gray-900 border-t-2 border-gray-200">
+                      <td className="py-2.5 px-3">Whole school</td>
+                      <td className={numCell}>{sum(feeRows, r => r.pupils)}</td>
+                      <td className={numCell}></td>
+                      <td className={numCell}>{money(sum(feeRows, r => r.billed))}</td>
+                      <td className={`${numCell} text-green-700`}>{money(sum(feeRows, r => r.received))}</td>
+                      <td className={`${numCell} text-red-600`}>{money(sum(feeRows, r => r.owed))}</td>
+                      <td className="py-2.5 px-3 text-center">{sum(feeRows, r => r.discounted) || ''}</td>
+                    </tr>
+                  </tfoot>
+                )}
+              </table>
+            </div>
+          </div>
+          <p className="text-xs text-gray-400">“Tuition price” edits the class fee (Fee Structure). Expand a class to give a pupil a discounted tuition — that lowers what the class is billed. “Received” = Tuition &amp; Enrollment payments for the selected term; “Owed” = billed − received.</p>
+        </>
+      )}
+
+      {/* ---------------- LUNCH ---------------- */}
+      {tab === 'lunch' && (
+        <SimpleTable
+          totalsLabel="Whole school"
+          summary={[
+            { label: 'On lunch', value: String(sum(lunchRows, r => r.onLunch)), tone: 'plain' },
+            { label: 'Received', value: money(sum(lunchRows, r => r.received)), tone: 'green' },
+            { label: 'Owed', value: money(sum(lunchRows, r => r.owed)), tone: sum(lunchRows, r => r.owed) > 0 ? 'red' : 'plain' },
+          ]}
+          cols={['Class', 'On lunch', 'Received', 'Owed', 'Total']}
+          rows={lunchRows.map(r => [r.grade, String(r.onLunch), money(r.received), money(r.owed), money(r.billed)])}
+          foot={['', String(sum(lunchRows, r => r.onLunch)), money(sum(lunchRows, r => r.received)), money(sum(lunchRows, r => r.owed)), money(sum(lunchRows, r => r.billed))]}
+          note="Lunch totals come from the Lunch List across all periods."
+        />
+      )}
+
+      {/* ---------------- TRANSPORT ---------------- */}
+      {tab === 'transport' && (
+        <SimpleTable
+          totalsLabel="Whole school"
+          summary={[
+            { label: 'Riders', value: String(sum(transportRows, r => r.riders)), tone: 'plain' },
+            { label: 'Received', value: money(sum(transportRows, r => r.received)), tone: 'green' },
+            { label: 'Expected/mo', value: money(sum(transportRows, r => r.expected)), tone: 'plain' },
+          ]}
+          cols={['Class', 'Riders', 'Received', 'Expected/mo', 'Owed']}
+          rows={transportRows.map(r => [r.grade, String(r.riders), money(r.received), money(r.expected), money(r.owed)])}
+          foot={['', String(sum(transportRows, r => r.riders)), money(sum(transportRows, r => r.received)), money(sum(transportRows, r => r.expected)), money(sum(transportRows, r => r.owed))]}
+          note="Transport totals come from bus assignments and Transport payments for the selected term."
+        />
+      )}
+    </div>
+  );
+}
+
+// Compact per-class table used by the Lunch and Transport tabs.
+function SimpleTable({ cols, rows, foot, totalsLabel, note, summary }: {
+  cols: string[]; rows: string[][]; foot: string[]; totalsLabel: string; note: string;
+  summary: { label: string; value: string; tone: 'plain' | 'green' | 'red' }[];
+}) {
+  const toneCls = { plain: 'bg-white border-gray-200 text-gray-900', green: 'bg-green-50 border-green-200 text-green-800', red: 'bg-red-50 border-red-200 text-red-700' };
+  return (
+    <>
+      <div className="grid grid-cols-3 gap-4">
+        {summary.map(c => (
+          <div key={c.label} className={`border rounded-lg p-4 ${toneCls[c.tone]}`}>
+            <p className="text-sm opacity-80">{c.label}</p>
+            <p className="text-2xl font-bold">{c.value}</p>
+          </div>
+        ))}
+      </div>
+      <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden mt-4">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="text-xs uppercase tracking-wide">
-                <th className="py-2 px-3 text-left bg-gray-100"></th>
-                <th className="py-2 px-3 text-center bg-gray-100"></th>
-                <th colSpan={3} className="py-2 px-3 text-center bg-blue-100 text-blue-800 border-l border-white">School Fees</th>
-                <th colSpan={2} className="py-2 px-3 text-center bg-amber-100 text-amber-800 border-l border-white">Lunch</th>
-                <th colSpan={2} className="py-2 px-3 text-center bg-teal-100 text-teal-800 border-l border-white">Transport</th>
-              </tr>
               <tr className="text-xs text-gray-500 bg-gray-50 border-b border-gray-200">
-                <th className="py-2 px-3 text-left font-medium">Class</th>
-                <th className="py-2 px-3 text-center font-medium">Pupils</th>
-                <th className={`${th} border-l border-gray-200`}>Expected/term</th>
-                <th className={th}>Paid</th>
-                <th className={th}>Owing</th>
-                <th className={`${th} border-l border-gray-200`}>Paid</th>
-                <th className={th}>Owing</th>
-                <th className={`${th} border-l border-gray-200`}>Paid</th>
-                <th className={th}>Expected/mo</th>
+                {cols.map((c, i) => <th key={c} className={`py-2.5 px-3 font-medium ${i === 0 ? 'text-left' : 'text-right'}`}>{c}</th>)}
               </tr>
             </thead>
             <tbody>
               {rows.map(r => (
-                <tr key={r.grade} className="border-b border-gray-100 hover:bg-gray-50">
-                  <td className="py-2 px-3 font-medium text-gray-900">{r.grade}</td>
-                  <td className="py-2 px-3 text-center text-gray-600">{r.pupils}</td>
-                  <td className="py-2 px-3 text-right text-gray-600 border-l border-gray-100">{money(r.feeExpected)}</td>
-                  <td className="py-2 px-3 text-right text-green-700 font-medium">{money(r.feePaid)}</td>
-                  <td className={`py-2 px-3 text-right font-medium ${r.feeOwing > 0 ? 'text-red-600' : 'text-gray-400'}`}>{money(r.feeOwing)}</td>
-                  <td className="py-2 px-3 text-right text-green-700 font-medium border-l border-gray-100">{money(r.lunchPaid)}</td>
-                  <td className={`py-2 px-3 text-right font-medium ${r.lunchOwing > 0 ? 'text-red-600' : 'text-gray-400'}`}>{money(r.lunchOwing)}</td>
-                  <td className="py-2 px-3 text-right text-green-700 font-medium border-l border-gray-100">{money(r.transportPaid)}</td>
-                  <td className="py-2 px-3 text-right text-gray-600">{money(r.transportExpected)}<span className="text-xs text-gray-400">/mo</span></td>
+                <tr key={r[0]} className="border-b border-gray-100 hover:bg-gray-50">
+                  {r.map((cell, i) => <td key={i} className={`py-2 px-3 ${i === 0 ? 'text-left font-medium text-gray-900' : `text-right ${i === 2 ? 'text-green-700 font-medium' : 'text-gray-600'}`}`}>{cell}</td>)}
                 </tr>
               ))}
-              {rows.length === 0 && <tr><td colSpan={9} className="py-12 text-center text-gray-400">No classes with active pupils yet.</td></tr>}
+              {rows.length === 0 && <tr><td colSpan={cols.length} className="py-12 text-center text-gray-400">No classes with active pupils yet.</td></tr>}
             </tbody>
             {rows.length > 0 && (
               <tfoot>
                 <tr className="bg-gray-50 font-semibold text-gray-900 border-t-2 border-gray-200">
-                  <td className="py-2.5 px-3">Total</td>
-                  <td className="py-2.5 px-3 text-center">{tot.pupils}</td>
-                  <td className="py-2.5 px-3 text-right border-l border-gray-100">{money(tot.feeExpected)}</td>
-                  <td className="py-2.5 px-3 text-right text-green-700">{money(tot.feePaid)}</td>
-                  <td className="py-2.5 px-3 text-right text-red-600">{money(tot.feeOwing)}</td>
-                  <td className="py-2.5 px-3 text-right text-green-700 border-l border-gray-100">{money(tot.lunchPaid)}</td>
-                  <td className="py-2.5 px-3 text-right text-red-600">{money(tot.lunchOwing)}</td>
-                  <td className="py-2.5 px-3 text-right text-green-700 border-l border-gray-100">{money(tot.transportPaid)}</td>
-                  <td className="py-2.5 px-3 text-right">{money(tot.transportExpected)}/mo</td>
+                  {foot.map((cell, i) => <td key={i} className={`py-2.5 px-3 ${i === 0 ? 'text-left' : 'text-right'}`}>{i === 0 ? totalsLabel : cell}</td>)}
                 </tr>
               </tfoot>
             )}
           </table>
         </div>
       </div>
-      <p className="text-xs text-gray-400">School fees come from <strong>Tuition&nbsp;Fee</strong> &amp; <strong>Enrollment&nbsp;Form</strong> payments (expected from the Fee Structure per class). Lunch totals come from the Lunch List across all periods; transport from bus assignments and <strong>Transport</strong> payments. Term filter applies to fee &amp; transport payments.</p>
-    </div>
+      <p className="text-xs text-gray-400 mt-3">{note}</p>
+    </>
   );
 }
