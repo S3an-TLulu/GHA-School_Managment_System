@@ -73,7 +73,7 @@ export function StudentModal({ student, onSave, onClose }: StudentModalProps) {
     if (!data.name.trim()) e.name = 'Student name is required.';
     if (!data.guardianName.trim()) e.guardianName = 'Guardian name is required.';
     if (!data.guardianPhone.trim()) e.guardianPhone = 'Guardian phone is required.';
-    else if (!/^[0-9+\s\-]{7,15}$/.test(data.guardianPhone.trim())) e.guardianPhone = 'Enter a valid phone number.';
+    else if (!/^[0-9+\s-]{7,15}$/.test(data.guardianPhone.trim())) e.guardianPhone = 'Enter a valid phone number.';
     if (data.guardianEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.guardianEmail)) e.guardianEmail = 'Enter a valid email address.';
     if (!data.enrollmentDate) e.enrollmentDate = 'Enrollment date is required.';
     return e;

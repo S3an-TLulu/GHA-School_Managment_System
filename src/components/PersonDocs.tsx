@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { Camera, X, Upload, Download, Trash2, FolderOpen, FileText, Image as ImageIcon } from 'lucide-react';
+import { Camera, Upload, Download, Trash2, FolderOpen, FileText } from 'lucide-react';
 import { useAppContext, PersonDocument, DocFolder } from '../context/AppContext';
 import { useToast } from './ToastProvider';
 import { compressImage, fileToDataUrl } from '../lib/images';

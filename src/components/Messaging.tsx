@@ -27,8 +27,6 @@ const STATUS_STYLE: Record<MsgStatus, string> = {
   failed: 'bg-red-100 text-red-800',
 };
 
-const PER_RECIPIENT: MsgChannel[] = ['email', 'whatsapp', 'sms'];
-
 export function Messaging() {
   const { students, debtors, branding } = useAppContext();
   const { toast } = useToast();

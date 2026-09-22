@@ -1,4 +1,4 @@
-import { Generator, Problem, str, num } from '../types';
+import { Generator, Problem, str } from '../types';
 import { gradeTier } from '../grades';
 import { numToWords, capitalise } from '../num2words';
 import { answerLines } from '../svg';

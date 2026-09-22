@@ -1,7 +1,6 @@
-import { Generator, Problem, str, num } from '../types';
+import { Generator, Problem, str } from '../types';
 import { gradeTier } from '../grades';
 import { answerLines } from '../svg';
-import { RNG } from '../rng';
 
 // ---- Unit conversion ----
 type UnitFamily = { name: string; units: { u: string; per: number }[] };

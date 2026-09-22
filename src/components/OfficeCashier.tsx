@@ -4,7 +4,6 @@ import { printHtml, exportPdf } from '../lib/print';
 import { printReceipt } from '../lib/receipt';
 import { useAppContext, PaymentMethod } from '../context/AppContext';
 import { useToast } from './ToastProvider';
-import { useThemeClasses } from '../hooks/useThemeClasses';
 
 const PAYMENT_TYPES = ['Tuition Fee', 'Enrollment Form', 'Lunch', 'Transport', 'Water', 'Assessment Tests', 'Uniform', 'Other'];
 
@@ -15,7 +14,6 @@ function todayISO() {
 export function OfficeCashier() {
   const { students, payments, feeStructure, addPayment, updateStudent, branding, currentTerm } = useAppContext();
   const { toast } = useToast();
-  const tc = useThemeClasses();
 
   const [studentSearch, setStudentSearch] = useState('');
   const [selectedStudent, setSelectedStudent] = useState<typeof students[0] | null>(null);

@@ -3,7 +3,7 @@ import {
   Trophy, Users2, Plus, Trash2, Printer, Download, ArrowLeft, Check, Lock, Pencil,
   Shuffle, Medal, Lightbulb, FileQuestion, X, FileDown, Crown, UserPlus, Image as ImageIcon, FileType2,
 } from 'lucide-react';
-import { useAppContext, Competition, CompetitionEntry, House, HouseMember, SchoolProject, ProjectTask, QuizQuestion, QuestionType } from '../context/AppContext';
+import { useAppContext, Competition, House, HouseMember, SchoolProject, ProjectTask, QuestionType } from '../context/AppContext';
 import { useToast } from './ToastProvider';
 import { useThemeClasses } from '../hooks/useThemeClasses';
 import { leaderboard, entryPoints } from '../lib/scoring';
@@ -463,7 +463,7 @@ export function Tools() {
       setQ({ ...q, question: '', options: ['', '', '', ''], answerText: '', imageData: '' });
       toast('Question added to the bank.', 'success');
     };
-    const toggleSel = (id: string) => setSel(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
+    const toggleSel = (id: string) => setSel(prev => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n; });
     const chosen = () => quizQuestions.filter(x => sel.has(x.id));
     const print = (withAnswers: boolean, out: 'print' | 'pdf' | 'word' = 'print') => {
       const qs = chosen().length > 0 ? chosen() : filtered;

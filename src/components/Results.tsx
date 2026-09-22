@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { GraduationCap, Printer, Save, Plus, Trash2, ChevronDown, FileDown, Table2 } from 'lucide-react';
+import { GraduationCap, Printer, Save, Plus, ChevronDown, FileDown, Table2 } from 'lucide-react';
 import { useAppContext, StudentResult } from '../context/AppContext';
 import { useThemeClasses } from '../hooks/useThemeClasses';
 import { useToast } from './ToastProvider';
@@ -47,11 +47,11 @@ function calcAverage(subjects: Record<string, number>): number {
 }
 
 export function Results() {
-  const { students, results, saveClassResults, deleteResult, terms, branding,
+  const { students, results, saveClassResults, terms, branding,
     subjects: canonicalSubjects, addSubject: addCanonicalSubject, deleteSubject: deleteCanonicalSubject } = useAppContext();
   const TERMS = terms;
   const tc = useThemeClasses();
-  const toast = useToast();
+  const { toast } = useToast();
 
   const [selectedClass, setSelectedClass] = useState(CLASSES[3]);
   const [selectedTerm, setSelectedTerm] = useState(TERMS[0]);
@@ -59,7 +59,6 @@ export function Results() {
   const [newSubject, setNewSubject] = useState('');
   const [editGrid, setEditGrid] = useState<Record<string, Record<string, string>>>({});
   const [isEditing, setIsEditing] = useState(false);
-  const [viewStudent, setViewStudent] = useState<string | null>(null);
 
   const viewingOverall = selectedAssessment === OVERALL;
 
@@ -168,7 +167,7 @@ export function Results() {
     if (isEditing) {
       setEditGrid(prev => {
         const next = { ...prev };
-        Object.keys(next).forEach(sid => { const { [sub]: _, ...rest } = next[sid]; next[sid] = rest; });
+        Object.keys(next).forEach(sid => { const rest = { ...next[sid] }; delete rest[sub]; next[sid] = rest; });
         return next;
       });
     }
@@ -324,7 +323,7 @@ export function Results() {
   // Print every student's full report card in one document (one card per page).
   const printAllCards = (pdf = false) => {
     const withResults = classStudents.filter(s => getStudentResult(s.id));
-    if (withResults.length === 0) { toast.toast?.('No results recorded for this class yet.', 'warning'); return; }
+    if (withResults.length === 0) { toast('No results recorded for this class yet.', 'warning'); return; }
     const card = (student: typeof classStudents[number]) => {
       const result = getStudentResult(student.id)!;
       const avg = calcAverage(result.subjects);
@@ -354,9 +353,6 @@ export function Results() {
     const html = `<!DOCTYPE html><html><head><title>Report Cards — ${selectedClass} — ${selectedTerm}</title><style>@media print{button{display:none}}body{font-family:Arial,sans-serif;padding:16px}</style></head><body>${withResults.map(card).join('')}<script>window.onload=function(){setTimeout(function(){window.print()},300)}</script></body></html>`;
     emitDoc(html, `Report_Cards_${selectedClass}_${selectedTerm}`, pdf);
   };
-
-  const viewResult = viewStudent ? getStudentResult(viewStudent) : null;
-  const viewStudentInfo = viewStudent ? students.find(s => s.id === viewStudent) : null;
 
   return (
     <div className="space-y-6">

@@ -88,7 +88,6 @@ export function Students() {
   const printClassList = (pdf = false) => {
     const roster = filteredStudents;
     if (roster.length === 0) { toast('No students to print.', 'warning'); return; }
-    const gradeRank = (g: string) => { const i = GRADES.indexOf(g); return i === -1 ? 999 : i; };
     const groups = (gradeFilter ? [gradeFilter] : gradesPresent)
       .map(g => ({ grade: g, list: roster.filter(s => s.grade === g).sort((a, b) => a.name.localeCompare(b.name)) }))
       .filter(x => x.list.length > 0);

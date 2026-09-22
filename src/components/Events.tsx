@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Plus, Calendar, Pencil, Trash2, X, DollarSign, Users, ChevronDown, ChevronUp, Check, Download } from 'lucide-react';
+import { Plus, Calendar, Pencil, Trash2, X, DollarSign, Users, Check, Download } from 'lucide-react';
 import { useAppContext, SchoolEvent } from '../context/AppContext';
 import { useToast } from './ToastProvider';
 import { useThemeClasses } from '../hooks/useThemeClasses';
@@ -208,7 +208,7 @@ export function Events() {
   const toggleParticipantPanel = (eventId: string) =>
     setExpandedParticipants(prev => {
       const next = new Set(prev);
-      next.has(eventId) ? next.delete(eventId) : next.add(eventId);
+      if (next.has(eventId)) next.delete(eventId); else next.add(eventId);
       return next;
     });
 
