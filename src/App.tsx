@@ -13,8 +13,13 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 
 // Lazy: every other section is code-split into its own chunk and only fetched
 // when the user first opens it, keeping the initial bundle small.
-const named = <M extends Record<string, unknown>>(loader: () => Promise<M>, key: keyof M) =>
-  lazy(() => loader().then(m => ({ default: m[key] as ComponentType })));
+// Keeps each component's real prop types (e.g. ParentPortal's `onBack`)
+// instead of erasing them to ComponentType<{}> — the previous plain
+// `as ComponentType` cast did that silently, which is why a prop mismatch
+// here wasn't caught until now.
+const named = <M extends Record<string, unknown>, K extends keyof M>(loader: () => Promise<M>, key: K) =>
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- satisfying React.lazy's own ComponentType<any> constraint; callers still get M[K]'s real, specific prop type via Extract.
+  lazy(() => loader().then(m => ({ default: m[key] as Extract<M[K], ComponentType<any>> })));
 
 const Students = named(() => import('./components/Students'), 'Students');
 const FeeStructure = named(() => import('./components/FeeStructure'), 'FeeStructure');

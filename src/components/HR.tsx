@@ -4,6 +4,7 @@ import { printHtml, exportPdf } from '../lib/print';
 import { useAppContext, Teacher, PayrollRecord } from '../context/AppContext';
 import { useToast } from './ToastProvider';
 import { useThemeClasses } from '../hooks/useThemeClasses';
+import { parseMoneyInput, roundMoney } from '../lib/money';
 
 function currentMonth() {
   return new Date().toISOString().slice(0, 7);
@@ -82,16 +83,16 @@ export function HR() {
   const buildRecord = (t: Teacher, markPaid: boolean): PayrollRecord => {
     const d = draftFor(t);
     const existing = recordFor(t.id);
-    const net = (t.baseSalary ?? 0) + (parseFloat(d.allowances) || 0) - monthAdvances(t.id) - (parseFloat(d.feeDeduction) || 0) - (parseFloat(d.otherDeductions) || 0);
+    const net = roundMoney((t.baseSalary ?? 0) + parseMoneyInput(d.allowances) - monthAdvances(t.id) - parseMoneyInput(d.feeDeduction) - parseMoneyInput(d.otherDeductions));
     return {
       id: existing?.id || `pay-${t.id}-${month}`,
       teacherId: t.id,
       month,
       baseSalary: t.baseSalary ?? 0,
-      allowances: parseFloat(d.allowances) || 0,
+      allowances: parseMoneyInput(d.allowances),
       advancesDeducted: monthAdvances(t.id),
-      feeDeduction: parseFloat(d.feeDeduction) || 0,
-      otherDeductions: parseFloat(d.otherDeductions) || 0,
+      feeDeduction: parseMoneyInput(d.feeDeduction),
+      otherDeductions: parseMoneyInput(d.otherDeductions),
       notes: d.notes || undefined,
       status: markPaid ? 'paid' : (existing?.status ?? 'pending'),
       paidDate: markPaid ? (existing?.paidDate || new Date().toISOString()) : existing?.paidDate,
@@ -101,16 +102,16 @@ export function HR() {
   };
 
   const netPay = (r: PayrollRecord) =>
-    r.baseSalary + r.allowances - r.advancesDeducted - r.feeDeduction - r.otherDeductions;
+    roundMoney(r.baseSalary + r.allowances - r.advancesDeducted - r.feeDeduction - r.otherDeductions);
   // How much of a record has actually been paid (legacy 'paid' rows = fully paid).
   const paidOf = (r: PayrollRecord) => r.amountPaid ?? (r.status === 'paid' ? netPay(r) : 0);
-  const balanceOf = (r: PayrollRecord) => netPay(r) - paidOf(r);
+  const balanceOf = (r: PayrollRecord) => roundMoney(netPay(r) - paidOf(r));
 
   // Record a (possibly partial) payment against a teacher's month, updating status.
   const setPaidAmount = (t: Teacher, value: string) => {
     const rec = buildRecord(t, false);
     const net = netPay(rec);
-    const paid = Math.max(0, parseFloat(value) || 0);
+    const paid = Math.max(0, parseMoneyInput(value));
     const status: PayrollRecord['status'] = paid <= 0 ? 'pending' : paid + 0.001 >= net ? 'paid' : 'partial';
     savePayrollRecord({ ...rec, amountPaid: paid, status, paidDate: paid > 0 ? (recordFor(t.id)?.paidDate || new Date().toISOString()) : undefined });
   };

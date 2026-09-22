@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { X, Banknote, Smartphone, Building2, FileText, MoreHorizontal } from 'lucide-react';
 import { useAppContext, PaymentMethod } from '../context/AppContext';
+import { parseMoneyInput, roundMoney } from '../lib/money';
 
 interface PaymentModalProps {
   onSave: (paymentData: ReturnType<typeof buildPayment>) => void;
@@ -22,9 +23,9 @@ const DISCOUNT_REASONS = ['Early payment', 'Sibling discount', 'Bursary / Schola
 
 // Work out the discount amount (clamped to the gross) for the chosen mode.
 function computeDiscount(gross: number, kind: string, value: string) {
-  const v = parseFloat(value) || 0;
-  if (kind === 'percent') return Math.min(gross, Math.max(0, (gross * v) / 100));
-  if (kind === 'amount') return Math.min(gross, Math.max(0, v));
+  const v = parseMoneyInput(value);
+  if (kind === 'percent') return roundMoney(Math.min(gross, Math.max(0, (gross * v) / 100)));
+  if (kind === 'amount') return roundMoney(Math.min(gross, Math.max(0, v)));
   return 0;
 }
 
@@ -34,9 +35,9 @@ function buildPayment(formData: {
   paymentMethod: PaymentMethod; mobileNetwork: string;
   discountKind: string; discountValue: string; discountReason: string;
 }) {
-  const gross = parseFloat(formData.amount) || 0;
+  const gross = parseMoneyInput(formData.amount);
   const discount = computeDiscount(gross, formData.discountKind, formData.discountValue);
-  const net = Math.round((gross - discount) * 100) / 100;
+  const net = roundMoney(gross - discount);
   return {
     id: `payment-${Date.now()}`,
     studentId: formData.studentId,
@@ -52,7 +53,7 @@ function buildPayment(formData: {
     paymentMethod: formData.paymentMethod,
     mobileNetwork: formData.paymentMethod === 'Mobile Money' ? (formData.mobileNetwork || undefined) : undefined,
     grossAmount: discount > 0 ? gross : undefined,
-    discount: discount > 0 ? Math.round(discount * 100) / 100 : undefined,
+    discount: discount > 0 ? discount : undefined,
     discountReason: discount > 0 ? (formData.discountReason || 'Discount') : undefined,
   };
 }
@@ -76,9 +77,9 @@ export function PaymentModal({ onSave, onClose }: PaymentModalProps) {
     discountReason: DISCOUNT_REASONS[0],
   });
 
-  const gross = parseFloat(formData.amount) || 0;
+  const gross = parseMoneyInput(formData.amount);
   const discountAmt = computeDiscount(gross, formData.discountKind, formData.discountValue);
-  const net = Math.round((gross - discountAmt) * 100) / 100;
+  const net = roundMoney(gross - discountAmt);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();

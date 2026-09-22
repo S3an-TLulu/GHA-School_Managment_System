@@ -15,7 +15,7 @@ const ROLE_BLURB: Record<string, string> = {
 
 export function Profile() {
   const { currentUser, setUserPassword } = useAuth();
-  const { teachers, students, payments } = useAppContext();
+  const { teachers, students } = useAppContext();
   const { toast } = useToast();
   const tc = useThemeClasses();
 

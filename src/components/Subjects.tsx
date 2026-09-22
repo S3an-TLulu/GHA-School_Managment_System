@@ -6,7 +6,7 @@ import {
 import { generateResource } from '../lib/aiGenerate';
 import {
   useAppContext, Subject, SubjectTopic, LessonPlan, ProjectTask, WorkGroup,
-  ClassRule, ClassRole, ClassInventoryItem, WishlistItem, QuizQuestion, QuestionType,
+  WishlistItem, QuizQuestion, QuestionType,
 } from '../context/AppContext';
 import { useThemeClasses } from '../hooks/useThemeClasses';
 import { useAuth } from '../context/AuthContext';

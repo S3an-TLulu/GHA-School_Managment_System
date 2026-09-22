@@ -64,7 +64,7 @@ export function Worksheets() {
   const toggleItemLock = (id: string, i: number) => setWs(w => ({ ...w, sections: w.sections.map(s => {
     if (s.id !== id) return s;
     const set = new Set(s.lockedItems ?? []);
-    set.has(i) ? set.delete(i) : set.add(i);
+    if (set.has(i)) set.delete(i); else set.add(i);
     return { ...s, lockedItems: [...set] };
   }) }));
   const applyGradeDefaults = () => setWs(w => ({ ...w, sections: w.sections.map(s => { const g = getGenerator(s.generatorId); return g ? { ...s, settings: { ...g.defaults } } : s; }) }));
