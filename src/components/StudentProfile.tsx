@@ -6,6 +6,7 @@ import { printReceipt, printStatement } from '../lib/receipt';
 import { useThemeClasses } from '../hooks/useThemeClasses';
 import { useToast } from './ToastProvider';
 import { PersonDocuments } from './PersonDocs';
+import { parseMoneyInput, roundMoney } from '../lib/money';
 
 const PAYMENT_TYPES = ['Tuition Fee', 'Enrollment Form', 'Lunch', 'Transport', 'Water', 'Assessment Tests', 'Uniform', 'Other'];
 const METHODS: PaymentMethod[] = ['Cash', 'Mobile Money', 'Bank Transfer', 'Cheque', 'Other'];
@@ -34,9 +35,9 @@ export function StudentProfile({ student, onClose, onEdit }: StudentProfileProps
   // Record-a-payment panel.
   const [showPay, setShowPay] = useState(false);
   const [pay, setPay] = useState({ type: 'Tuition Fee', amount: '', method: 'Cash' as PaymentMethod, receipt: `RCP-${Date.now().toString().slice(-5)}`, discount: '', reason: '', notes: '' });
-  const gross = parseFloat(pay.amount) || 0;
-  const discountAmt = parseFloat(pay.discount) || 0;
-  const netPay = Math.max(0, gross - discountAmt);
+  const gross = parseMoneyInput(pay.amount);
+  const discountAmt = parseMoneyInput(pay.discount);
+  const netPay = Math.max(0, roundMoney(gross - discountAmt));
   const suggested = useMemo(() => (pay.type === 'Tuition Fee' && classFee ? classFee : 0), [pay.type, classFee]);
 
   const recordPayment = () => {
@@ -59,7 +60,7 @@ export function StudentProfile({ student, onClose, onEdit }: StudentProfileProps
   const [tuitionDraft, setTuitionDraft] = useState(student.tuitionFee != null ? String(student.tuitionFee) : '');
   const [reasonDraft, setReasonDraft] = useState(student.tuitionDiscountReason || '');
   const saveTuition = () => {
-    const v = tuitionDraft.trim() === '' ? undefined : Math.max(0, parseFloat(tuitionDraft) || 0);
+    const v = tuitionDraft.trim() === '' ? undefined : Math.max(0, parseMoneyInput(tuitionDraft));
     updateStudent(student.id, { tuitionFee: v, tuitionDiscountReason: v != null ? (reasonDraft || undefined) : undefined });
     toast(v == null ? 'Tuition reset to class price.' : `Tuition set to K${v.toLocaleString()} for ${student.name}.`, 'success');
   };

@@ -4,6 +4,7 @@ import { printHtml, exportPdf } from '../lib/print';
 import { printReceipt } from '../lib/receipt';
 import { useAppContext, PaymentMethod } from '../context/AppContext';
 import { useToast } from './ToastProvider';
+import { parseMoneyInput, roundMoney } from '../lib/money';
 
 const PAYMENT_TYPES = ['Tuition Fee', 'Enrollment Form', 'Lunch', 'Transport', 'Water', 'Assessment Tests', 'Uniform', 'Other'];
 
@@ -28,9 +29,9 @@ export function OfficeCashier() {
   const [successMessage, setSuccessMessage] = useState('');
   const [sessionIds, setSessionIds] = useState<string[]>([]);
 
-  const grossAmt = parseFloat(amount) || 0;
-  const discountAmt = parseFloat(discount) || 0;
-  const netAmt = Math.max(0, grossAmt - discountAmt);
+  const grossAmt = parseMoneyInput(amount);
+  const discountAmt = parseMoneyInput(discount);
+  const netAmt = Math.max(0, roundMoney(grossAmt - discountAmt));
 
   const activeStudents = students.filter(s => !s.status || s.status === 'active');
 
