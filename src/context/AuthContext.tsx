@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { hashPassword, securePassword, verifyPassword, needsRehash, generateMasterCode } from '../lib/auth';
 import { logAudit, setAuditActor } from '../lib/audit';
+import { deriveCloudEmail, ensureCloudAccount, signOutCloud, updateCloudPassword } from '../lib/supabase';
 
 // Sign-in lockout: after this many consecutive failures for a username, further
 // attempts are blocked for LOCKOUT_MS. Tracked per-username in localStorage so a
@@ -160,6 +161,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setAuditActor(user.username);
     setCurrentUser(user);
     logAudit('login', `${user.fullName} (${user.role})`, user.username);
+
+    // Best-effort, non-blocking: also sign this device in to Supabase Auth
+    // (self-provisioning on first use) so Cloud Sync/Live Sync/Messaging
+    // work under the authenticated-only RLS policies. Never awaited — a
+    // slow or unreachable cloud project must never slow down or fail local
+    // sign-in, which stays fully self-contained.
+    ensureCloudAccount(deriveCloudEmail(user), password).catch(() => {});
+
     return { ok: true };
   };
 
@@ -167,6 +176,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (currentUser) logAudit('logout', currentUser.fullName, currentUser.username);
     setAuditActor('system');
     setCurrentUser(null);
+    signOutCloud().catch(() => {});
   };
 
   const addUser = async (user: Omit<AppUser, 'password'> & { password: string }) => {
@@ -186,8 +196,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const hashed = await securePassword(user.username, plainPassword);
     updateUser(id, { password: hashed, mustReset: false });
     // Distinguish an admin resetting someone else vs. a user changing their own.
-    if (currentUser && currentUser.id === id) logAudit('password-change', currentUser.fullName);
-    else logAudit('password-reset', `@${user.username}`);
+    if (currentUser && currentUser.id === id) {
+      logAudit('password-change', currentUser.fullName);
+      // Keep the cloud account's password in step. Only possible for a
+      // self-change: updating another Supabase Auth user's password from
+      // the client would need a service-role key, which never belongs in
+      // the browser — an admin-reset account re-links on that user's next
+      // local login instead (ensureCloudAccount signs up fresh if needed).
+      updateCloudPassword(plainPassword).catch(() => {});
+    } else {
+      logAudit('password-reset', `@${user.username}`);
+    }
   };
 
   const deleteUser = (id: string) => setUsers(prev => {

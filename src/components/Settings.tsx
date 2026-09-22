@@ -6,7 +6,7 @@ import { useToast } from './ToastProvider';
 import { useThemeClasses } from '../hooks/useThemeClasses';
 import { generatePassword } from '../lib/auth';
 import { getAudit, clearAudit, logAudit, AUDIT_LABELS, AuditEntry } from '../lib/audit';
-import { getCloudConfig, saveCloudConfig, pushToCloud, pullFromCloud, testConnection, SETUP_SQL, SETUP_SQL_LIVE, isLiveSyncEnabled, setLiveSyncEnabled, pullAllLive } from '../lib/supabase';
+import { getCloudConfig, saveCloudConfig, pushToCloud, pullFromCloud, testConnection, SETUP_SQL, SETUP_SQL_LIVE, isLiveSyncEnabled, setLiveSyncEnabled, pullAllLive, getCloudAuthStatus, deriveCloudEmail, authorizeEmailsSql } from '../lib/supabase';
 
 const ROLES: UserRole[] = ['Admin', 'Cashier', 'Teacher', 'Viewer'];
 
@@ -157,6 +157,15 @@ export function Settings() {
   const [cloudCfg, setCloudCfg] = useState(getCloudConfig);
   const [cloudBusy, setCloudBusy] = useState(false);
   const [showSql, setShowSql] = useState(false);
+  const [cloudAuth, setCloudAuth] = useState(getCloudAuthStatus);
+
+  // Reflects the Supabase Auth link AuthContext establishes on local login.
+  useEffect(() => {
+    const refresh = () => setCloudAuth(getCloudAuthStatus());
+    refresh();
+    window.addEventListener('gha-cloud-auth', refresh);
+    return () => window.removeEventListener('gha-cloud-auth', refresh);
+  }, []);
   const [liveOn, setLiveOn] = useState(isLiveSyncEnabled);
   const [editingUser, setEditingUser] = useState<AppUser | null>(null);
   const [userModalOpen, setUserModalOpen] = useState(false);
@@ -518,6 +527,28 @@ export function Settings() {
                 </div>
               </div>
 
+              <div className={`border rounded-lg p-4 ${cloudAuth.linked ? 'border-green-200 bg-green-50' : 'border-amber-200 bg-amber-50'}`}>
+                <p className={`font-semibold flex items-center gap-2 ${cloudAuth.linked ? 'text-green-900' : 'text-amber-900'}`}>
+                  <Shield className="h-4 w-4" />Cloud Account {cloudAuth.linked && <span className="text-xs bg-green-200 text-green-800 px-2 py-0.5 rounded-full">Signed in</span>}
+                </p>
+                {cloudAuth.linked ? (
+                  <p className="text-xs text-green-700 mt-1">
+                    Signed in to Supabase Auth as <strong>{cloudAuth.email}</strong>. Push, Pull, Live Sync and
+                    Messaging use this session — required since data access now needs a real login, not just
+                    the anon key (see the setup SQL below).
+                  </p>
+                ) : (
+                  <div className="text-xs text-amber-800 mt-1 space-y-1">
+                    <p>
+                      {cloudAuth.checking ? 'Linking this device to Supabase Auth…'
+                        : cloudAuth.error ? cloudAuth.error
+                        : 'Not signed in yet — this links automatically the next time you sign in to the app locally.'}
+                    </p>
+                    <p>Until this is signed in <em>and</em> your email is authorized (setup SQL below), Push/Pull/Live Sync/Messaging will fail.</p>
+                  </div>
+                )}
+              </div>
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="border border-green-200 bg-green-50 rounded-lg p-4">
                   <p className="font-semibold text-green-900 flex items-center gap-2"><UploadCloud className="h-4 w-4" />Push to Cloud</p>
@@ -600,11 +631,27 @@ export function Settings() {
                 </button>
                 {showSql && (
                   <>
-                    <p className="mt-3 text-xs font-semibold text-gray-500">1) Backup table (already done if push/pull works):</p>
+                    <p className="mt-3 text-xs text-gray-500">
+                      Data access requires a real, authorized sign-in now — an anon key alone is no longer
+                      enough (see ARCHITECTURE_AUDIT.md). Also turn off <strong>Confirm email</strong> in
+                      Supabase → Authentication → Providers → Email, so a staff member's first local login
+                      can link their cloud account immediately, without waiting on a confirmation email that
+                      an internal-only tool has nowhere to send.
+                    </p>
+                    <p className="mt-3 text-xs font-semibold text-gray-500">1) Backup table + the authorized-staff allow-list:</p>
                     <pre className="mt-1 bg-gray-900 text-green-300 text-xs rounded-lg p-4 overflow-x-auto whitespace-pre-wrap">{SETUP_SQL}</pre>
                     <p className="mt-3 text-xs font-semibold text-gray-500">2) Live Sync table (run before enabling Live Sync):</p>
                     <pre className="mt-1 bg-gray-900 text-purple-300 text-xs rounded-lg p-4 overflow-x-auto whitespace-pre-wrap">{SETUP_SQL_LIVE}</pre>
-                    <button onClick={() => { navigator.clipboard.writeText(SETUP_SQL + '\n\n' + SETUP_SQL_LIVE); toast('Both SQL blocks copied.', 'success'); }}
+                    <p className="mt-3 text-xs font-semibold text-gray-500">
+                      3) Authorize your current staff accounts (run again whenever you add a user — each one
+                      links to Supabase Auth automatically on their next local sign-in, but still can't read
+                      or write anything here until their email is on this list):
+                    </p>
+                    <pre className="mt-1 bg-gray-900 text-blue-300 text-xs rounded-lg p-4 overflow-x-auto whitespace-pre-wrap">{authorizeEmailsSql(users.map(deriveCloudEmail)) || '-- add at least one user in Users & Roles first'}</pre>
+                    <button onClick={() => {
+                        navigator.clipboard.writeText([SETUP_SQL, SETUP_SQL_LIVE, authorizeEmailsSql(users.map(deriveCloudEmail))].filter(Boolean).join('\n\n'));
+                        toast('All SQL blocks copied.', 'success');
+                      }}
                       className="mt-2 text-xs text-blue-600 hover:underline">Copy All SQL</button>
                   </>
                 )}

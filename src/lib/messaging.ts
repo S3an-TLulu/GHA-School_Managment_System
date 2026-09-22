@@ -40,7 +40,9 @@ export const CHANNEL_LABELS: Record<MsgChannel, string> = {
 
 // SQL the user runs once in their Supabase SQL editor (same style as the
 // cloud-sync tables in supabase.ts). Realtime is enabled so the app sees status
-// changes the moment the sender updates a row.
+// changes the moment the sender updates a row. Requires gha_authorized_emails
+// to already exist — run the Cloud Sync setup SQL (Settings → Cloud Sync)
+// first if this is a fresh project.
 export const SETUP_SQL_OUTBOX = `create table if not exists public.gha_outbox (
   id uuid primary key default gen_random_uuid(),
   channel text not null,
@@ -56,8 +58,12 @@ export const SETUP_SQL_OUTBOX = `create table if not exists public.gha_outbox (
 );
 alter table public.gha_outbox enable row level security;
 drop policy if exists "gha outbox anon access" on public.gha_outbox;
-create policy "gha outbox anon access" on public.gha_outbox
-  for all using (true) with check (true);
+drop policy if exists "gha outbox authenticated access" on public.gha_outbox;
+drop policy if exists "gha outbox authorized staff access" on public.gha_outbox;
+create policy "gha outbox authorized staff access" on public.gha_outbox
+  for all to authenticated
+  using (exists (select 1 from public.gha_authorized_emails a where a.email = auth.jwt() ->> 'email'))
+  with check (exists (select 1 from public.gha_authorized_emails a where a.email = auth.jwt() ->> 'email'));
 alter publication supabase_realtime add table public.gha_outbox;`;
 
 // ---- Channel configuration (which channels are switched on) ----

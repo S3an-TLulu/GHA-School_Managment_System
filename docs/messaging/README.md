@@ -97,7 +97,9 @@ retry button).
 ## Security notes
 
 - Provider secrets live only in Supabase Edge Function secrets — never in the app.
-- `gha_outbox` currently uses the same open RLS as the other GHA tables. Before
-  going live with real parent contacts, tighten its policy (e.g. require a shared
-  key) so a leaked anon key can't be used to blast messages.
+- `gha_outbox`, like the other GHA tables, now requires a signed-in, authorized
+  Supabase Auth session (see `SETUP_SQL` in Settings → Cloud Sync and
+  `SETUP_SQL_OUTBOX` in the Setup tab here) — the anon key alone can no longer
+  read or write it. `gha-sender` is unaffected: it uses the service-role key,
+  which bypasses RLS entirely.
 - Keep an opt-out flag per guardian and honour STOP replies once two-way is added.
