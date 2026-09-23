@@ -7,6 +7,7 @@ import { useToast } from './ToastProvider';
 import { waLink, buildFeeReminder } from '../lib/notify';
 import { PersonDocuments } from './PersonDocs';
 import { summarizePayments } from '../lib/feeLedger';
+import { nextReceiptNumbers } from '../lib/receiptNumber';
 
 const RELATIONS = ['Mother', 'Father', 'Guardian', 'Grandparent', 'Other'];
 const uid = (p: string) => `${p}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
@@ -96,7 +97,7 @@ export function FamilyStatements() {
     addPayment({
       id: `pay-${Date.now()}`, studentId, type: 'Fees', amount: amt,
       dueDate: now, status: 'paid', paidDate: now, createdDate: now,
-      term: currentTerm, receiptNumber: `RCP-${Date.now().toString().slice(-6)}`, paymentMethod: 'Cash',
+      term: currentTerm, receiptNumber: nextReceiptNumbers(1, payments.map(p => p.receiptNumber))[0], paymentMethod: 'Cash',
     });
     toast(`K${amt.toLocaleString()} recorded for ${studentName}.`, 'success');
   };

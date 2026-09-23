@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Users, CheckCircle2, Circle, Printer, CreditCard, AlertCircle, Banknote, Smartphone, Building2, FileText, FileDown } from 'lucide-react';
 import { printHtml, exportPdf } from '../lib/print';
 import { useAppContext, Payment, PaymentMethod } from '../context/AppContext';
+import { nextReceiptNumbers } from '../lib/receiptNumber';
 
 const CLASSES = ['Baby Class', 'Middle Class', 'Reception', 'Grade 1', 'Grade 2', 'Grade 3', 'Grade 4', 'Grade 5', 'Grade 6', 'Grade 7'];
 
@@ -9,9 +10,6 @@ const FEE_TYPES = ['Tuition Fee', 'Lunch', 'Transport', 'Assessment Tests', 'Wat
 
 function generateId() {
   return `pay-bulk-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
-}
-function generateReceipt() {
-  return `RCP-${Date.now().toString().slice(-6)}`;
 }
 
 export function BulkFeeCollection() {
@@ -87,7 +85,8 @@ export function BulkFeeCollection() {
   const recordPayments = () => {
     if (!amount || selectedIds.size === 0) return;
     const batch: Payment[] = [];
-    selectedIds.forEach(studentId => {
+    const receipts = nextReceiptNumbers(selectedIds.size, payments.map(p => p.receiptNumber));
+    [...selectedIds].forEach((studentId, i) => {
       const payment: Payment = {
         id: generateId(),
         studentId,
@@ -98,7 +97,7 @@ export function BulkFeeCollection() {
         paidDate: payDate,
         createdDate: new Date().toISOString(),
         term: currentTerm,
-        receiptNumber: generateReceipt(),
+        receiptNumber: receipts[i],
         paymentMethod,
       };
       addPayment(payment);
