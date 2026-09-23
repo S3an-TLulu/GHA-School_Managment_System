@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { getCloudConfig, pushToCloud, isLiveSyncEnabled, pushKeyLive, subscribeLive, pullAllLive } from '../lib/supabase';
 import { logAudit } from '../lib/audit';
+import { syncFamilyMembership, clearFamilyMembership, removeStudentFromFamilies } from '../lib/family';
 
 export interface Student {
   id: string;
@@ -22,6 +23,13 @@ export interface Student {
   // pupil instead of the class price (used for bursaries / staff discounts).
   tuitionFee?: number;
   tuitionDiscountReason?: string;
+  // The managed Family this student belongs to (Families & Guardians), kept in
+  // sync with Family.studentIds by addFamily/updateFamily/deleteFamily below —
+  // this is what siblings/family grouping should key off, not guardianPhone.
+  // Optional because most students won't have an explicit Family record until
+  // an admin creates or links one; guardianName/guardianPhone remain the
+  // fallback for that case.
+  familyId?: string;
 }
 
 export type PaymentMethod = 'Cash' | 'Mobile Money' | 'Bank Transfer' | 'Cheque' | 'Other';
@@ -1164,6 +1172,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setUniforms(prev => prev.filter(u => u.studentId !== id));
     setRequirements(prev => prev.filter(r => r.studentId !== id));
     setResults(prev => prev.filter(r => r.studentId !== id));
+    setFamilies(prev => removeStudentFromFamilies(prev, id));
   };
 
   const nameForStudent = (sid: string) => {
@@ -1355,9 +1364,24 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const addWorksheet = (w: Worksheet) => setWorksheets(prev => [w, ...prev]);
   const updateWorksheet = (id: string, u: Partial<Worksheet>) => setWorksheets(prev => prev.map(w => w.id === id ? { ...w, ...u } : w));
   const deleteWorksheet = (id: string) => setWorksheets(prev => prev.filter(w => w.id !== id));
-  const addFamily = (f: Family) => setFamilies(prev => [f, ...prev]);
-  const updateFamily = (id: string, u: Partial<Family>) => setFamilies(prev => prev.map(f => f.id === id ? { ...f, ...u } : f));
-  const deleteFamily = (id: string) => setFamilies(prev => prev.filter(f => f.id !== id));
+  // See lib/family.ts — these three keep Student.familyId in sync with the
+  // Family record's studentIds, which stays the single thing an admin
+  // actually edits (the Family editor in Families & Guardians).
+  const addFamily = (f: Family) => {
+    setFamilies(prev => [f, ...prev]);
+    if (f.studentIds.length) setStudents(prev => syncFamilyMembership(prev, f.id, [], f.studentIds));
+  };
+  const updateFamily = (id: string, u: Partial<Family>) => {
+    setFamilies(prev => prev.map(f => f.id === id ? { ...f, ...u } : f));
+    if (u.studentIds) {
+      const before = families.find(f => f.id === id)?.studentIds ?? [];
+      setStudents(prev => syncFamilyMembership(prev, id, before, u.studentIds!));
+    }
+  };
+  const deleteFamily = (id: string) => {
+    setFamilies(prev => prev.filter(f => f.id !== id));
+    setStudents(prev => clearFamilyMembership(prev, id));
+  };
   const addLunchRecord = (r: LunchRecord) => setLunchRecords(prev => [...prev, r]);
   const updateLunchRecord = (id: string, u: Partial<LunchRecord>) => setLunchRecords(prev => prev.map(r => r.id === id ? { ...r, ...u } : r));
   const deleteLunchRecord = (id: string) => setLunchRecords(prev => prev.filter(r => r.id !== id));
