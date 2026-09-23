@@ -58,9 +58,14 @@ export function ParentPortal({ onBack }: { onBack: () => void }) {
   }
 
   // ---- Signed-in view ----
-  // Siblings: other children on the same guardian phone, so a parent can switch.
-  const guardianKey = normalizeZmPhone(student.guardianPhone || '');
-  const siblings = students.filter(s => normalizeZmPhone(s.guardianPhone || '') === guardianKey && (!s.status || s.status === 'active'));
+  // Siblings: other children in the same managed Family (Families & Guardians)
+  // when this student has one — the authoritative grouping, immune to a wrong
+  // or reused guardian phone silently merging or splitting a family. Students
+  // not yet linked to a Family (the common case until an admin sets one up)
+  // fall back to matching by guardian phone, same as before.
+  const siblings = student.familyId
+    ? students.filter(s => s.familyId === student.familyId && (!s.status || s.status === 'active'))
+    : students.filter(s => normalizeZmPhone(s.guardianPhone || '') === normalizeZmPhone(student.guardianPhone || '') && (!s.status || s.status === 'active'));
 
   const myPayments = payments.filter(p => p.studentId === student.id);
   const paid = myPayments.filter(p => p.status === 'paid').reduce((a, p) => a + p.amount, 0);
