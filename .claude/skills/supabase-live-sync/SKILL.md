@@ -9,7 +9,7 @@ This app has no backend — Supabase is used only as an optional cloud mirror
 of `localStorage`. There are **two independent sync mechanisms** plus a
 message outbox, all gated by the same auth model. Get the auth model wrong
 and you either lock everyone out or reopen the security hole fixed in
-`ARCHITECTURE_AUDIT.md` §0 — read that section before changing RLS or the
+`docs/ARCHITECTURE_AUDIT.md` §0 — read that section before changing RLS or the
 auth flow.
 
 ## The three tables

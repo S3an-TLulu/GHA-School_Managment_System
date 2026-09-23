@@ -1,5 +1,5 @@
 // Centralized money math. Plain JavaScript floats still hold Kwacha amounts
-// throughout the app (see ARCHITECTURE_AUDIT.md §3/§7 — moving to integer
+// throughout the app (see docs/ARCHITECTURE_AUDIT.md §3/§7 — moving to integer
 // minor units is a bigger, separate data-model change) but every rounding
 // and summing operation should go through here instead of being reinvented
 // per call site, since a naive `Math.round(n * 100) / 100` gets classic

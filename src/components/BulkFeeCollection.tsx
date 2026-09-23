@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Users, CheckCircle2, Circle, Printer, CreditCard, AlertCircle, Banknote, Smartphone, Building2, FileText, FileDown } from 'lucide-react';
 import { printHtml, exportPdf } from '../lib/print';
 import { useAppContext, Payment, PaymentMethod } from '../context/AppContext';
+import { nextReceiptNumbers } from '../lib/receiptNumber';
 
 const CLASSES = ['Baby Class', 'Middle Class', 'Reception', 'Grade 1', 'Grade 2', 'Grade 3', 'Grade 4', 'Grade 5', 'Grade 6', 'Grade 7'];
 
@@ -9,9 +10,6 @@ const FEE_TYPES = ['Tuition Fee', 'Lunch', 'Transport', 'Assessment Tests', 'Wat
 
 function generateId() {
   return `pay-bulk-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
-}
-function generateReceipt() {
-  return `RCP-${Date.now().toString().slice(-6)}`;
 }
 
 export function BulkFeeCollection() {
@@ -84,10 +82,13 @@ export function BulkFeeCollection() {
     }
   };
 
+  const validAmount = Number(amount) > 0;
+
   const recordPayments = () => {
-    if (!amount || selectedIds.size === 0) return;
+    if (!validAmount || selectedIds.size === 0) return;
     const batch: Payment[] = [];
-    selectedIds.forEach(studentId => {
+    const receipts = nextReceiptNumbers(selectedIds.size, payments.map(p => p.receiptNumber));
+    [...selectedIds].forEach((studentId, i) => {
       const payment: Payment = {
         id: generateId(),
         studentId,
@@ -98,7 +99,7 @@ export function BulkFeeCollection() {
         paidDate: payDate,
         createdDate: new Date().toISOString(),
         term: currentTerm,
-        receiptNumber: generateReceipt(),
+        receiptNumber: receipts[i],
         paymentMethod,
       };
       addPayment(payment);
@@ -310,7 +311,7 @@ export function BulkFeeCollection() {
             )}
             <button
               onClick={recordPayments}
-              disabled={selectedIds.size === 0 || !amount || saved}
+              disabled={selectedIds.size === 0 || !validAmount || saved}
               className="flex items-center space-x-2 bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium">
               <CreditCard className="h-4 w-4" />
               <span>Record {selectedIds.size > 0 ? `${selectedIds.size} Payment${selectedIds.size > 1 ? 's' : ''}` : 'Payments'}</span>
@@ -328,10 +329,10 @@ export function BulkFeeCollection() {
           </div>
         )}
 
-        {selectedIds.size > 0 && !amount && (
+        {selectedIds.size > 0 && !validAmount && (
           <div className="mt-4 flex items-center space-x-2 text-amber-700 bg-amber-50 rounded-lg p-3">
             <AlertCircle className="h-4 w-4 flex-shrink-0" />
-            <p className="text-sm">Enter an amount before recording payments.</p>
+            <p className="text-sm">Enter an amount greater than zero before recording payments.</p>
           </div>
         )}
       </div>

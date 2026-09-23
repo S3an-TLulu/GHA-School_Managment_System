@@ -1,5 +1,6 @@
 import { Payment, Student, SchoolBranding } from '../context/AppContext';
 import { esc, printHtml, exportPdf, DOC_FONT } from './print';
+import { summarizeByTerm, summarizePayments } from './feeLedger';
 
 const money = (n: number) => `K${Math.round(n || 0).toLocaleString()}`;
 const dateStr = (iso?: string) => iso ? new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }) : '—';
@@ -81,16 +82,10 @@ export function printReceipt(payment: Payment, student: Student, branding: Schoo
 // A full account statement (fees ledger) for one pupil.
 export function printStatement(student: Student, payments: Payment[], branding: SchoolBranding, pdf = false) {
   const ps = [...payments].sort((a, b) => (a.paidDate || a.dueDate || a.createdDate || '').localeCompare(b.paidDate || b.dueDate || b.createdDate || ''));
-  const charged = ps.reduce((s, p) => s + p.amount, 0);
-  const paid = ps.filter(p => p.status === 'paid').reduce((s, p) => s + p.amount, 0);
-  const outstanding = ps.filter(p => p.status !== 'paid').reduce((s, p) => s + p.amount, 0);
+  const { charged, paid, outstanding } = summarizePayments(ps);
 
-  const terms = [...new Set(ps.map(p => p.term || '—'))];
-  const termRows = terms.map(t => {
-    const tp = ps.filter(p => (p.term || '—') === t);
-    const c = tp.reduce((s, p) => s + p.amount, 0);
-    const pd = tp.filter(p => p.status === 'paid').reduce((s, p) => s + p.amount, 0);
-    return `<tr><td style="padding:6px 8px;border-bottom:1px solid #eee">${esc(t)}</td><td style="padding:6px 8px;border-bottom:1px solid #eee;text-align:right">${money(c)}</td><td style="padding:6px 8px;border-bottom:1px solid #eee;text-align:right;color:#15803d">${money(pd)}</td><td style="padding:6px 8px;border-bottom:1px solid #eee;text-align:right;color:${c - pd > 0 ? '#b91c1c' : '#6b7280'}">${money(c - pd)}</td></tr>`;
+  const termRows = summarizeByTerm(ps).map(({ term: t, charged: c, paid: pd, balance }) => {
+    return `<tr><td style="padding:6px 8px;border-bottom:1px solid #eee">${esc(t)}</td><td style="padding:6px 8px;border-bottom:1px solid #eee;text-align:right">${money(c)}</td><td style="padding:6px 8px;border-bottom:1px solid #eee;text-align:right;color:#15803d">${money(pd)}</td><td style="padding:6px 8px;border-bottom:1px solid #eee;text-align:right;color:${balance > 0 ? '#b91c1c' : '#6b7280'}">${money(balance)}</td></tr>`;
   }).join('');
 
   const ledger = ps.length ? ps.map(p => `<tr>

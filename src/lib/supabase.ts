@@ -10,7 +10,7 @@ import { createClient, SupabaseClient, RealtimeChannel } from '@supabase/supabas
 // of these tables. `to authenticated` alone is not enough — Supabase
 // Auth's email/password sign-up is open to anyone who has the anon key
 // (that's normal and expected), so without the allow-list check a stranger
-// could self-register and still pass RLS. See ARCHITECTURE_AUDIT.md §0/§10.
+// could self-register and still pass RLS. See docs/ARCHITECTURE_AUDIT.md §0/§10.
 
 export const DEFAULT_SUPABASE_URL = 'https://tlcehbvzniujzjxiyokl.supabase.co';
 // Anon/publishable key — safe to ship in the client; data access is governed
@@ -211,7 +211,7 @@ export function subscribeLive(onRemoteChange: (key: string, data: unknown) => vo
 
 // ---------------- Cloud auth ----------------
 // Real Supabase Auth sessions, required by RLS on every gha_* table since
-// the "do it right" security fix (see ARCHITECTURE_AUDIT.md §0). A local
+// the "do it right" security fix (see docs/ARCHITECTURE_AUDIT.md §0). A local
 // app login (username + password, from AuthContext) has no relationship to
 // Supabase on its own; ensureCloudAccount() is how a local sign-in also
 // becomes an authenticated Supabase session, using the same credentials.
