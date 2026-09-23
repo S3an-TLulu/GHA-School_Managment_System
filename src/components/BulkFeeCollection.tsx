@@ -82,8 +82,10 @@ export function BulkFeeCollection() {
     }
   };
 
+  const validAmount = Number(amount) > 0;
+
   const recordPayments = () => {
-    if (!amount || selectedIds.size === 0) return;
+    if (!validAmount || selectedIds.size === 0) return;
     const batch: Payment[] = [];
     const receipts = nextReceiptNumbers(selectedIds.size, payments.map(p => p.receiptNumber));
     [...selectedIds].forEach((studentId, i) => {
@@ -309,7 +311,7 @@ export function BulkFeeCollection() {
             )}
             <button
               onClick={recordPayments}
-              disabled={selectedIds.size === 0 || !amount || saved}
+              disabled={selectedIds.size === 0 || !validAmount || saved}
               className="flex items-center space-x-2 bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium">
               <CreditCard className="h-4 w-4" />
               <span>Record {selectedIds.size > 0 ? `${selectedIds.size} Payment${selectedIds.size > 1 ? 's' : ''}` : 'Payments'}</span>
@@ -327,10 +329,10 @@ export function BulkFeeCollection() {
           </div>
         )}
 
-        {selectedIds.size > 0 && !amount && (
+        {selectedIds.size > 0 && !validAmount && (
           <div className="mt-4 flex items-center space-x-2 text-amber-700 bg-amber-50 rounded-lg p-3">
             <AlertCircle className="h-4 w-4 flex-shrink-0" />
-            <p className="text-sm">Enter an amount before recording payments.</p>
+            <p className="text-sm">Enter an amount greater than zero before recording payments.</p>
           </div>
         )}
       </div>
