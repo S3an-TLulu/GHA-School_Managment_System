@@ -7,6 +7,19 @@ This is a Phase 1 audit only. **No destructive or structural changes have been
 made.** It exists to give a shared, accurate picture of the system before any
 refactor, security fix, or database migration begins.
 
+> **Status as of 2026-09-23.** The body below is the original snapshot and is
+> kept unedited as a record. Several findings have since been addressed;
+> check this table before acting on any section. Live tracking lives in
+> [`TECHNICAL_DEBT.md`](TECHNICAL_DEBT.md) and [`ROADMAP.md`](ROADMAP.md).
+>
+> | Finding | Status |
+> |---|---|
+> | §0 / §4.1 Open `using (true)` RLS | **Fixed in code** (PR #46): Supabase Auth + `gha_authorized_emails` allow-list. The production project is only protected once an admin re-runs the updated setup SQL. That has not been verified from the repo. |
+> | §4.7 No CI quality gate | **Fixed** (PR #47): `ci.yml` and `deploy.yml` run typecheck, lint, test, build |
+> | §7.5 Centralize money math | **Partly done**: `lib/money.ts` (PR #47), `lib/feeLedger.ts` (2026-09-23) |
+> | §5 Families not first-class | **In progress**: open PR #49 (`Student.familyId`) |
+> | Everything else | Open. See `TECHNICAL_DEBT.md` |
+
 ---
 
 ## 0. Critical — read this first

@@ -633,7 +633,7 @@ export function Settings() {
                   <>
                     <p className="mt-3 text-xs text-gray-500">
                       Data access requires a real, authorized sign-in now — an anon key alone is no longer
-                      enough (see ARCHITECTURE_AUDIT.md). Also turn off <strong>Confirm email</strong> in
+                      enough (see docs/ARCHITECTURE_AUDIT.md). Also turn off <strong>Confirm email</strong> in
                       Supabase → Authentication → Providers → Email, so a staff member's first local login
                       can link their cloud account immediately, without waiting on a confirmation email that
                       an internal-only tool has nowhere to send.

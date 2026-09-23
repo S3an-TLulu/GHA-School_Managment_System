@@ -155,7 +155,7 @@ sign-in — not just the anon key. Signing in to the app locally links (or
 creates) a matching Supabase Auth account for you automatically, but an admin
 still has to add your email to the `gha_authorized_emails` allow-list once
 (SQL provided in *Settings → Cloud Sync*) before Push/Pull/Live Sync/Messaging
-will work for you. See `ARCHITECTURE_AUDIT.md` for why this changed.
+will work for you. See `docs/ARCHITECTURE_AUDIT.md` for why this changed.
 
 **Golden rule:** download a local backup (*Settings → Backup & Restore*) before any
 big change, and regularly — browser storage can be lost by clearing browsing data.
