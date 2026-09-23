@@ -6,6 +6,7 @@ import { useThemeClasses } from '../hooks/useThemeClasses';
 import { useToast } from './ToastProvider';
 import { waLink, buildFeeReminder } from '../lib/notify';
 import { PersonDocuments } from './PersonDocs';
+import { summarizePayments } from '../lib/feeLedger';
 
 const RELATIONS = ['Mother', 'Father', 'Guardian', 'Grandparent', 'Other'];
 const uid = (p: string) => `${p}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
@@ -36,12 +37,8 @@ export function FamilyStatements() {
   const activeStudents = students.filter(s => !s.status || s.status === 'active');
 
   const totalsFor = (ids: string[]) => {
-    const ps = payments.filter(p => ids.includes(p.studentId));
-    return {
-      totalPaid: ps.filter(p => p.status === 'paid').reduce((s, p) => s + p.amount, 0),
-      totalPending: ps.filter(p => p.status === 'pending').reduce((s, p) => s + p.amount, 0),
-      totalOverdue: ps.filter(p => p.status === 'overdue').reduce((s, p) => s + p.amount, 0),
-    };
+    const t = summarizePayments(payments.filter(p => ids.includes(p.studentId)));
+    return { totalPaid: t.paid, totalPending: t.pending, totalOverdue: t.overdue };
   };
 
   // Explicit managed families first, then derived groups for any remaining students.

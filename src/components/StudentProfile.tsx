@@ -7,6 +7,7 @@ import { useThemeClasses } from '../hooks/useThemeClasses';
 import { useToast } from './ToastProvider';
 import { PersonDocuments } from './PersonDocs';
 import { parseMoneyInput, roundMoney } from '../lib/money';
+import { summarizeByTerm, summarizePayments } from '../lib/feeLedger';
 
 const PAYMENT_TYPES = ['Tuition Fee', 'Enrollment Form', 'Lunch', 'Transport', 'Water', 'Assessment Tests', 'Uniform', 'Other'];
 const METHODS: PaymentMethod[] = ['Cash', 'Mobile Money', 'Bank Transfer', 'Cheque', 'Other'];
@@ -75,20 +76,13 @@ export function StudentProfile({ student, onClose, onEdit }: StudentProfileProps
     .filter(r => r.studentId === student.id)
     .sort((a, b) => b.term.localeCompare(a.term));
 
-  const totalPaid = studentPayments.filter(p => p.status === 'paid').reduce((s, p) => s + p.amount, 0);
-  const totalPending = studentPayments.filter(p => p.status === 'pending').reduce((s, p) => s + p.amount, 0);
-  const totalOverdue = studentPayments.filter(p => p.status === 'overdue').reduce((s, p) => s + p.amount, 0);
-  const totalCharged = studentPayments.reduce((s, p) => s + p.amount, 0);
-  const outstanding = totalPending + totalOverdue;
+  const {
+    paid: totalPaid, pending: totalPending, overdue: totalOverdue,
+    charged: totalCharged, outstanding,
+  } = summarizePayments(studentPayments);
 
   // Payments tabulated by term for a quick statement view.
-  const terms = [...new Set(studentPayments.map(p => p.term || '—'))];
-  const byTerm = terms.map(t => {
-    const ps = studentPayments.filter(p => (p.term || '—') === t);
-    const charged = ps.reduce((s, p) => s + p.amount, 0);
-    const paid = ps.filter(p => p.status === 'paid').reduce((s, p) => s + p.amount, 0);
-    return { term: t, charged, paid, balance: charged - paid };
-  });
+  const byTerm = summarizeByTerm(studentPayments);
 
   const toInput = (iso?: string) => (iso ? iso.split('T')[0] : '');
   const setDate = (id: string, field: 'dueDate' | 'paidDate', val: string) =>
