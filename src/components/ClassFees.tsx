@@ -1,10 +1,12 @@
 import { useState } from 'react';
-import { GraduationCap, Utensils, Bus, Printer, FileDown, Percent, Users, FileSpreadsheet } from 'lucide-react';
-import { useAppContext } from '../context/AppContext';
+import { GraduationCap, Utensils, Bus, Printer, FileDown, Percent, Users, FileSpreadsheet, MoreVertical, Eye, Pencil } from 'lucide-react';
+import { useAppContext, Student } from '../context/AppContext';
 import { useThemeClasses } from '../hooks/useThemeClasses';
 import { useToast } from './ToastProvider';
 import { esc, emitDoc, DOC_FONT } from '../lib/print';
 import { exportCSV } from '../lib/exports';
+import { StudentProfile } from './StudentProfile';
+import { StudentModal } from './StudentModal';
 
 const GRADES = ['Baby Class', 'Middle Class', 'Reception', 'Grade 1', 'Grade 2', 'Grade 3', 'Grade 4', 'Grade 5', 'Grade 6', 'Grade 7'];
 const money = (n: number) => `K${Math.round(n || 0).toLocaleString()}`;
@@ -18,12 +20,17 @@ type Tab = 'fees' | 'pupils' | 'lunch' | 'transport';
 export function ClassFees() {
   const {
     students, feeStructure, payments, lunchRecords, transportRoutes, terms, currentTerm, branding,
-    addFeeStructureItem, updateFeeStructureItem,
+    addFeeStructureItem, updateFeeStructureItem, updateStudent,
   } = useAppContext();
   const tc = useThemeClasses();
   const { toast } = useToast();
   const [tab, setTab] = useState<Tab>('fees');
   const [term, setTerm] = useState(currentTerm || terms[0] || 'All terms');
+  // Row actions on the Tuition by Pupil tab (view profile / edit details).
+  const [menuFor, setMenuFor] = useState<{ id: string; x: number; y: number } | null>(null);
+  const [profileStudent, setProfileStudent] = useState<Student | null>(null);
+  const [editingStudent, setEditingStudent] = useState<Student | null>(null);
+  const openMenuStudent = (id: string) => students.find(s => s.id === id) || null;
 
   const activeStudents = students.filter(s => !s.status || s.status === 'active');
   const gradesPresent = [
@@ -312,6 +319,7 @@ export function ClassFees() {
                       <th className="py-2 px-3 text-right font-medium">Billed</th>
                       <th className="py-2 px-3 text-right font-medium">Tuition paid</th>
                       <th className="py-2 px-3 text-right font-medium">Balance</th>
+                      <th className="py-2 px-3 w-10"></th>
                     </tr>
                   </thead>
                   <tbody>
@@ -323,6 +331,12 @@ export function ClassFees() {
                         <td className={`${numCell} text-gray-600`}>{money(p.billed)}</td>
                         <td className={`${numCell} text-green-700 font-medium`}>{money(p.paid)}</td>
                         <td className={`${numCell} font-medium ${p.balance > 0 ? 'text-red-600' : 'text-gray-400'}`}>{money(p.balance)}</td>
+                        <td className="py-2 px-2 text-right">
+                          <button onClick={e => setMenuFor(menuFor?.id === p.id ? null : { id: p.id, x: e.clientX, y: e.clientY })}
+                            title="Actions" className="p-1.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100">
+                            <MoreVertical className="h-4 w-4" />
+                          </button>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -332,6 +346,7 @@ export function ClassFees() {
                       <td className={numCell}>{money(g.billed)}</td>
                       <td className={`${numCell} text-green-700`}>{money(g.paid)}</td>
                       <td className={`${numCell} ${g.balance > 0 ? 'text-red-600' : ''}`}>{money(g.balance)}</td>
+                      <td></td>
                     </tr>
                   </tfoot>
                 </table>
@@ -378,6 +393,40 @@ export function ClassFees() {
           rows={transportRows.map(r => [r.grade, String(r.riders), money(r.received), money(r.expected), money(r.owed)])}
           foot={['', String(sum(transportRows, r => r.riders)), money(sum(transportRows, r => r.received)), money(sum(transportRows, r => r.expected)), money(sum(transportRows, r => r.owed))]}
           note="Transport totals come from bus assignments and Transport payments for the selected term."
+        />
+      )}
+
+      {/* Row action menu (Tuition by Pupil) */}
+      {menuFor && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setMenuFor(null)} />
+          <div className="fixed z-50 bg-white border border-gray-200 rounded-lg shadow-lg py-1 w-44"
+            style={{ top: Math.min(menuFor.y, window.innerHeight - 100), left: Math.min(menuFor.x, window.innerWidth - 180) }}>
+            <button onClick={() => { const s = openMenuStudent(menuFor.id); setMenuFor(null); if (s) setProfileStudent(s); }}
+              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 text-left">
+              <Eye className="h-4 w-4 text-gray-400" />View profile
+            </button>
+            <button onClick={() => { const s = openMenuStudent(menuFor.id); setMenuFor(null); if (s) setEditingStudent(s); }}
+              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 text-left">
+              <Pencil className="h-4 w-4 text-gray-400" />Edit details
+            </button>
+          </div>
+        </>
+      )}
+
+      {profileStudent && (
+        <StudentProfile
+          student={profileStudent}
+          onClose={() => setProfileStudent(null)}
+          onEdit={s => { setProfileStudent(null); setEditingStudent(s); }}
+        />
+      )}
+
+      {editingStudent && (
+        <StudentModal
+          student={editingStudent}
+          onClose={() => setEditingStudent(null)}
+          onSave={data => { updateStudent(editingStudent.id, data); toast(`${data.name}'s record updated.`, 'success'); setEditingStudent(null); }}
         />
       )}
     </div>
