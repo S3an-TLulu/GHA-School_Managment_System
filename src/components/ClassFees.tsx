@@ -1,14 +1,15 @@
 import { useState } from 'react';
-import { GraduationCap, Utensils, Bus, Printer, FileDown, Percent } from 'lucide-react';
+import { GraduationCap, Utensils, Bus, Printer, FileDown, Percent, Users, FileSpreadsheet } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 import { useThemeClasses } from '../hooks/useThemeClasses';
 import { useToast } from './ToastProvider';
 import { esc, emitDoc, DOC_FONT } from '../lib/print';
+import { exportCSV } from '../lib/exports';
 
 const GRADES = ['Baby Class', 'Middle Class', 'Reception', 'Grade 1', 'Grade 2', 'Grade 3', 'Grade 4', 'Grade 5', 'Grade 6', 'Grade 7'];
 const money = (n: number) => `K${Math.round(n || 0).toLocaleString()}`;
 
-type Tab = 'fees' | 'lunch' | 'transport';
+type Tab = 'fees' | 'pupils' | 'lunch' | 'transport';
 
 // School fees, lunch and transport are shown on their own tabs so each stream
 // reads cleanly per class and school-wide. School fees = "Tuition Fee" (+
@@ -53,6 +54,32 @@ export function ClassFees() {
     const discounted = studs.filter(s => s.tuitionFee != null && s.tuitionFee < price).length;
     return { grade, studs, pupils: studs.length, price, billed, received, owed, discounted };
   });
+  // ---- Tuition paid per pupil, grouped by class ----
+  const tuitionPaidFor = (studentId: string) =>
+    payments.filter(p => p.studentId === studentId && isSchoolFee(p.type) && p.status === 'paid' && matchesTerm(p.term)).reduce((s, p) => s + p.amount, 0);
+  const pupilGroups = gradesPresent.map(grade => {
+    const pupils = activeStudents
+      .filter(s => s.grade === grade)
+      .sort((a, b) => a.name.localeCompare(b.name))
+      .map(s => {
+        const billed = effTuition(s);
+        const paid = tuitionPaidFor(s.id);
+        return { id: s.id, name: s.name, adm: s.admissionNumber || '', billed, paid, balance: Math.max(0, billed - paid) };
+      });
+    return {
+      grade, pupils,
+      billed: pupils.reduce((s, p) => s + p.billed, 0),
+      paid: pupils.reduce((s, p) => s + p.paid, 0),
+      balance: pupils.reduce((s, p) => s + p.balance, 0),
+    };
+  }).filter(g => g.pupils.length > 0);
+  const pupilTotals = {
+    pupils: pupilGroups.reduce((s, g) => s + g.pupils.length, 0),
+    billed: pupilGroups.reduce((s, g) => s + g.billed, 0),
+    paid: pupilGroups.reduce((s, g) => s + g.paid, 0),
+    balance: pupilGroups.reduce((s, g) => s + g.balance, 0),
+  };
+
   // ---- Lunch per class (all periods) ----
   const lunchRows = gradesPresent.map(grade => {
     const ids = new Set(activeStudents.filter(s => s.grade === grade).map(s => s.id));
@@ -76,13 +103,24 @@ export function ClassFees() {
 
   const TABS: { id: Tab; label: string; icon: typeof GraduationCap }[] = [
     { id: 'fees', label: 'School Fees', icon: GraduationCap },
+    { id: 'pupils', label: 'Tuition by Pupil', icon: Users },
     { id: 'lunch', label: 'Lunch', icon: Utensils },
     { id: 'transport', label: 'Transport', icon: Bus },
   ];
 
   const print = (pdf = false) => {
     let cols: string[] = [], body = '', foot = '', title = '';
-    if (tab === 'fees') {
+    if (tab === 'pupils') {
+      title = 'Tuition by Pupil';
+      cols = ['#', 'Pupil', 'Adm. No.', '~Billed', '~Paid', '~Balance'];
+      body = pupilGroups.map(g => {
+        const header = `<tr style="background:#eef2ff;font-weight:700"><td colspan="6">${esc(g.grade)} — ${g.pupils.length} pupils</td></tr>`;
+        const rows = g.pupils.map((p, i) => `<tr><td>${i + 1}</td><td>${esc(p.name)}</td><td>${esc(p.adm)}</td><td style="text-align:right">${money(p.billed)}</td><td style="text-align:right;color:#15803d">${money(p.paid)}</td><td style="text-align:right;color:${p.balance > 0 ? '#b91c1c' : '#6b7280'}">${money(p.balance)}</td></tr>`).join('');
+        const sub = `<tr style="font-weight:600;background:#f7f7f7"><td colspan="3">Subtotal — ${esc(g.grade)}</td><td style="text-align:right">${money(g.billed)}</td><td style="text-align:right">${money(g.paid)}</td><td style="text-align:right">${money(g.balance)}</td></tr>`;
+        return header + rows + sub;
+      }).join('');
+      foot = `<tr style="font-weight:700;background:#f0f0f0"><td colspan="3">Whole school — ${pupilTotals.pupils} pupils</td><td style="text-align:right">${money(pupilTotals.billed)}</td><td style="text-align:right">${money(pupilTotals.paid)}</td><td style="text-align:right">${money(pupilTotals.balance)}</td></tr>`;
+    } else if (tab === 'fees') {
       title = 'School Fees by Class';
       cols = ['Class', '~Pupils', '~Tuition price', '~Billed (class total)', '~Received', '~Owed'];
       body = feeRows.map(r => `<tr><td>${esc(r.grade)}</td><td style="text-align:right">${r.pupils}${r.discounted ? ` (${r.discounted} disc.)` : ''}</td><td style="text-align:right">${money(r.price)}</td><td style="text-align:right">${money(r.billed)}</td><td style="text-align:right;color:#15803d">${money(r.received)}</td><td style="text-align:right;color:${r.owed > 0 ? '#b91c1c' : '#6b7280'}">${money(r.owed)}</td></tr>`).join('');
@@ -115,6 +153,36 @@ export function ClassFees() {
     emitDoc(html, `${title.replace(/\s+/g, '_')}_${term.replace(/\s+/g, '_')}`, pdf ? 'pdf' : 'print');
   };
 
+  // Export the active tab as a CSV (table format).
+  const exportCsv = () => {
+    if (!gradesPresent.length) { toast('Nothing to export yet.', 'warning'); return; }
+    let name = '', headers: string[] = [];
+    const rows: (string | number)[][] = [];
+    if (tab === 'pupils') {
+      name = 'Tuition_by_Pupil';
+      headers = ['Class', 'Pupil', 'Admission No.', 'Tuition billed', 'Tuition paid', 'Balance'];
+      pupilGroups.forEach(g => g.pupils.forEach(p => rows.push([g.grade, p.name, p.adm, p.billed, p.paid, p.balance])));
+      rows.push(['TOTAL', '', '', pupilTotals.billed, pupilTotals.paid, pupilTotals.balance]);
+    } else if (tab === 'fees') {
+      name = 'School_Fees_by_Class';
+      headers = ['Class', 'Pupils', 'Tuition price', 'Billed', 'Received', 'Owed'];
+      feeRows.forEach(r => rows.push([r.grade, r.pupils, r.price, r.billed, r.received, r.owed]));
+      rows.push(['TOTAL', sum(feeRows, r => r.pupils), '', sum(feeRows, r => r.billed), sum(feeRows, r => r.received), sum(feeRows, r => r.owed)]);
+    } else if (tab === 'lunch') {
+      name = 'Lunch_by_Class';
+      headers = ['Class', 'On lunch', 'Received', 'Owed', 'Total'];
+      lunchRows.forEach(r => rows.push([r.grade, r.onLunch, r.received, r.owed, r.billed]));
+      rows.push(['TOTAL', sum(lunchRows, r => r.onLunch), sum(lunchRows, r => r.received), sum(lunchRows, r => r.owed), sum(lunchRows, r => r.billed)]);
+    } else {
+      name = 'Transport_by_Class';
+      headers = ['Class', 'Riders', 'Received', 'Expected/mo', 'Owed'];
+      transportRows.forEach(r => rows.push([r.grade, r.riders, r.received, r.expected, r.owed]));
+      rows.push(['TOTAL', sum(transportRows, r => r.riders), sum(transportRows, r => r.received), sum(transportRows, r => r.expected), sum(transportRows, r => r.owed)]);
+    }
+    exportCSV(`${name}_${term.replace(/\s+/g, '_')}`, headers, rows);
+    toast('CSV exported.', 'success');
+  };
+
   const numCell = 'py-2 px-3 text-right';
 
   return (
@@ -133,6 +201,7 @@ export function ClassFees() {
           </label>
           <button onClick={() => print()} className={`flex items-center gap-1.5 ${tc.btn} text-white px-3 py-2 rounded-lg text-sm`}><Printer className="h-4 w-4" />Print</button>
           <button title="Export to PDF" onClick={() => print(true)} className="flex items-center border border-gray-300 text-gray-700 px-2 py-2 rounded-lg text-sm hover:bg-gray-50"><FileDown className="h-4 w-4" /></button>
+          <button title="Export to CSV" onClick={exportCsv} className="flex items-center gap-1.5 border border-gray-300 text-gray-700 px-2.5 py-2 rounded-lg text-sm hover:bg-gray-50"><FileSpreadsheet className="h-4 w-4" /><span className="hidden sm:inline">CSV</span></button>
         </div>
       </div>
 
@@ -210,6 +279,73 @@ export function ClassFees() {
             </div>
           </div>
           <p className="text-xs text-gray-400">“Tuition price” edits the class fee (Fee Structure). Per-pupil discounts are set on the pupil’s profile (Students → view) or at the Office Cashier; they lower what the class is billed and show in the Discounts column. “Received” = Tuition &amp; Enrollment payments for the selected term; “Owed” = billed − received.</p>
+        </>
+      )}
+
+      {/* ---------------- TUITION BY PUPIL ---------------- */}
+      {tab === 'pupils' && (
+        <>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            <div className="bg-white border border-gray-200 rounded-lg p-4"><p className="text-sm text-gray-500">Pupils</p><p className="text-2xl font-bold text-gray-900">{pupilTotals.pupils}</p></div>
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4"><p className="text-sm text-blue-700">Billed</p><p className="text-2xl font-bold text-blue-900">{money(pupilTotals.billed)}</p></div>
+            <div className="bg-green-50 border border-green-200 rounded-lg p-4"><p className="text-sm text-green-700">Tuition paid</p><p className="text-2xl font-bold text-green-800">{money(pupilTotals.paid)}</p></div>
+            <div className={`rounded-lg border p-4 ${pupilTotals.balance > 0 ? 'bg-red-50 border-red-200' : 'bg-white border-gray-200'}`}><p className="text-sm text-gray-500">Balance owed</p><p className={`text-2xl font-bold ${pupilTotals.balance > 0 ? 'text-red-700' : 'text-gray-900'}`}>{money(pupilTotals.balance)}</p></div>
+          </div>
+
+          {pupilGroups.length === 0 && (
+            <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-12 text-center text-gray-400">No classes with active pupils yet.</div>
+          )}
+
+          {pupilGroups.map(g => (
+            <div key={g.grade} className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+              <div className="px-4 py-2.5 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
+                <p className="font-semibold text-gray-900">{g.grade} <span className="text-sm font-normal text-gray-500">· {g.pupils.length} pupils</span></p>
+                <p className="text-sm text-gray-600">Paid <strong className="text-green-700">{money(g.paid)}</strong>{g.balance > 0 && <> · Owed <strong className="text-red-600">{money(g.balance)}</strong></>}</p>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-xs text-gray-500 bg-gray-50/60 border-b border-gray-100">
+                      <th className="py-2 px-3 text-left font-medium w-8">#</th>
+                      <th className="py-2 px-3 text-left font-medium">Pupil</th>
+                      <th className="py-2 px-3 text-left font-medium">Admission No.</th>
+                      <th className="py-2 px-3 text-right font-medium">Billed</th>
+                      <th className="py-2 px-3 text-right font-medium">Tuition paid</th>
+                      <th className="py-2 px-3 text-right font-medium">Balance</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {g.pupils.map((p, i) => (
+                      <tr key={p.id} className="border-b border-gray-100 hover:bg-gray-50">
+                        <td className="py-2 px-3 text-gray-400">{i + 1}</td>
+                        <td className="py-2 px-3 font-medium text-gray-900">{p.name}</td>
+                        <td className="py-2 px-3 text-gray-500 text-xs">{p.adm || '—'}</td>
+                        <td className={`${numCell} text-gray-600`}>{money(p.billed)}</td>
+                        <td className={`${numCell} text-green-700 font-medium`}>{money(p.paid)}</td>
+                        <td className={`${numCell} font-medium ${p.balance > 0 ? 'text-red-600' : 'text-gray-400'}`}>{money(p.balance)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr className="bg-gray-50 font-semibold text-gray-900 border-t border-gray-200">
+                      <td className="py-2 px-3" colSpan={3}>Subtotal — {g.grade}</td>
+                      <td className={numCell}>{money(g.billed)}</td>
+                      <td className={`${numCell} text-green-700`}>{money(g.paid)}</td>
+                      <td className={`${numCell} ${g.balance > 0 ? 'text-red-600' : ''}`}>{money(g.balance)}</td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            </div>
+          ))}
+
+          {pupilGroups.length > 0 && (
+            <div className="bg-gray-900 text-white rounded-xl p-4 flex items-center justify-between flex-wrap gap-2">
+              <p className="font-semibold">Whole school · {pupilTotals.pupils} pupils</p>
+              <p className="text-sm">Billed {money(pupilTotals.billed)} · <span className="text-green-300">Paid {money(pupilTotals.paid)}</span> · <span className={pupilTotals.balance > 0 ? 'text-red-300' : ''}>Owed {money(pupilTotals.balance)}</span></p>
+            </div>
+          )}
+          <p className="text-xs text-gray-400">Tuition paid per pupil account (Tuition &amp; Enrollment payments) for the selected term, grouped by class with class subtotals and a whole-school total. Use Print, PDF or CSV above to export this table.</p>
         </>
       )}
 
